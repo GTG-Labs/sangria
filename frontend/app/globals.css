@@ -1,0 +1,91 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-surface-DEFAULT: #0a0a0b;
+  --color-surface-50: #18181b;
+  --color-surface-100: #1e1e22;
+  --color-surface-200: #27272a;
+  --color-surface-300: #3f3f46;
+  
+  --color-sangria-50: #fdf2f8;
+  --color-sangria-100: #fce7f3;
+  --color-sangria-200: #fbcfe8;
+  --color-sangria-300: #f9a8d4;
+  --color-sangria-400: #f472b6;
+  --color-sangria-500: #ec4899;
+  --color-sangria-600: #db2777;
+  --color-sangria-700: #be185d;
+  --color-sangria-800: #9d174d;
+  --color-sangria-900: #831843;
+  
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+body {
+  background: #0a0a0b;
+  color: #d4d4d8;
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+.gradient-text {
+  background: linear-gradient(135deg, #ec4899 0%, #a855f7 50%, #6366f1 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.gradient-border {
+  position: relative;
+  background: #18181b;
+  border-radius: 1rem;
+}
+.gradient-border::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: 1rem;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(236,72,153,0.3), rgba(168,85,247,0.1), rgba(99,102,241,0.3));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+
+.glow {
+  box-shadow: 0 0 60px -12px rgba(236, 72, 153, 0.25);
+}
+
+.flow-line {
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #ec4899, #a855f7, #6366f1, transparent);
+  animation: flowPulse 3s ease-in-out infinite;
+}
+
+@keyframes flowPulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
+.fade-in {
+  animation: fadeIn 0.6s ease-out forwards;
+  opacity: 0;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.card-hover {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.card-hover:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(236, 72, 153, 0.1);
+}
+
+.code-block {
+  background: linear-gradient(145deg, #18181b 0%, #0f0f12 100%);
+}
