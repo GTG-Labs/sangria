@@ -2,19 +2,73 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/joho/godotenv"
+	"github.com/workos/workos-go/v4/pkg/usermanagement"
 
 	dbengine "sangrianet/backend/dbEngine"
 )
 
+// WorkOSUser contains user information from validated session
+type WorkOSUser struct {
+	ID        string
+	Email     string
+	FirstName string
+	LastName  string
+}
+
+// workosAuthMiddleware validates WorkOS session and extracts user info
+// This middleware expects the frontend to pass the WorkOS user ID in the Authorization header
+// after the frontend has already validated the session with WorkOS AuthKit
+func workosAuthMiddleware(c fiber.Ctx) error {
+	// Get Authorization header containing user ID
+	authHeader := c.Get("Authorization")
+	if authHeader == "" {
+		return c.Status(401).JSON(fiber.Map{"error": "Authorization header required"})
+	}
+
+	// Extract user ID from the header (format: "User user_id")
+	userID := strings.TrimPrefix(authHeader, "User ")
+	if userID == authHeader || userID == "" {
+		return c.Status(401).JSON(fiber.Map{"error": "Valid user ID required in Authorization header"})
+	}
+
+	// Get user info from WorkOS using the user ID
+	user, err := usermanagement.GetUser(c.Context(), usermanagement.GetUserOpts{
+		User: userID,
+	})
+	if err != nil {
+		log.Printf("WorkOS user lookup failed: %v", err)
+		return c.Status(401).JSON(fiber.Map{"error": "Invalid user session"})
+	}
+
+	// Store validated user info in context
+	c.Locals("workos_user", WorkOSUser{
+		ID:        user.ID,
+		Email:     user.Email,
+		FirstName: user.FirstName,
+		LastName:  user.LastName,
+	})
+
+	return c.Next()
+}
+
 func main() {
 	// Load .env file if it exists (no error if missing)
 	godotenv.Load()
+
+	// WorkOS configuration
+	workosAPIKey := os.Getenv("WORKOS_API_KEY")
+	if workosAPIKey == "" {
+		log.Fatal("WORKOS_API_KEY environment variable is required")
+	}
+	usermanagement.SetAPIKey(workosAPIKey)
 
 	ctx := context.Background()
 
@@ -49,24 +103,22 @@ func main() {
 		return c.SendString("Hello, Sangria!")
 	})
 
-	// POST /accounts — create an account
-	app.Post("/accounts", func(c fiber.Ctx) error {
-		// Try both form values and query parameters for flexibility
-		accountNumber := c.FormValue("account_number")
-		if accountNumber == "" {
-			accountNumber = c.Query("account_number")
+	// POST /accounts — create an account (requires authentication)
+	app.Post("/accounts", workosAuthMiddleware, func(c fiber.Ctx) error {
+		// Get authenticated user from middleware
+		user := c.Locals("workos_user").(WorkOSUser)
+
+		// Generate display name from authenticated user data
+		owner := user.Email
+		if user.FirstName != "" && user.LastName != "" {
+			owner = fmt.Sprintf("%s %s", user.FirstName, user.LastName)
 		}
 
-		owner := c.FormValue("owner")
-		if owner == "" {
-			owner = c.Query("owner")
-		}
+		// Generate deterministic account number from WorkOS user ID
+		accountNumber := fmt.Sprintf("ACC-%s", strings.ToUpper(user.ID[:8]))
 
-		if accountNumber == "" || owner == "" {
-			return c.Status(400).JSON(fiber.Map{"error": "account_number and owner are required"})
-		}
-
-		account, err := dbengine.InsertAccount(c.Context(), pool, accountNumber, owner)
+		// Create account using verified user data only
+		account, err := dbengine.InsertAccount(c.Context(), pool, accountNumber, owner, user.ID)
 		if err != nil {
 			log.Printf("insert error: %v", err)
 			return c.Status(500).JSON(fiber.Map{"error": "failed to create account"})
