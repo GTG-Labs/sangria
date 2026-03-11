@@ -11,21 +11,29 @@ export const GET = handleAuth({
       }
 
       // Call Go backend to create/check financial account using JWT token
-      const response = await fetch(`${process.env.BACKEND_URL}/accounts`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-      });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 
-      if (!response.ok) {
-        console.error('Failed to create account:', await response.text());
-      } else {
-        console.log('Financial account created for user');
+      try {
+        const response = await fetch(`${process.env.BACKEND_URL}/accounts`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId); // Clear timeout on successful completion
+
+        if (!response.ok) {
+          console.error('Failed to create account:', await response.text());
+        } else {
+          console.log('Financial account created for user');
+        }
+      } catch (error) {
+        clearTimeout(timeoutId); // Clear timeout on error
+        console.error('Error creating financial account:', error);
       }
-    } catch (error) {
-      console.error('Error creating financial account:', error);
-    }
   },
 });

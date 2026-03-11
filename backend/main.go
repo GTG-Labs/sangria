@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/joho/godotenv"
@@ -27,6 +28,9 @@ type WorkOSUser struct {
 	FirstName string
 	LastName  string
 }
+
+// Global JWKS cache for WorkOS JWT validation
+var jwksCache *jwk.Cache
 
 // workosAuthMiddleware validates WorkOS JWT session tokens and extracts user info
 func workosAuthMiddleware(c fiber.Ctx) error {
@@ -69,8 +73,30 @@ func workosAuthMiddleware(c fiber.Ctx) error {
 	return c.Next()
 }
 
+// initJWKSCache initializes the global JWKS cache with proper security settings
+func initJWKSCache(clientID string) error {
+	// Get JWKS URL for this client
+	jwksURL, err := usermanagement.GetJWKSURL(clientID)
+	if err != nil {
+		return fmt.Errorf("failed to get JWKS URL: %w", err)
+	}
+
+	// Create HTTP client with timeout to avoid indefinite hangs
+	httpClient := &http.Client{
+		Timeout: 10 * time.Second,
+	}
+
+	// Initialize JWKS cache with security restrictions
+	jwksCache = jwk.NewCache(context.Background())
+
+	// Register the JWKS URL with the cache, using the custom HTTP client
+	jwksCache.Register(jwksURL.String(), jwk.WithHTTPClient(httpClient))
+
+	return nil
+}
+
 // verifyWorkOSToken validates a WorkOS JWT token and extracts the user ID
-func verifyWorkOSToken(_ context.Context, tokenStr string) (string, error) {
+func verifyWorkOSToken(ctx context.Context, tokenStr string) (string, error) {
 	clientID := os.Getenv("WORKOS_CLIENT_ID")
 	if clientID == "" {
 		return "", fmt.Errorf("WORKOS_CLIENT_ID not configured")
@@ -82,17 +108,10 @@ func verifyWorkOSToken(_ context.Context, tokenStr string) (string, error) {
 		return "", fmt.Errorf("failed to get JWKS URL: %w", err)
 	}
 
-	// Fetch JWKS from WorkOS
-	resp, err := http.Get(jwksURL.String())
+	// Get key set from cache (this will automatically fetch/refresh as needed)
+	keySet, err := jwksCache.Get(ctx, jwksURL.String())
 	if err != nil {
-		return "", fmt.Errorf("failed to fetch JWKS: %w", err)
-	}
-	defer resp.Body.Close()
-
-	// Parse JWKS
-	keySet, err := jwk.ParseReader(resp.Body)
-	if err != nil {
-		return "", fmt.Errorf("failed to parse JWKS: %w", err)
+		return "", fmt.Errorf("failed to get JWKS from cache: %w", err)
 	}
 
 	// Parse and verify JWT token
@@ -159,6 +178,11 @@ func main() {
 	}
 	usermanagement.SetAPIKey(workosAPIKey)
 
+	// Initialize JWKS cache
+	if err := initJWKSCache(workosClientID); err != nil {
+		log.Fatalf("Failed to initialize JWKS cache: %v", err)
+	}
+
 	ctx := context.Background()
 
 	connStr := os.Getenv("DATABASE_URL")
@@ -208,6 +232,12 @@ func main() {
 		// Get authenticated user from middleware
 		user := c.Locals("workos_user").(WorkOSUser)
 
+		// Validate user has WorkOS ID (should never be empty due to middleware, but defensive programming)
+		if user.ID == "" {
+			log.Printf("User missing WorkOS ID: %+v", user)
+			return c.Status(500).JSON(fiber.Map{"error": "Invalid user session"})
+		}
+
 		// Generate display name from authenticated user data
 		owner := user.Email
 		if user.FirstName != "" && user.LastName != "" {
@@ -218,7 +248,7 @@ func main() {
 		accountNumber := fmt.Sprintf("ACC-%s", strings.ToUpper(user.ID[:8]))
 
 		// Create account using verified user data only
-		account, err := dbengine.InsertAccount(c.Context(), pool, accountNumber, owner, user.ID)
+		account, err := dbengine.InsertAccount(c.Context(), pool, accountNumber, owner, dbengine.StringPtr(user.ID))
 		if err != nil {
 			log.Printf("insert error: %v", err)
 			return c.Status(500).JSON(fiber.Map{"error": "failed to create account"})
