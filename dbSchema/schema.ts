@@ -4,6 +4,7 @@ export const accounts = pgTable("accounts", {
   id: bigserial({ mode: "number" }).primaryKey(),
   accountNumber: text("account_number").notNull().unique(),
   owner: text().notNull(),
+  workosId: text("workos_id").unique(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

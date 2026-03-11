@@ -1,11 +1,11 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import ThemeToggle from './ThemeToggle';
-import { getUser, getSignInUrl } from '@workos-inc/authkit-nextjs';
+import { withAuth, getSignInUrl } from '@workos-inc/authkit-nextjs';
 import { SignOutButton } from './SignOutButton';
 
 export default async function Navigation() {
-  const { user } = await getUser();
+  const { user } = await withAuth();
   const signInUrl = await getSignInUrl();
 
   return (
