@@ -35,5 +35,8 @@ export const GET = handleAuth({
         clearTimeout(timeoutId); // Clear timeout on error
         console.error('Error creating financial account:', error);
       }
+    } catch (error) {
+      console.error('Error in auth callback:', error);
+    }
   },
 });
