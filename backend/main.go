@@ -4,7 +4,6 @@ import (
 	"context"
 	"log"
 	"os"
-	"strconv"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/joho/godotenv"
@@ -13,7 +12,6 @@ import (
 )
 
 func main() {
-	// Load .env file if it exists (no error if missing)
 	godotenv.Load()
 
 	ctx := context.Background()
@@ -32,74 +30,155 @@ func main() {
 
 	app := fiber.New()
 
+	// Health check
 	app.Get("/", func(c fiber.Ctx) error {
 		return c.SendString("Hello, Sangria!")
 	})
 
-	// POST /accounts — create an account
-	app.Post("/accounts", func(c fiber.Ctx) error {
-		accountNumber := c.Query("account_number")
-		owner := c.Query("owner")
-		if accountNumber == "" || owner == "" {
-			return c.Status(400).JSON(fiber.Map{"error": "account_number and owner are required"})
-		}
-
-		account, err := dbengine.InsertAccount(c.Context(), pool, accountNumber, owner)
+	// -----------------------------------------------------------------------
+	// Assets
+	// -----------------------------------------------------------------------
+	app.Get("/assets", func(c fiber.Ctx) error {
+		assets, err := dbengine.GetAllAssets(c.Context(), pool)
 		if err != nil {
-			log.Printf("insert error: %v", err)
-			return c.Status(500).JSON(fiber.Map{"error": "failed to create account"})
+			log.Printf("query assets error: %v", err)
+			return c.Status(500).JSON(fiber.Map{"error": "failed to fetch assets"})
 		}
-
-		return c.Status(201).JSON(account)
+		return c.JSON(assets)
 	})
 
-	// GET /accounts — list all accounts
-	app.Get("/accounts", func(c fiber.Ctx) error {
-		accounts, err := dbengine.GetAllAccounts(c.Context(), pool)
-		if err != nil {
-			log.Printf("query error: %v", err)
-			return c.Status(500).JSON(fiber.Map{"error": "failed to fetch accounts"})
+	// -----------------------------------------------------------------------
+	// Liabilities
+	// -----------------------------------------------------------------------
+	app.Post("/liabilities", func(c fiber.Ctx) error {
+		var body struct {
+			Name     string `json:"name"`
+			Currency string `json:"currency"`
+			UserID   string `json:"user_id"`
 		}
-
-		return c.JSON(accounts)
+		if err := c.Bind().JSON(&body); err != nil {
+			return c.Status(400).JSON(fiber.Map{"error": "invalid JSON body"})
+		}
+		if body.Name == "" || body.Currency == "" || body.UserID == "" {
+			return c.Status(400).JSON(fiber.Map{"error": "name, currency, and user_id are required"})
+		}
+		liability, err := dbengine.InsertLiability(c.Context(), pool, body.Name, body.Currency, body.UserID)
+		if err != nil {
+			log.Printf("insert liability error: %v", err)
+			return c.Status(500).JSON(fiber.Map{"error": "failed to create liability"})
+		}
+		return c.Status(201).JSON(liability)
 	})
 
-	// POST /transactions — create a transaction
-	app.Post("/transactions", func(c fiber.Ctx) error {
-		fromStr := c.Query("from_account")
-		toStr := c.Query("to_account")
-		value := c.Query("value")
-		if fromStr == "" || toStr == "" || value == "" {
-			return c.Status(400).JSON(fiber.Map{"error": "from_account, to_account, and value are required"})
-		}
-
-		fromAccount, err := strconv.ParseInt(fromStr, 10, 64)
+	app.Get("/liabilities", func(c fiber.Ctx) error {
+		liabilities, err := dbengine.GetAllLiabilities(c.Context(), pool)
 		if err != nil {
-			return c.Status(400).JSON(fiber.Map{"error": "from_account must be an integer"})
+			log.Printf("query liabilities error: %v", err)
+			return c.Status(500).JSON(fiber.Map{"error": "failed to fetch liabilities"})
 		}
-		toAccount, err := strconv.ParseInt(toStr, 10, 64)
-		if err != nil {
-			return c.Status(400).JSON(fiber.Map{"error": "to_account must be an integer"})
-		}
-
-		txn, err := dbengine.InsertTransaction(c.Context(), pool, fromAccount, toAccount, value)
-		if err != nil {
-			log.Printf("insert error: %v", err)
-			return c.Status(500).JSON(fiber.Map{"error": "failed to create transaction"})
-		}
-
-		return c.Status(201).JSON(txn)
+		return c.JSON(liabilities)
 	})
 
-	// GET /transactions — list all transactions
-	app.Get("/transactions", func(c fiber.Ctx) error {
-		txns, err := dbengine.GetAllTransactions(c.Context(), pool)
-		if err != nil {
-			log.Printf("query error: %v", err)
-			return c.Status(500).JSON(fiber.Map{"error": "failed to fetch transactions"})
+	// -----------------------------------------------------------------------
+	// Expenses
+	// -----------------------------------------------------------------------
+	app.Post("/expenses", func(c fiber.Ctx) error {
+		var body struct {
+			Name     string `json:"name"`
+			Currency string `json:"currency"`
 		}
+		if err := c.Bind().JSON(&body); err != nil {
+			return c.Status(400).JSON(fiber.Map{"error": "invalid JSON body"})
+		}
+		if body.Name == "" || body.Currency == "" {
+			return c.Status(400).JSON(fiber.Map{"error": "name and currency are required"})
+		}
+		expense, err := dbengine.InsertExpense(c.Context(), pool, body.Name, body.Currency)
+		if err != nil {
+			log.Printf("insert expense error: %v", err)
+			return c.Status(500).JSON(fiber.Map{"error": "failed to create expense"})
+		}
+		return c.Status(201).JSON(expense)
+	})
 
-		return c.JSON(txns)
+	app.Get("/expenses", func(c fiber.Ctx) error {
+		expenses, err := dbengine.GetAllExpenses(c.Context(), pool)
+		if err != nil {
+			log.Printf("query expenses error: %v", err)
+			return c.Status(500).JSON(fiber.Map{"error": "failed to fetch expenses"})
+		}
+		return c.JSON(expenses)
+	})
+
+	// -----------------------------------------------------------------------
+	// Revenues
+	// -----------------------------------------------------------------------
+	app.Post("/revenues", func(c fiber.Ctx) error {
+		var body struct {
+			Name     string `json:"name"`
+			Currency string `json:"currency"`
+		}
+		if err := c.Bind().JSON(&body); err != nil {
+			return c.Status(400).JSON(fiber.Map{"error": "invalid JSON body"})
+		}
+		if body.Name == "" || body.Currency == "" {
+			return c.Status(400).JSON(fiber.Map{"error": "name and currency are required"})
+		}
+		revenue, err := dbengine.InsertRevenue(c.Context(), pool, body.Name, body.Currency)
+		if err != nil {
+			log.Printf("insert revenue error: %v", err)
+			return c.Status(500).JSON(fiber.Map{"error": "failed to create revenue"})
+		}
+		return c.Status(201).JSON(revenue)
+	})
+
+	app.Get("/revenues", func(c fiber.Ctx) error {
+		revenues, err := dbengine.GetAllRevenues(c.Context(), pool)
+		if err != nil {
+			log.Printf("query revenues error: %v", err)
+			return c.Status(500).JSON(fiber.Map{"error": "failed to fetch revenues"})
+		}
+		return c.JSON(revenues)
+	})
+
+	// -----------------------------------------------------------------------
+	// Ledger
+	// -----------------------------------------------------------------------
+	app.Post("/ledger", func(c fiber.Ctx) error {
+		var body struct {
+			Entries []dbengine.LedgerLine `json:"entries"`
+		}
+		if err := c.Bind().JSON(&body); err != nil {
+			return c.Status(400).JSON(fiber.Map{"error": "invalid JSON body"})
+		}
+		if len(body.Entries) == 0 {
+			return c.Status(400).JSON(fiber.Map{"error": "entries array is required and must not be empty"})
+		}
+		entries, err := dbengine.InsertLedgerEntries(c.Context(), pool, body.Entries)
+		if err != nil {
+			log.Printf("insert ledger error: %v", err)
+			return c.Status(500).JSON(fiber.Map{"error": "failed to insert ledger entries"})
+		}
+		return c.Status(201).JSON(entries)
+	})
+
+	app.Get("/ledger", func(c fiber.Ctx) error {
+		entries, err := dbengine.GetAllLedgerEntries(c.Context(), pool)
+		if err != nil {
+			log.Printf("query ledger error: %v", err)
+			return c.Status(500).JSON(fiber.Map{"error": "failed to fetch ledger entries"})
+		}
+		return c.JSON(entries)
+	})
+
+	app.Get("/ledger/:transaction_id", func(c fiber.Ctx) error {
+		txID := c.Params("transaction_id")
+		entries, err := dbengine.GetLedgerEntriesByTransaction(c.Context(), pool, txID)
+		if err != nil {
+			log.Printf("query ledger by tx error: %v", err)
+			return c.Status(500).JSON(fiber.Map{"error": "failed to fetch ledger entries"})
+		}
+		return c.JSON(entries)
 	})
 
 	log.Fatal(app.Listen(":3000"))

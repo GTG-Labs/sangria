@@ -6,66 +6,136 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// InsertAccount creates a new account and returns the full row.
-func InsertAccount(ctx context.Context, pool *pgxpool.Pool, accountNumber, owner string) (Account, error) {
-	var a Account
-	err := pool.QueryRow(ctx,
-		`INSERT INTO accounts (account_number, owner)
-		 VALUES ($1, $2)
-		 RETURNING id, account_number, owner, created_at, updated_at`,
-		accountNumber, owner,
-	).Scan(&a.ID, &a.AccountNumber, &a.Owner, &a.CreatedAt, &a.UpdatedAt)
-	return a, err
-}
-
-// GetAllAccounts returns every account in the table.
-func GetAllAccounts(ctx context.Context, pool *pgxpool.Pool) ([]Account, error) {
+func GetAllAssets(ctx context.Context, pool *pgxpool.Pool) ([]Asset, error) {
 	rows, err := pool.Query(ctx,
-		`SELECT id, account_number, owner, created_at, updated_at FROM accounts ORDER BY id`)
+		`SELECT id, name, currency, created_at FROM assets ORDER BY created_at`)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var accounts []Account
+	var assets []Asset
 	for rows.Next() {
-		var a Account
-		if err := rows.Scan(&a.ID, &a.AccountNumber, &a.Owner, &a.CreatedAt, &a.UpdatedAt); err != nil {
+		var a Asset
+		if err := rows.Scan(&a.ID, &a.Name, &a.Currency, &a.CreatedAt); err != nil {
 			return nil, err
 		}
-		accounts = append(accounts, a)
+		assets = append(assets, a)
 	}
-	return accounts, rows.Err()
+	return assets, rows.Err()
 }
 
-// InsertTransaction creates a new transaction and returns the full row.
-func InsertTransaction(ctx context.Context, pool *pgxpool.Pool, fromAccount, toAccount int64, value string) (Transaction, error) {
-	var t Transaction
-	err := pool.QueryRow(ctx,
-		`INSERT INTO transactions (from_account, to_account, value)
-		 VALUES ($1, $2, $3)
-		 RETURNING id, from_account, to_account, value, created_at`,
-		fromAccount, toAccount, value,
-	).Scan(&t.ID, &t.FromAccount, &t.ToAccount, &t.Value, &t.CreatedAt)
-	return t, err
-}
-
-// GetAllTransactions returns every transaction in the table.
-func GetAllTransactions(ctx context.Context, pool *pgxpool.Pool) ([]Transaction, error) {
+func GetAllLiabilities(ctx context.Context, pool *pgxpool.Pool) ([]Liability, error) {
 	rows, err := pool.Query(ctx,
-		`SELECT id, from_account, to_account, value, created_at FROM transactions ORDER BY id`)
+		`SELECT id, name, currency, user_id, created_at FROM liabilities ORDER BY created_at`)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var txns []Transaction
+	var liabilities []Liability
 	for rows.Next() {
-		var t Transaction
-		if err := rows.Scan(&t.ID, &t.FromAccount, &t.ToAccount, &t.Value, &t.CreatedAt); err != nil {
+		var l Liability
+		if err := rows.Scan(&l.ID, &l.Name, &l.Currency, &l.UserID, &l.CreatedAt); err != nil {
 			return nil, err
 		}
-		txns = append(txns, t)
+		liabilities = append(liabilities, l)
 	}
-	return txns, rows.Err()
+	return liabilities, rows.Err()
+}
+
+func GetAllExpenses(ctx context.Context, pool *pgxpool.Pool) ([]Expense, error) {
+	rows, err := pool.Query(ctx,
+		`SELECT id, name, currency, created_at FROM expenses ORDER BY created_at`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var expenses []Expense
+	for rows.Next() {
+		var e Expense
+		if err := rows.Scan(&e.ID, &e.Name, &e.Currency, &e.CreatedAt); err != nil {
+			return nil, err
+		}
+		expenses = append(expenses, e)
+	}
+	return expenses, rows.Err()
+}
+
+func GetAllRevenues(ctx context.Context, pool *pgxpool.Pool) ([]Revenue, error) {
+	rows, err := pool.Query(ctx,
+		`SELECT id, name, currency, created_at FROM revenues ORDER BY created_at`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var revenues []Revenue
+	for rows.Next() {
+		var r Revenue
+		if err := rows.Scan(&r.ID, &r.Name, &r.Currency, &r.CreatedAt); err != nil {
+			return nil, err
+		}
+		revenues = append(revenues, r)
+	}
+	return revenues, rows.Err()
+}
+
+func GetAllLedgerEntries(ctx context.Context, pool *pgxpool.Pool) ([]LedgerEntry, error) {
+	rows, err := pool.Query(ctx,
+		`SELECT id, transaction_id, currency, amount, direction, asset_id, liability_id, expense_id, revenue_id
+		 FROM ledger_entries ORDER BY transaction_id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var entries []LedgerEntry
+	for rows.Next() {
+		var e LedgerEntry
+		if err := rows.Scan(&e.ID, &e.TransactionID, &e.Currency, &e.Amount, &e.Direction,
+			&e.AssetID, &e.LiabilityID, &e.ExpenseID, &e.RevenueID); err != nil {
+			return nil, err
+		}
+		entries = append(entries, e)
+	}
+	return entries, rows.Err()
+}
+
+func GetLedgerEntriesByTransaction(ctx context.Context, pool *pgxpool.Pool, txID string) ([]LedgerEntry, error) {
+	rows, err := pool.Query(ctx,
+		`SELECT id, transaction_id, currency, amount, direction, asset_id, liability_id, expense_id, revenue_id
+		 FROM ledger_entries WHERE transaction_id = $1 ORDER BY id`, txID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var entries []LedgerEntry
+	for rows.Next() {
+		var e LedgerEntry
+		if err := rows.Scan(&e.ID, &e.TransactionID, &e.Currency, &e.Amount, &e.Direction,
+			&e.AssetID, &e.LiabilityID, &e.ExpenseID, &e.RevenueID); err != nil {
+			return nil, err
+		}
+		entries = append(entries, e)
+	}
+	return entries, rows.Err()
+}
+
+func GetLiabilityBalance(ctx context.Context, pool *pgxpool.Pool, liabilityID, currency string) (int64, error) {
+	var balance int64
+	err := pool.QueryRow(ctx,
+		`SELECT COALESCE(SUM(
+			CASE direction
+				WHEN 'CREDIT' THEN amount
+				WHEN 'DEBIT'  THEN -amount
+			END
+		), 0)
+		FROM ledger_entries
+		WHERE liability_id = $1 AND currency = $2`,
+		liabilityID, currency,
+	).Scan(&balance)
+	return balance, err
 }
