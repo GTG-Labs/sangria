@@ -11,6 +11,7 @@ import {
 import { sql } from "drizzle-orm";
 
 export const directionEnum = pgEnum("direction", ["DEBIT", "CREDIT"]);
+export const currencyEnum = pgEnum("currency", ["USD", "USDC", "ETH"]);
 
 // ---------------------------------------------------------------------------
 // 4 Account Tables (Assets + Expenses = Liabilities + Revenues)
@@ -19,14 +20,14 @@ export const directionEnum = pgEnum("direction", ["DEBIT", "CREDIT"]);
 export const assets = pgTable("assets", {
   id: uuid().primaryKey().defaultRandom(),
   name: varchar({ length: 255 }).notNull(),
-  currency: varchar({ length: 10 }).notNull(),
+  currency: currencyEnum().notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const liabilities = pgTable("liabilities", {
   id: uuid().primaryKey().defaultRandom(),
   name: varchar({ length: 255 }).notNull(),
-  currency: varchar({ length: 10 }).notNull(),
+  currency: currencyEnum().notNull(),
   userId: uuid("user_id").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -34,14 +35,14 @@ export const liabilities = pgTable("liabilities", {
 export const expenses = pgTable("expenses", {
   id: uuid().primaryKey().defaultRandom(),
   name: varchar({ length: 255 }).notNull(),
-  currency: varchar({ length: 10 }).notNull(),
+  currency: currencyEnum().notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const revenues = pgTable("revenues", {
   id: uuid().primaryKey().defaultRandom(),
   name: varchar({ length: 255 }).notNull(),
-  currency: varchar({ length: 10 }).notNull(),
+  currency: currencyEnum().notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -54,7 +55,7 @@ export const ledgerEntries = pgTable(
   {
     id: uuid().primaryKey().defaultRandom(),
     transactionId: uuid("transaction_id").notNull(),
-    currency: varchar({ length: 10 }).notNull(),
+    currency: currencyEnum().notNull(),
     amount: bigint({ mode: "bigint" }).notNull(),
     direction: directionEnum().notNull(),
     assetId: uuid("asset_id").references(() => assets.id),

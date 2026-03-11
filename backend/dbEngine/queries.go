@@ -124,7 +124,7 @@ func GetLedgerEntriesByTransaction(ctx context.Context, pool *pgxpool.Pool, txID
 	return entries, rows.Err()
 }
 
-func GetLiabilityBalance(ctx context.Context, pool *pgxpool.Pool, liabilityID, currency string) (int64, error) {
+func GetLiabilityBalance(ctx context.Context, pool *pgxpool.Pool, liabilityID string, currency Currency) (int64, error) {
 	var balance int64
 	err := pool.QueryRow(ctx,
 		`SELECT COALESCE(SUM(

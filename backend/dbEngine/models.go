@@ -11,17 +11,25 @@ const (
 	Credit Direction = "CREDIT"
 )
 
+type Currency string
+
+const (
+	USD  Currency = "USD"
+	USDC Currency = "USDC"
+	ETH  Currency = "ETH"
+)
+
 type Asset struct {
 	ID        string    `json:"id"`
 	Name      string    `json:"name"`
-	Currency  string    `json:"currency"`
+	Currency  Currency  `json:"currency"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
 type Liability struct {
 	ID        string    `json:"id"`
 	Name      string    `json:"name"`
-	Currency  string    `json:"currency"`
+	Currency  Currency  `json:"currency"`
 	UserID    string    `json:"user_id"`
 	CreatedAt time.Time `json:"created_at"`
 }
@@ -29,21 +37,21 @@ type Liability struct {
 type Expense struct {
 	ID        string    `json:"id"`
 	Name      string    `json:"name"`
-	Currency  string    `json:"currency"`
+	Currency  Currency  `json:"currency"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
 type Revenue struct {
 	ID        string    `json:"id"`
 	Name      string    `json:"name"`
-	Currency  string    `json:"currency"`
+	Currency  Currency  `json:"currency"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
 type LedgerEntry struct {
 	ID            string  `json:"id"`
 	TransactionID string  `json:"transaction_id"`
-	Currency      string  `json:"currency"`
+	Currency      Currency `json:"currency"`
 	Amount        int64   `json:"amount"`
 	Direction     Direction `json:"direction"`
 	AssetID       *string `json:"asset_id"`
