@@ -1,20 +1,22 @@
 import { handleAuth } from '@workos-inc/authkit-nextjs';
 
 export const GET = handleAuth({
-  onSuccess: async (user: any) => {
+  onSuccess: async (authData: { user?: any; accessToken?: string }) => {
     try {
-      // Call Go backend to create/check financial account for this user
+      // Extract JWT access token from WorkOS authentication response
+      const accessToken = authData.accessToken;
+      if (!accessToken) {
+        console.error('No access token received from WorkOS');
+        return;
+      }
+
+      // Call Go backend to create/check financial account using JWT token
       const response = await fetch(`${process.env.BACKEND_URL}/accounts`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
         },
-        body: new URLSearchParams({
-          workos_user_id: user.user?.id,
-          owner: user.user?.firstName && user.user?.lastName
-            ? `${user.user.firstName} ${user.user.lastName}`
-            : user.user?.email || 'Unknown User',
-        }),
       });
 
       if (!response.ok) {

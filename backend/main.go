@@ -2,14 +2,19 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/joho/godotenv"
+	"github.com/lestrrat-go/jwx/v2/jwk"
+	"github.com/lestrrat-go/jwx/v2/jwt"
 	"github.com/workos/workos-go/v4/pkg/usermanagement"
 
 	dbengine "sangrianet/backend/dbEngine"
@@ -23,29 +28,34 @@ type WorkOSUser struct {
 	LastName  string
 }
 
-// workosAuthMiddleware validates WorkOS session and extracts user info
-// This middleware expects the frontend to pass the WorkOS user ID in the Authorization header
-// after the frontend has already validated the session with WorkOS AuthKit
+// workosAuthMiddleware validates WorkOS JWT session tokens and extracts user info
 func workosAuthMiddleware(c fiber.Ctx) error {
-	// Get Authorization header containing user ID
+	// Get Authorization header containing JWT token
 	authHeader := c.Get("Authorization")
 	if authHeader == "" {
 		return c.Status(401).JSON(fiber.Map{"error": "Authorization header required"})
 	}
 
-	// Extract user ID from the header (format: "User user_id")
-	userID := strings.TrimPrefix(authHeader, "User ")
-	if userID == authHeader || userID == "" {
-		return c.Status(401).JSON(fiber.Map{"error": "Valid user ID required in Authorization header"})
+	// Extract bearer token
+	token := strings.TrimPrefix(authHeader, "Bearer ")
+	if token == authHeader || token == "" {
+		return c.Status(401).JSON(fiber.Map{"error": "Bearer token required"})
 	}
 
-	// Get user info from WorkOS using the user ID
+	// Validate JWT token and extract user ID
+	userID, err := verifyWorkOSToken(c.Context(), token)
+	if err != nil {
+		log.Printf("JWT validation failed: %v", err)
+		return c.Status(401).JSON(fiber.Map{"error": "Invalid or expired session token"})
+	}
+
+	// Get user info from WorkOS using the validated user ID
 	user, err := usermanagement.GetUser(c.Context(), usermanagement.GetUserOpts{
 		User: userID,
 	})
 	if err != nil {
-		log.Printf("WorkOS user lookup failed: %v", err)
-		return c.Status(401).JSON(fiber.Map{"error": "Invalid user session"})
+		log.Printf("WorkOS user lookup failed for validated user %s: %v", userID, err)
+		return c.Status(401).JSON(fiber.Map{"error": "User session not found"})
 	}
 
 	// Store validated user info in context
@@ -59,6 +69,81 @@ func workosAuthMiddleware(c fiber.Ctx) error {
 	return c.Next()
 }
 
+// verifyWorkOSToken validates a WorkOS JWT token and extracts the user ID
+func verifyWorkOSToken(_ context.Context, tokenStr string) (string, error) {
+	clientID := os.Getenv("WORKOS_CLIENT_ID")
+	if clientID == "" {
+		return "", fmt.Errorf("WORKOS_CLIENT_ID not configured")
+	}
+
+	// Get JWKS URL for this client
+	jwksURL, err := usermanagement.GetJWKSURL(clientID)
+	if err != nil {
+		return "", fmt.Errorf("failed to get JWKS URL: %w", err)
+	}
+
+	// Fetch JWKS from WorkOS
+	resp, err := http.Get(jwksURL.String())
+	if err != nil {
+		return "", fmt.Errorf("failed to fetch JWKS: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// Parse JWKS
+	keySet, err := jwk.ParseReader(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse JWKS: %w", err)
+	}
+
+	// Parse and verify JWT token
+	token, err := jwt.ParseString(tokenStr, jwt.WithKeySet(keySet), jwt.WithValidate(true))
+	if err != nil {
+		if errors.Is(err, jwt.ErrTokenExpired()) {
+			return "", fmt.Errorf("token expired, please refresh your session")
+		}
+		return "", fmt.Errorf("failed to parse/verify token: %w", err)
+	}
+
+	// Extract user ID from 'sub' claim
+	userID, ok := token.Get("sub")
+	if !ok {
+		return "", fmt.Errorf("token missing 'sub' claim")
+	}
+
+	userIDStr, ok := userID.(string)
+	if !ok {
+		return "", fmt.Errorf("invalid 'sub' claim type")
+	}
+
+	return userIDStr, nil
+}
+
+// getallowedOrigins parses the ALLOWED_ORIGINS environment variable
+func getallowedOrigins() []string {
+	allowedOriginsEnv := os.Getenv("ALLOWED_ORIGINS")
+	if allowedOriginsEnv == "" {
+		log.Println("Warning: ALLOWED_ORIGINS not set, defaulting to localhost:3000")
+		return []string{"http://localhost:3000"}
+	}
+
+	// Split by comma and trim whitespace
+	origins := strings.Split(allowedOriginsEnv, ",")
+	for i, origin := range origins {
+		origins[i] = strings.TrimSpace(origin)
+	}
+
+	return origins
+}
+
+// isOriginAllowed checks if the given origin is in the allowlist
+func isOriginAllowed(origin string, allowedOrigins []string) bool {
+	if origin == "" {
+		return false
+	}
+
+	return slices.Contains(allowedOrigins, origin)
+}
+
 func main() {
 	// Load .env file if it exists (no error if missing)
 	godotenv.Load()
@@ -67,6 +152,10 @@ func main() {
 	workosAPIKey := os.Getenv("WORKOS_API_KEY")
 	if workosAPIKey == "" {
 		log.Fatal("WORKOS_API_KEY environment variable is required")
+	}
+	workosClientID := os.Getenv("WORKOS_CLIENT_ID")
+	if workosClientID == "" {
+		log.Fatal("WORKOS_CLIENT_ID environment variable is required")
 	}
 	usermanagement.SetAPIKey(workosAPIKey)
 
@@ -86,9 +175,20 @@ func main() {
 
 	app := fiber.New()
 
-	// Add CORS middleware
+	// Configure allowed origins from environment
+	allowedOrigins := getallowedOrigins()
+
+	// Add secure CORS middleware
 	app.Use(func(c fiber.Ctx) error {
-		c.Set("Access-Control-Allow-Origin", "*")
+		// Get the Origin header from the request
+		origin := c.Get("Origin")
+
+		// Check if origin is in allowlist
+		if isOriginAllowed(origin, allowedOrigins) {
+			c.Set("Access-Control-Allow-Origin", origin)
+		}
+		// If origin not allowed, don't set CORS headers (fail closed)
+
 		c.Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		c.Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 

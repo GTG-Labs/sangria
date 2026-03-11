@@ -12,6 +12,8 @@ func InsertAccount(ctx context.Context, pool *pgxpool.Pool, accountNumber, owner
 	err := pool.QueryRow(ctx,
 		`INSERT INTO accounts (account_number, owner, workos_id)
 		 VALUES ($1, $2, $3)
+		 ON CONFLICT (workos_id) DO UPDATE
+		 	SET owner = EXCLUDED.owner
 		 RETURNING id, account_number, owner, workos_id, created_at, updated_at`,
 		accountNumber, owner, workosID,
 	).Scan(&a.ID, &a.AccountNumber, &a.Owner, &a.WorkosID, &a.CreatedAt, &a.UpdatedAt)
