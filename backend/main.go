@@ -32,14 +32,36 @@ func main() {
 
 	app := fiber.New()
 
+	// Add CORS middleware
+	app.Use(func(c fiber.Ctx) error {
+		c.Set("Access-Control-Allow-Origin", "*")
+		c.Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		c.Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+		if c.Method() == "OPTIONS" {
+			return c.SendStatus(200)
+		}
+
+		return c.Next()
+	})
+
 	app.Get("/", func(c fiber.Ctx) error {
 		return c.SendString("Hello, Sangria!")
 	})
 
 	// POST /accounts — create an account
 	app.Post("/accounts", func(c fiber.Ctx) error {
-		accountNumber := c.Query("account_number")
-		owner := c.Query("owner")
+		// Try both form values and query parameters for flexibility
+		accountNumber := c.FormValue("account_number")
+		if accountNumber == "" {
+			accountNumber = c.Query("account_number")
+		}
+
+		owner := c.FormValue("owner")
+		if owner == "" {
+			owner = c.Query("owner")
+		}
+
 		if accountNumber == "" || owner == "" {
 			return c.Status(400).JSON(fiber.Map{"error": "account_number and owner are required"})
 		}
@@ -102,5 +124,5 @@ func main() {
 		return c.JSON(txns)
 	})
 
-	log.Fatal(app.Listen(":3000"))
+	log.Fatal(app.Listen(":8080"))
 }
