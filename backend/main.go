@@ -89,8 +89,13 @@ func initJWKSCache(clientID string) error {
 	// Initialize JWKS cache with security restrictions
 	jwksCache = jwk.NewCache(context.Background())
 
-	// Register the JWKS URL with the cache, using the custom HTTP client
-	jwksCache.Register(jwksURL.String(), jwk.WithHTTPClient(httpClient))
+	// Register the JWKS URL with the cache, using custom HTTP client and fetch whitelist
+	jwksCache.Register(jwksURL.String(),
+		jwk.WithHTTPClient(httpClient),
+		jwk.WithFetchWhitelist(jwk.WhitelistFunc(func(u string) bool {
+			// Only allow fetching the expected WorkOS JWKS URL
+			return u == jwksURL.String()
+		})))
 
 	return nil
 }
