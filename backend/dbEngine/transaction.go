@@ -2,11 +2,16 @@ package dbengine
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
-	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+// ErrDuplicateTransaction is returned when a transaction with the same
+// idempotency key has already been committed.
+var ErrDuplicateTransaction = errors.New("duplicate transaction")
 
 // validCurrencies is the set of currencies accepted by the ledger.
 var validCurrencies = map[Currency]bool{
@@ -20,8 +25,13 @@ var validDirections = map[Direction]bool{
 
 // InsertTransaction validates a batch of ledger lines for double-entry
 // correctness (zero-net per currency) and atomically inserts them as a
-// single transaction. Returns the inserted entries or a validation error.
-func InsertTransaction(ctx context.Context, pool *pgxpool.Pool, lines []LedgerLine) ([]LedgerEntry, error) {
+// single transaction. The caller-supplied idempotencyKey is stored under a
+// unique constraint so that retries with the same key return the existing
+// entries instead of posting duplicate movements.
+func InsertTransaction(ctx context.Context, pool *pgxpool.Pool, idempotencyKey string, lines []LedgerLine) ([]LedgerEntry, error) {
+	if idempotencyKey == "" {
+		return nil, fmt.Errorf("idempotency key must not be empty")
+	}
 	if err := validateLines(lines); err != nil {
 		return nil, err
 	}
@@ -30,25 +40,45 @@ func InsertTransaction(ctx context.Context, pool *pgxpool.Pool, lines []LedgerLi
 	if err != nil {
 		return nil, fmt.Errorf("begin transaction: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer tx.Rollback(ctx) // safe: if Commit() already fired, Rollback() is a no-op
 
-	txnID := uuid.New().String()
+	// Insert into transactions table; the unique constraint on
+	// idempotency_key prevents duplicate ledger writes.
+	var txnID string
+	err = tx.QueryRow(ctx,
+		`INSERT INTO transactions (idempotency_key)
+		 VALUES ($1)
+		 ON CONFLICT (idempotency_key) DO NOTHING
+		 RETURNING id`,
+		idempotencyKey,
+	).Scan(&txnID)
+
+	if errors.Is(err, pgx.ErrNoRows) {
+		// Idempotency key already exists — return existing entries.
+		tx.Rollback(ctx)
+		return getExistingEntries(ctx, pool, idempotencyKey)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("insert transaction: %w", err)
+	}
+
+	// Verify each line's currency matches its referenced account.
+	if err := validateAccountCurrencies(ctx, tx, lines); err != nil {
+		return nil, err
+	}
+
 	entries := make([]LedgerEntry, len(lines))
-
 	for i, line := range lines {
 		var e LedgerEntry
 		err := tx.QueryRow(ctx,
 			`INSERT INTO ledger_entries
-			   (transaction_id, currency, amount, direction,
-			    asset_id, liability_id, expense_id, revenue_id)
-			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-			 RETURNING id, transaction_id, currency, amount, direction,
-			           asset_id, liability_id, expense_id, revenue_id`,
-			txnID, line.Currency, line.Amount, line.Direction,
-			line.AssetID, line.LiabilityID, line.ExpenseID, line.RevenueID,
+			   (transaction_id, currency, amount, direction, account_id)
+			 VALUES ($1, $2, $3, $4, $5)
+			 RETURNING id, transaction_id, currency, amount, direction, account_id`,
+			txnID, line.Currency, line.Amount, line.Direction, line.AccountID,
 		).Scan(
 			&e.ID, &e.TransactionID, &e.Currency, &e.Amount, &e.Direction,
-			&e.AssetID, &e.LiabilityID, &e.ExpenseID, &e.RevenueID,
+			&e.AccountID,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("insert ledger entry %d: %w", i, err)
@@ -61,6 +91,59 @@ func InsertTransaction(ctx context.Context, pool *pgxpool.Pool, lines []LedgerLi
 	}
 
 	return entries, nil
+}
+
+// getExistingEntries fetches ledger entries for a previously committed
+// transaction identified by its idempotency key.
+func getExistingEntries(ctx context.Context, pool *pgxpool.Pool, idempotencyKey string) ([]LedgerEntry, error) {
+	rows, err := pool.Query(ctx,
+		`SELECT le.id, le.transaction_id, le.currency, le.amount, le.direction,
+		        le.account_id
+		 FROM ledger_entries le
+		 JOIN transactions t ON t.id = le.transaction_id
+		 WHERE t.idempotency_key = $1`,
+		idempotencyKey,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("fetch existing entries: %w", err)
+	}
+	defer rows.Close()
+
+	var entries []LedgerEntry
+	for rows.Next() {
+		var e LedgerEntry
+		if err := rows.Scan(
+			&e.ID, &e.TransactionID, &e.Currency, &e.Amount, &e.Direction,
+			&e.AccountID,
+		); err != nil {
+			return nil, fmt.Errorf("scan existing entry: %w", err)
+		}
+		entries = append(entries, e)
+	}
+	return entries, rows.Err()
+}
+
+// validateAccountCurrencies checks that each line's currency matches
+// the currency of the referenced account. Runs inside the DB transaction
+// so the account rows are read under the same snapshot.
+func validateAccountCurrencies(ctx context.Context, tx pgx.Tx, lines []LedgerLine) error {
+	for i, line := range lines {
+		var acctCurrency Currency
+		err := tx.QueryRow(ctx,
+			`SELECT currency FROM accounts WHERE id = $1`,
+			line.AccountID,
+		).Scan(&acctCurrency)
+		if err != nil {
+			return fmt.Errorf("line %d: account lookup: %w", i, err)
+		}
+		if acctCurrency != line.Currency {
+			return fmt.Errorf(
+				"line %d: currency mismatch — line is %s but account %s is %s",
+				i, line.Currency, line.AccountID, acctCurrency,
+			)
+		}
+	}
+	return nil
 }
 
 // validateLines runs all pre-insert checks on the batch of lines.
@@ -79,33 +162,12 @@ func validateLines(lines []LedgerLine) error {
 		if !validCurrencies[line.Currency] {
 			return fmt.Errorf("line %d: invalid currency %q", i, line.Currency)
 		}
-		if err := validateExactlyOneFK(i, line); err != nil {
-			return err
+		if line.AccountID == "" {
+			return fmt.Errorf("line %d: account_id must be set", i)
 		}
 	}
 
 	return validateZeroNet(lines)
-}
-
-// validateExactlyOneFK ensures exactly one foreign key is set per line.
-func validateExactlyOneFK(i int, line LedgerLine) error {
-	count := 0
-	if line.AssetID != nil {
-		count++
-	}
-	if line.LiabilityID != nil {
-		count++
-	}
-	if line.ExpenseID != nil {
-		count++
-	}
-	if line.RevenueID != nil {
-		count++
-	}
-	if count != 1 {
-		return fmt.Errorf("line %d: exactly one account FK must be set, got %d", i, count)
-	}
-	return nil
 }
 
 // validateZeroNet checks that debits and credits balance to zero for each currency.

@@ -1,12 +1,12 @@
 # dbEngine
 
-Double-entry ledger engine and account management layer. Sits between the Fiber HTTP handlers and Postgres.
+Double-entry ledger engine and account management layer.
 
 ## Core invariant
 
 **Every transaction must net to zero per currency.** If you debit 10 USDC somewhere, you must credit 10 USDC somewhere else. This is what keeps the books balanced.
 
-```
+```text
 Deposit 10 USDC:
 
   DEBIT   10,000,000  Asset (platform wallet)     USDC
@@ -22,20 +22,20 @@ Amounts are positive integers in microunits (1 USDC = 1,000,000). Direction (`DE
 | File | Purpose |
 |------|---------|
 | `engine.go` | `Connect(ctx, connStr)` — creates and pings a `pgxpool.Pool` |
-| `models.go` | Go structs mirroring the Drizzle schema. `Currency` and `Direction` typed enums |
-| `creation.go` | `CreateAsset`, `CreateLiability`, `CreateExpense`, `CreateRevenue` |
+| `models.go` | Go structs mirroring the Drizzle schema. `Currency`, `Direction`, and `AccountType` typed enums |
+| `creation.go` | `CreateAccount` — insert any account type |
 | `queries.go` | Read queries — list accounts, ledger entries, balances |
 | `transaction.go` | `InsertTransaction` — zero-net enforced ledger writes |
 
 ## Transaction engine
 
-### `InsertTransaction(ctx, pool, lines []LedgerLine) ([]LedgerEntry, error)`
+### `InsertTransaction(ctx, pool, idempotencyKey, lines []LedgerLine) ([]LedgerEntry, error)`
 
-Validates a batch of ledger lines, then atomically inserts them under a shared `transaction_id`.
+Validates a batch of ledger lines, then atomically inserts them under a shared `transaction_id`. The caller-supplied `idempotencyKey` is stored in the `transactions` table under a unique constraint — retries with the same key return the existing entries instead of posting duplicates.
 
 ### Validation rules
 
-All checks run **before** touching the database:
+Rules 1–5 run **before** touching the database. Rule 6 runs inside the DB transaction.
 
 | # | Rule | Rejected with |
 |---|------|---------------|
@@ -43,16 +43,19 @@ All checks run **before** touching the database:
 | 2 | Amount <= 0 | `line N: amount must be positive, got X` |
 | 3 | Invalid direction | `line N: invalid direction "X"` |
 | 4 | Invalid currency | `line N: invalid currency "X"` |
-| 5 | Zero or multiple account FKs | `line N: exactly one account FK must be set, got X` |
+| 5 | account_id is empty | `line N: account_id must be set` |
 | 6 | Debits != credits for any currency | `transaction does not balance for X: debits=A credits=B` |
+| 7 | Line currency != account currency | `line N: currency mismatch — line is X but account ID is Y` |
 
 ### Insert flow
 
 1. Validate all lines (rules above)
 2. `BEGIN` Postgres transaction
-3. Generate shared `transaction_id` (UUID v4)
-4. Insert each line as a `ledger_entry` row
-5. `COMMIT`
+3. Insert into `transactions` with the caller's idempotency key (`ON CONFLICT DO NOTHING`)
+4. If the key already existed, return the existing entries (retry-safe)
+5. Verify each line's currency matches the referenced account's currency (rule 7)
+6. Insert each line as a `ledger_entry` row referencing the new `transaction_id`
+7. `COMMIT`
 
 Failure at any step rolls back. Nothing partial hits the database.
 
@@ -60,24 +63,22 @@ Failure at any step rolls back. Nothing partial hits the database.
 
 ### Account types
 
-Four account types, each with its own table:
+A single `accounts` table with a `type` enum:
 
-- **Asset** — things the platform owns (e.g. USDC wallet)
-- **Liability** — obligations to users (e.g. user balances)
-- **Expense** — costs incurred (e.g. fees paid)
-- **Revenue** — income earned (e.g. fees collected)
+- **ASSET** — things the platform owns (e.g. USDC wallet)
+- **LIABILITY** — obligations to users (e.g. user balances)
+- **EQUITY** — owner's equity
+- **REVENUE** — income earned (e.g. fees collected)
+- **EXPENSE** — costs incurred (e.g. fees paid)
 
 ### `LedgerLine` (input)
 
 ```go
 type LedgerLine struct {
-    Currency    Currency   // USD, USDC, ETH
-    Amount      int64      // positive, in microunits
-    Direction   Direction  // DEBIT or CREDIT
-    AssetID     *string    // exactly one of these four must be set
-    LiabilityID *string
-    ExpenseID   *string
-    RevenueID   *string
+    Currency  Currency   // USD, USDC, ETH
+    Amount    int64      // positive, in microunits
+    Direction Direction  // DEBIT or CREDIT
+    AccountID string     // references accounts.id
 }
 ```
 
@@ -89,13 +90,12 @@ Same fields as `LedgerLine` plus `ID` and `TransactionID`, populated after inser
 
 | Function | Description |
 |----------|-------------|
-| `GetAllAssets` | List all asset accounts |
-| `GetAllLiabilities` | List all liability accounts |
-| `GetAllExpenses` | List all expense accounts |
-| `GetAllRevenues` | List all revenue accounts |
+| `CreateAccount(ctx, pool, name, type, currency, userID)` | Create an account of any type |
+| `GetAllAccounts` | List all accounts |
+| `GetAccountsByType(accountType)` | List accounts filtered by type |
 | `GetAllLedgerEntries` | List all ledger entries ordered by transaction |
 | `GetLedgerEntriesByTransaction(txID)` | Entries for a specific transaction |
-| `GetLiabilityBalance(liabilityID, currency)` | Net balance (credits - debits) for a liability account |
+| `GetAccountBalance(accountID, currency)` | Net balance (credits - debits) for any account |
 
 ## Schema
 

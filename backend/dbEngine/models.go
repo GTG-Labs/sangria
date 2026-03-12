@@ -19,54 +19,44 @@ const (
 	ETH  Currency = "ETH"
 )
 
-type Asset struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	Currency  Currency  `json:"currency"`
-	CreatedAt time.Time `json:"created_at"`
+type AccountType string
+
+const (
+	AccountTypeAsset     AccountType = "ASSET"
+	AccountTypeLiability AccountType = "LIABILITY"
+	AccountTypeEquity    AccountType = "EQUITY"
+	AccountTypeRevenue   AccountType = "REVENUE"
+	AccountTypeExpense   AccountType = "EXPENSE"
+)
+
+type Account struct {
+	ID        string      `json:"id"`
+	Name      string      `json:"name"`
+	Type      AccountType `json:"type"`
+	Currency  Currency    `json:"currency"`
+	UserID    *string     `json:"user_id"`
+	CreatedAt time.Time   `json:"created_at"`
 }
 
-type Liability struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	Currency  Currency  `json:"currency"`
-	UserID    string    `json:"user_id"`
-	CreatedAt time.Time `json:"created_at"`
-}
-
-type Expense struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	Currency  Currency  `json:"currency"`
-	CreatedAt time.Time `json:"created_at"`
-}
-
-type Revenue struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	Currency  Currency  `json:"currency"`
-	CreatedAt time.Time `json:"created_at"`
+type Transaction struct {
+	ID             string    `json:"id"`
+	IdempotencyKey string    `json:"idempotency_key"`
+	CreatedAt      time.Time `json:"created_at"`
 }
 
 type LedgerEntry struct {
-	ID            string  `json:"id"`
-	TransactionID string  `json:"transaction_id"`
-	Currency      Currency `json:"currency"`
-	Amount        int64   `json:"amount"`
+	ID            string    `json:"id"`
+	TransactionID string    `json:"transaction_id"`
+	Currency      Currency  `json:"currency"`
+	Amount        int64     `json:"amount"`
 	Direction     Direction `json:"direction"`
-	AssetID       *string `json:"asset_id"`
-	LiabilityID   *string `json:"liability_id"`
-	ExpenseID     *string `json:"expense_id"`
-	RevenueID     *string `json:"revenue_id"`
+	AccountID     string    `json:"account_id"`
 }
 
 // LedgerLine is an input struct used when building entries to insert.
 type LedgerLine struct {
-	Currency    Currency  `json:"currency"`
-	Amount      int64     `json:"amount"`
-	Direction   Direction `json:"direction"`
-	AssetID     *string   `json:"asset_id"`
-	LiabilityID *string   `json:"liability_id"`
-	ExpenseID   *string   `json:"expense_id"`
-	RevenueID   *string   `json:"revenue_id"`
+	Currency  Currency  `json:"currency"`
+	Amount    int64     `json:"amount"`
+	Direction Direction `json:"direction"`
+	AccountID string    `json:"account_id"`
 }

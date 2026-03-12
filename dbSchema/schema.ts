@@ -5,46 +5,53 @@ import {
   varchar,
   timestamp,
   bigint,
-  check,
   index,
+  unique,
 } from "drizzle-orm/pg-core";
-import { sql } from "drizzle-orm";
 
 export const directionEnum = pgEnum("direction", ["DEBIT", "CREDIT"]);
 export const currencyEnum = pgEnum("currency", ["USD", "USDC", "ETH"]);
+export const accountTypeEnum = pgEnum("account_type", [
+  "ASSET",
+  "LIABILITY",
+  "EQUITY",
+  "REVENUE",
+  "EXPENSE",
+]);
 
 // ---------------------------------------------------------------------------
-// 4 Account Tables (Assets + Expenses = Liabilities + Revenues)
+// Unified Accounts Table
 // ---------------------------------------------------------------------------
 
-export const assets = pgTable("assets", {
-  id: uuid().primaryKey().defaultRandom(),
-  name: varchar({ length: 255 }).notNull(),
-  currency: currencyEnum().notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+export const accounts = pgTable(
+  "accounts",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    name: varchar({ length: 255 }).notNull(),
+    type: accountTypeEnum().notNull(),
+    currency: currencyEnum().notNull(),
+    userId: uuid("user_id"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("idx_accounts_user_id").on(table.userId),
+    index("idx_accounts_type").on(table.type),
+  ]
+);
 
-export const liabilities = pgTable("liabilities", {
-  id: uuid().primaryKey().defaultRandom(),
-  name: varchar({ length: 255 }).notNull(),
-  currency: currencyEnum().notNull(),
-  userId: uuid("user_id").notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+// ---------------------------------------------------------------------------
+// Transactions (idempotency envelope for ledger writes)
+// ---------------------------------------------------------------------------
 
-export const expenses = pgTable("expenses", {
-  id: uuid().primaryKey().defaultRandom(),
-  name: varchar({ length: 255 }).notNull(),
-  currency: currencyEnum().notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
-
-export const revenues = pgTable("revenues", {
-  id: uuid().primaryKey().defaultRandom(),
-  name: varchar({ length: 255 }).notNull(),
-  currency: currencyEnum().notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+export const transactions = pgTable(
+  "transactions",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    idempotencyKey: varchar("idempotency_key", { length: 255 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [unique("uq_idempotency_key").on(table.idempotencyKey)]
+);
 
 // ---------------------------------------------------------------------------
 // Append-only Ledger Journal
@@ -54,20 +61,18 @@ export const ledgerEntries = pgTable(
   "ledger_entries",
   {
     id: uuid().primaryKey().defaultRandom(),
-    transactionId: uuid("transaction_id").notNull(),
+    transactionId: uuid("transaction_id")
+      .notNull()
+      .references(() => transactions.id),
     currency: currencyEnum().notNull(),
     amount: bigint({ mode: "bigint" }).notNull(),
     direction: directionEnum().notNull(),
-    assetId: uuid("asset_id").references(() => assets.id),
-    liabilityId: uuid("liability_id").references(() => liabilities.id),
-    expenseId: uuid("expense_id").references(() => expenses.id),
-    revenueId: uuid("revenue_id").references(() => revenues.id),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => accounts.id),
   },
   (table) => [
     index("idx_ledger_transaction_id").on(table.transactionId),
-    check(
-      "chk_exactly_one_fk",
-      sql`(${table.assetId} IS NOT NULL)::int + (${table.liabilityId} IS NOT NULL)::int + (${table.expenseId} IS NOT NULL)::int + (${table.revenueId} IS NOT NULL)::int = 1`
-    ),
+    index("idx_ledger_account_id").on(table.accountId),
   ]
 );
