@@ -1,0 +1,1 @@
+ALTER TABLE "accounts" ALTER COLUMN "workos_id" SET NOT NULL;

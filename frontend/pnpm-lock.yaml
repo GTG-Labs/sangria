@@ -17,6 +17,9 @@ dependencies:
   '@types/mdx':
     specifier: ^2.0.13
     version: 2.0.13
+  '@workos-inc/authkit-nextjs':
+    specifier: ^2.15.0
+    version: 2.15.0(next@16.1.6)(react-dom@19.2.3)(react@19.2.3)
   lucide-react:
     specifier: ^0.577.0
     version: 0.577.0(react@19.2.3)
@@ -53,7 +56,7 @@ devDependencies:
     specifier: ^4
     version: 4.2.1
   typescript:
-    specifier: ^5
+    specifier: ^5.9.3
     version: 5.9.3
 
 packages:
@@ -1310,6 +1313,30 @@ packages:
     dev: true
     optional: true
 
+  /@workos-inc/authkit-nextjs@2.15.0(next@16.1.6)(react-dom@19.2.3)(react@19.2.3):
+    resolution: {integrity: sha512-HKqtOwlf++8F7XCSwkdvvrGz/tCFoLsymP70HouTM+j8TliWEvBM843vu7cSNic3SA2Dmpfi5C6FZFKNDZufhg==}
+    peerDependencies:
+      next: ^13.5.9 || ^14.2.26 || ^15.2.3 || ^16
+      react: ^18.0 || ^19.0.0
+      react-dom: ^18.0 || ^19.0.0
+    dependencies:
+      '@workos-inc/node': 8.8.0
+      iron-session: 8.0.4
+      jose: 5.10.0
+      next: 16.1.6(@babel/core@7.29.0)(react-dom@19.2.3)(react@19.2.3)
+      path-to-regexp: 6.3.0
+      react: 19.2.3
+      react-dom: 19.2.3(react@19.2.3)
+    dev: false
+
+  /@workos-inc/node@8.8.0:
+    resolution: {integrity: sha512-niYqVLkrJCmDxY3FA372kZoiYruW6C2lRJVIMUZ42vcNLMpo5aAXTkmd39YSCXKmIYQEIa24wYwODv8xH5U3XA==}
+    engines: {node: '>=20.15.0'}
+    dependencies:
+      iron-webcrypto: 2.0.0
+      jose: 6.1.3
+    dev: false
+
   /acorn-jsx@5.3.2(acorn@8.16.0):
     resolution: {integrity: sha512-rq9s+JNhf0IChjtDXxllJ7g41oZk5SlXtp0LHwyA5cejwn7vKmKp4pPri6YEePv2PU65sAsegbXtIinmDFDXgQ==}
     peerDependencies:
@@ -1610,6 +1637,11 @@ packages:
 
   /convert-source-map@2.0.0:
     resolution: {integrity: sha512-Kvp459HrV2FEJ1CAsi1Ku+MY3kasH19TFykTz2xWmMeq6bk2NU3XXvfJ+Q61m0xktWwt+1HSYf3JZsTms3aRJg==}
+
+  /cookie@0.7.2:
+    resolution: {integrity: sha512-yki5XnKuf750l50uGTllt6kKILY4nQ1eNIQatoXEByZ5dWgnKqbnqmTrBE5B4N7lrMJKQ2ytWMiTO2o0v6Ew/w==}
+    engines: {node: '>= 0.6'}
+    dev: false
 
   /cross-spawn@7.0.6:
     resolution: {integrity: sha512-uV2QOWP2nWzsy2aMp8aRibhi9dlzF5Hgh5SHaB9OiTGEyDTiJJyx0uy51QXdyWbtAHNua4XJzUKca3OzKUd3vA==}
@@ -2584,6 +2616,24 @@ packages:
       side-channel: 1.1.0
     dev: true
 
+  /iron-session@8.0.4:
+    resolution: {integrity: sha512-9ivNnaKOd08osD0lJ3i6If23GFS2LsxyMU8Gf/uBUEgm8/8CC1hrrCHFDpMo3IFbpBgwoo/eairRsaD3c5itxA==}
+    dependencies:
+      cookie: 0.7.2
+      iron-webcrypto: 1.2.1
+      uncrypto: 0.1.3
+    dev: false
+
+  /iron-webcrypto@1.2.1:
+    resolution: {integrity: sha512-feOM6FaSr6rEABp/eDfVseKyTMDt+KGpeB35SkVn9Tyn0CqvVsY3EwI0v5i8nMHyJnzCIQf7nsy3p41TPkJZhg==}
+    dev: false
+
+  /iron-webcrypto@2.0.0:
+    resolution: {integrity: sha512-rtffZKDUHciZElM8mjFCufBC7nVhCxHYyWHESqs89OioEDz4parOofd8/uhrejh/INhQFfYQfByS22LlezR9sQ==}
+    dependencies:
+      uint8array-extras: 1.5.0
+    dev: false
+
   /is-alphabetical@2.0.1:
     resolution: {integrity: sha512-FWyyY60MeTNyeSRpkM2Iry0G9hpr7/9kD40mD/cGQEuilcZYS4okz8SN2Q6rLCJ8gbCt6fN+rC+6tMGS99LaxQ==}
     dev: false
@@ -2821,6 +2871,14 @@ packages:
     resolution: {integrity: sha512-ekilCSN1jwRvIbgeg/57YFh8qQDNbwDb9xT/qu2DAHbFFZUicIl4ygVaAvzveMhMVr3LnpSKTNnwt8PoOfmKhQ==}
     hasBin: true
     dev: true
+
+  /jose@5.10.0:
+    resolution: {integrity: sha512-s+3Al/p9g32Iq+oqXxkW//7jk2Vig6FF1CFqzVXoTUXt2qz89YWbL+OwS17NFYEvxC35n0FKeGO2LGYSxeM2Gg==}
+    dev: false
+
+  /jose@6.1.3:
+    resolution: {integrity: sha512-0TpaTfihd4QMNwrz/ob2Bp7X04yuxJkjRGi4aKmOqwhov54i6u79oCv7T+C7lo70MKH6BesI3vscD1yb/yzKXQ==}
+    dev: false
 
   /js-tokens@4.0.0:
     resolution: {integrity: sha512-RdJUflcE3cUzKiMqQgsCu06FPu9UdIJO0beYbPhHN4k6apgJtifcoCtT9bcxOpYBtpD2kCM6Sbzg4CausW/PKQ==}
@@ -3683,6 +3741,10 @@ packages:
     resolution: {integrity: sha512-LDJzPVEEEPR+y48z93A0Ed0yXb8pAByGWo/k5YYdYgpY2/2EsOsksJrq7lOHxryrVOn1ejG6oAp8ahvOIQD8sw==}
     dev: true
 
+  /path-to-regexp@6.3.0:
+    resolution: {integrity: sha512-Yhpw4T9C6hPpgPeA28us07OJeqZ5EzQTkbfwuhsUg0c237RomFoETJgmp2sa3F/41gfLE6G5cqcYwznmeEeOlQ==}
+    dev: false
+
   /picocolors@1.1.1:
     resolution: {integrity: sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA==}
 
@@ -4350,6 +4412,11 @@ packages:
     hasBin: true
     dev: true
 
+  /uint8array-extras@1.5.0:
+    resolution: {integrity: sha512-rvKSBiC5zqCCiDZ9kAOszZcDvdAHwwIKJG33Ykj43OKcWsnmcBRL09YTU4nOeHZ8Y2a7l1MgTd08SBe9A8Qj6A==}
+    engines: {node: '>=18'}
+    dev: false
+
   /unbox-primitive@1.1.0:
     resolution: {integrity: sha512-nWJ91DjeOkej/TA8pXQ3myruKpKEYgqvpw9lz4OPHj/NWFNluYrjbz9j01CJ8yKQd2g4jFoOkINCTW2I5LEEyw==}
     engines: {node: '>= 0.4'}
@@ -4359,6 +4426,10 @@ packages:
       has-symbols: 1.1.0
       which-boxed-primitive: 1.1.1
     dev: true
+
+  /uncrypto@0.1.3:
+    resolution: {integrity: sha512-Ql87qFHB3s/De2ClA9e0gsnS6zXG27SkTiSJwjCc9MebbfapQfuPzumMIUMi38ezPZVNFcHI9sUIepeQfw8J8Q==}
+    dev: false
 
   /undici-types@6.21.0:
     resolution: {integrity: sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ==}

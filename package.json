@@ -1,0 +1,5 @@
+{
+	"dependencies": {
+		"@workos-inc/authkit-nextjs": "^2.15.0"
+	}
+}

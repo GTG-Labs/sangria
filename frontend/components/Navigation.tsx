@@ -1,8 +1,13 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import ThemeToggle from './ThemeToggle';
+import { withAuth, getSignInUrl } from '@workos-inc/authkit-nextjs';
+import { SignOutButton } from './SignOutButton';
 
-export default function Navigation() {
+export default async function Navigation() {
+  const { user } = await withAuth();
+  const signInUrl = await getSignInUrl();
+
   return (
     <nav className="fixed top-0 w-full z-50 border-b border-gray-200 dark:border-white/5 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-xl">
       <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
@@ -24,11 +29,28 @@ export default function Navigation() {
         </div>
         <div className="flex items-center gap-3">
           <ThemeToggle />
-          <Link 
-            href="https://github.com/GTG-Labs/sangria-net" 
-            className="text-sm font-medium px-4 py-2 rounded-lg bg-gradient-to-r from-sangria-600 to-indigo-600 text-white hover:opacity-90 transition-opacity"
+          {user ? (
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-gray-600 dark:text-zinc-400">
+                {user.email}
+              </span>
+              <SignOutButton className="text-sm font-medium px-4 py-2 rounded-lg border border-zinc-200 dark:border-white/10 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/5 transition-colors">
+                Sign Out
+              </SignOutButton>
+            </div>
+          ) : (
+            <Link
+              href={signInUrl}
+              className="text-sm font-medium px-4 py-2 rounded-lg bg-gradient-to-r from-sangria-600 to-indigo-600 text-white hover:opacity-90 transition-opacity"
+            >
+              Sign In
+            </Link>
+          )}
+          <Link
+            href="https://github.com/GTG-Labs/sangria-net"
+            className="text-sm font-medium px-4 py-2 rounded-lg border border-zinc-200 dark:border-white/10 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/5 transition-colors"
           >
-            View on GitHub
+            GitHub
           </Link>
         </div>
       </div>
