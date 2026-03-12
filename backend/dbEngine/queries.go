@@ -7,7 +7,7 @@ import (
 )
 
 // InsertAccount creates a new account and returns the full row.
-func InsertAccount(ctx context.Context, pool *pgxpool.Pool, accountNumber, owner string, workosID *string) (Account, error) {
+func InsertAccount(ctx context.Context, pool *pgxpool.Pool, accountNumber, owner, workosID string) (Account, error) {
 	var a Account
 	err := pool.QueryRow(ctx,
 		`INSERT INTO accounts (account_number, owner, workos_id)

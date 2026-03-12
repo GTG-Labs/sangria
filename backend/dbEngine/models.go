@@ -4,23 +4,11 @@ package dbengine
 
 import "time"
 
-// Helper functions for nullable WorkosID
-func StringPtr(s string) *string {
-	return &s
-}
-
-func SafeWorkosID(workosID *string) string {
-	if workosID == nil {
-		return ""
-	}
-	return *workosID
-}
-
 type Account struct {
 	ID            int64     `json:"id"`
 	AccountNumber string    `json:"account_number"`
 	Owner         string    `json:"owner"`
-	WorkosID      *string   `json:"workos_id,omitempty"`
+	WorkosID      string    `json:"workos_id"`
 	CreatedAt     time.Time `json:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at"`
 }

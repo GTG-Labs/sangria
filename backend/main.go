@@ -253,7 +253,7 @@ func main() {
 		accountNumber := fmt.Sprintf("ACC-%s", strings.ToUpper(user.ID[:8]))
 
 		// Create account using verified user data only
-		account, err := dbengine.InsertAccount(c.Context(), pool, accountNumber, owner, dbengine.StringPtr(user.ID))
+		account, err := dbengine.InsertAccount(c.Context(), pool, accountNumber, owner, user.ID)
 		if err != nil {
 			log.Printf("insert error: %v", err)
 			return c.Status(500).JSON(fiber.Map{"error": "failed to create account"})
