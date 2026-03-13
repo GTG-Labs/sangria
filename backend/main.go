@@ -169,7 +169,6 @@ func isOriginAllowed(origin string, allowedOrigins []string) bool {
 }
 
 func main() {
-	// Load .env file if it exists (no error if missing)
 	godotenv.Load()
 
 	// WorkOS configuration
