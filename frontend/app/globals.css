@@ -34,6 +34,20 @@
   --text-tertiary: #6b7280;
   --border-color: #e5e7eb;
   --surface-bg: rgba(255, 255, 255, 0.8);
+
+  /* Fumadocs overrides — light mode */
+  --fd-background: #ffffff;
+  --fd-foreground: #111827;
+  --fd-muted: #f3f4f6;
+  --fd-muted-foreground: #6b7280;
+  --fd-card: #ffffff;
+  --fd-card-foreground: #111827;
+  --fd-border: #e5e7eb;
+  --fd-primary: #db2777;
+  --fd-primary-foreground: #ffffff;
+  --fd-accent: #f3f4f6;
+  --fd-accent-foreground: #111827;
+  --fd-sidebar-background: #ffffff;
 }
 
 .dark {
@@ -45,6 +59,20 @@
   --text-tertiary: #a1a1aa;
   --border-color: rgba(255, 255, 255, 0.05);
   --surface-bg: rgba(10, 10, 11, 0.8);
+
+  /* Fumadocs overrides — dark mode */
+  --fd-background: #0a0a0b;
+  --fd-foreground: #ffffff;
+  --fd-muted: #1e1e22;
+  --fd-muted-foreground: #a1a1aa;
+  --fd-card: #18181b;
+  --fd-card-foreground: #ffffff;
+  --fd-border: rgba(255, 255, 255, 0.05);
+  --fd-primary: #ec4899;
+  --fd-primary-foreground: #ffffff;
+  --fd-accent: #1e1e22;
+  --fd-accent-foreground: #d4d4d8;
+  --fd-sidebar-background: #0a0a0b;
 }
 
 body {
