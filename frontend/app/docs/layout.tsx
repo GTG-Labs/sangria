@@ -4,14 +4,17 @@ import type { ReactNode } from "react";
 
 export default function Layout({ children }: { children: ReactNode }) {
   return (
-    <div className="pt-16">
-      <DocsLayout
-        tree={source.getPageTree()}
-        nav={{ enabled: false }}
-        sidebar={{ defaultOpenLevel: 1 }}
-      >
-        {children}
-      </DocsLayout>
-    </div>
+    <DocsLayout
+      tree={source.getPageTree()}
+      nav={{ enabled: false }}
+      sidebar={{ defaultOpenLevel: 1 }}
+      containerProps={{
+        style: {
+          "--fd-banner-height": "4rem",
+        } as React.CSSProperties,
+      }}
+    >
+      {children}
+    </DocsLayout>
   );
 }
