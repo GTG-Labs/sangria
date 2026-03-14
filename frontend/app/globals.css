@@ -10,23 +10,24 @@
   --color-surface-200: #27272a;
   --color-surface-300: #3f3f46;
 
-  --color-sangria-50: #fdf2f8;
-  --color-sangria-100: #fce7f3;
-  --color-sangria-200: #fbcfe8;
-  --color-sangria-300: #f9a8d4;
-  --color-sangria-400: #f472b6;
-  --color-sangria-500: #ec4899;
-  --color-sangria-600: #db2777;
-  --color-sangria-700: #be185d;
-  --color-sangria-800: #9d174d;
-  --color-sangria-900: #831843;
+  --color-sangria-50: #fef2f2;
+  --color-sangria-100: #fde3e3;
+  --color-sangria-200: #fccbcb;
+  --color-sangria-300: #f7a3a3;
+  --color-sangria-400: #c74b4b;
+  --color-sangria-500: #a51c30;
+  --color-sangria-600: #8c1728;
+  --color-sangria-700: #711220;
+  --color-sangria-800: #5a0e1a;
+  --color-sangria-900: #420a13;
 
-  --font-sans: "Inter", system-ui, sans-serif;
+  --font-sans: "Ubuntu", system-ui, sans-serif;
+  --font-serif: "PT Serif", "georgia", serif;
   --font-mono: "JetBrains Mono", monospace;
 }
 
 @theme {
-  /* Fumadocs overrides — light mode (matching site palette) */
+  /* Fumadocs overrides — light mode */
   --color-fd-background: #ffffff;
   --color-fd-foreground: #111827;
   --color-fd-muted: #f3f4f6;
@@ -36,7 +37,7 @@
   --color-fd-card: #f9fafb;
   --color-fd-card-foreground: #111827;
   --color-fd-border: #e5e7eb;
-  --color-fd-primary: #db2777;
+  --color-fd-primary: #a51c30;
   --color-fd-primary-foreground: #ffffff;
   --color-fd-secondary: #f3f4f6;
   --color-fd-secondary-foreground: #111827;
@@ -46,6 +47,7 @@
 }
 
 :root {
+  --fd-banner-height: 4rem;
   --bg-primary: #ffffff;
   --bg-secondary: #f9fafb;
   --bg-tertiary: #f3f4f6;
@@ -76,13 +78,17 @@
   --color-fd-card: #18181b;
   --color-fd-card-foreground: #f4f4f5;
   --color-fd-border: rgba(255, 255, 255, 0.08);
-  --color-fd-primary: #ec4899;
+  --color-fd-primary: #c74b4b;
   --color-fd-primary-foreground: #ffffff;
   --color-fd-secondary: #1e1e22;
   --color-fd-secondary-foreground: #f4f4f5;
   --color-fd-accent: rgba(255, 255, 255, 0.08);
   --color-fd-accent-foreground: #d4d4d8;
   --color-fd-ring: #52525b;
+}
+
+#nd-sidebar {
+  padding-top: 1rem;
 }
 
 .dark #nd-sidebar {
@@ -94,64 +100,34 @@
 body {
   background: var(--bg-primary);
   color: var(--text-secondary);
-  font-family: "Inter", system-ui, sans-serif;
+  font-family: var(--font-sans);
 }
 
-.gradient-text {
-  background: linear-gradient(135deg, #ec4899 0%, #a855f7 50%, #6366f1 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-serif);
 }
 
-.gradient-border {
+.card {
   position: relative;
   background: var(--bg-secondary);
   border-radius: 1rem;
-}
-.gradient-border::before {
-  content: "";
-  position: absolute;
-  inset: -1px;
-  border-radius: 1rem;
-  padding: 1px;
-  background: linear-gradient(
-    135deg,
-    rgba(236, 72, 153, 0.3),
-    rgba(168, 85, 247, 0.1),
-    rgba(99, 102, 241, 0.3)
-  );
-  -webkit-mask:
-    linear-gradient(#fff 0 0) content-box,
-    linear-gradient(#fff 0 0);
-  mask:
-    linear-gradient(#fff 0 0) content-box,
-    linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
+  border: 1px solid var(--border-color);
 }
 
 .glow {
-  box-shadow: 0 0 60px -12px rgba(236, 72, 153, 0.25);
+  box-shadow: 0 0 60px -12px rgba(165, 28, 48, 0.25);
 }
 
 .flow-line {
   height: 2px;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    #ec4899,
-    #a855f7,
-    #6366f1,
-    transparent
-  );
+  background: var(--color-sangria-500);
   animation: flowPulse 3s ease-in-out infinite;
 }
 
 @keyframes flowPulse {
   0%,
   100% {
-    opacity: 0.4;
+    opacity: 0.3;
   }
   50% {
     opacity: 1;
@@ -181,7 +157,7 @@ body {
 }
 .card-hover:hover {
   transform: translateY(-4px);
-  box-shadow: 0 12px 40px rgba(236, 72, 153, 0.1);
+  box-shadow: 0 12px 40px rgba(165, 28, 48, 0.1);
 }
 
 .code-block {

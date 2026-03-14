@@ -4,19 +4,19 @@ export const mdxComponents: MDXComponents = {
   // Override default elements for consistent styling
   h1: (props) => (
     <h1
-      className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mt-10 mb-4"
+      className="text-3xl md:text-4xl italic font-normal text-gray-900 dark:text-white mt-10 mb-4"
       {...props}
     />
   ),
   h2: (props) => (
     <h2
-      className="text-2xl font-bold text-gray-900 dark:text-white mt-10 mb-3 border-b border-zinc-100 dark:border-white/5 pb-2"
+      className="text-2xl italic font-normal text-gray-900 dark:text-white mt-10 mb-3 border-b border-zinc-100 dark:border-white/5 pb-2"
       {...props}
     />
   ),
   h3: (props) => (
     <h3
-      className="text-xl font-semibold text-gray-900 dark:text-white mt-8 mb-3"
+      className="text-xl italic font-normal text-gray-900 dark:text-white mt-8 mb-3"
       {...props}
     />
   ),
@@ -28,7 +28,7 @@ export const mdxComponents: MDXComponents = {
   ),
   a: (props) => (
     <a
-      className="text-sangria-400 hover:text-sangria-300 transition-colors"
+      className="text-sangria-500 hover:text-sangria-300 transition-colors"
       {...props}
     />
   ),
@@ -57,7 +57,7 @@ export const mdxComponents: MDXComponents = {
     if (isInline) {
       return (
         <code
-          className="text-sangria-400 bg-zinc-100 dark:bg-white/5 px-1.5 py-0.5 rounded font-mono text-sm"
+          className="text-sangria-500 bg-zinc-100 dark:bg-white/5 px-1.5 py-0.5 rounded font-mono text-sm"
           {...props}
         />
       );

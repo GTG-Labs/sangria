@@ -61,7 +61,7 @@ export default async function BlogPostPage({
               </span>
             )}
           </div>
-          <h1 className="text-3xl md:text-5xl font-extrabold text-gray-900 dark:text-white leading-tight mb-4">
+          <h1 className="text-3xl md:text-5xl italic font-normal text-gray-900 dark:text-white leading-tight mb-4">
             {post.title}
           </h1>
           <p className="text-lg text-zinc-600 dark:text-zinc-400 leading-relaxed">

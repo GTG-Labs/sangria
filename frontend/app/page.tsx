@@ -9,25 +9,26 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import Link from "next/link";
+import HeroBackground from "@/components/HeroBackground";
 
 export default function Home() {
   return (
     <div className="min-h-screen">
       {/* Hero */}
       <section className="relative pt-32 pb-20 md:pt-44 md:pb-32 overflow-hidden">
-        {/* Background glow */}
-        <div className="absolute top-20 left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-sangria-500/10 rounded-full blur-[120px] pointer-events-none"></div>
+        {/* PixelBlast background */}
+        <HeroBackground />
 
         <div className="relative max-w-4xl mx-auto px-6 text-center fade-in">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-zinc-200 dark:border-white/10 bg-zinc-100 dark:bg-white/5 text-xs text-zinc-500 dark:text-zinc-400 mb-8">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span className="w-1.5 h-1.5 rounded-full bg-sangria-500 animate-pulse"></span>
             Demo of the x402 payment protocol
           </div>
 
-          <h1 className="text-4xl sm:text-5xl md:text-7xl font-extrabold text-gray-900 dark:text-white leading-[1.1] tracking-tight mb-6">
+          <h1 className="text-4xl sm:text-5xl md:text-7xl italic font-normal text-gray-900 dark:text-white leading-[1.1] tracking-tight mb-6">
             HTTP-native
             <br />
-            <span className="gradient-text">micropayments.</span>
+            <span className="text-white">micropayments.</span>
           </h1>
 
           <p className="text-lg md:text-xl text-zinc-600 dark:text-zinc-400 max-w-2xl mx-auto mb-10 leading-relaxed">
@@ -39,7 +40,7 @@ export default function Home() {
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link
               href="https://github.com/GTG-Labs/sangria-net"
-              className="w-full sm:w-auto px-8 py-3.5 rounded-xl bg-gradient-to-r from-sangria-600 to-indigo-600 text-white font-semibold text-base hover:opacity-90 transition-opacity glow"
+              className="w-full sm:w-auto px-8 py-3.5 rounded-xl bg-sangria-500 text-white font-semibold text-base hover:bg-sangria-600 transition-colors glow"
             >
               View on GitHub
             </Link>
@@ -57,10 +58,10 @@ export default function Home() {
       <section id="how-it-works" className="py-20 md:py-32">
         <div className="max-w-6xl mx-auto px-6">
           <div className="text-center mb-16">
-            <p className="text-sangria-400 font-mono text-sm mb-3">
+            <p className="text-sangria-500 font-mono text-sm mb-3">
               HOW IT WORKS
             </p>
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white">
+            <h2 className="text-3xl md:text-4xl italic font-normal text-gray-900 dark:text-white">
               Three steps. One seamless flow.
             </h2>
           </div>
@@ -72,12 +73,12 @@ export default function Home() {
             </div>
 
             {/* Step 1 */}
-            <div className="relative z-10 gradient-border p-8 text-center card-hover">
+            <div className="relative z-10 card p-8 text-center card-hover">
               <div className="w-14 h-14 rounded-2xl bg-sangria-500/10 border border-sangria-500/20 flex items-center justify-center mx-auto mb-5">
-                <Globe className="w-6 h-6 text-sangria-400" />
+                <Globe className="w-6 h-6 text-sangria-500" />
               </div>
-              <div className="text-xs font-mono text-sangria-400 mb-2">01</div>
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">
+              <div className="text-xs font-mono text-sangria-500 mb-2">01</div>
+              <h3 className="text-xl italic font-normal text-gray-900 dark:text-white mb-3">
                 Client requests resource
               </h3>
               <p className="text-zinc-600 dark:text-zinc-400 text-sm leading-relaxed">
@@ -87,12 +88,12 @@ export default function Home() {
             </div>
 
             {/* Step 2 */}
-            <div className="relative z-10 gradient-border p-8 text-center card-hover">
-              <div className="w-14 h-14 rounded-2xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center mx-auto mb-5">
-                <Repeat className="w-6 h-6 text-purple-400" />
+            <div className="relative z-10 card p-8 text-center card-hover">
+              <div className="w-14 h-14 rounded-2xl bg-sangria-500/10 border border-sangria-500/20 flex items-center justify-center mx-auto mb-5">
+                <Repeat className="w-6 h-6 text-sangria-500" />
               </div>
-              <div className="text-xs font-mono text-purple-400 mb-2">02</div>
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">
+              <div className="text-xs font-mono text-sangria-500 mb-2">02</div>
+              <h3 className="text-xl italic font-normal text-gray-900 dark:text-white mb-3">
                 Server requires payment
               </h3>
               <p className="text-zinc-600 dark:text-zinc-400 text-sm leading-relaxed">
@@ -102,12 +103,12 @@ export default function Home() {
             </div>
 
             {/* Step 3 */}
-            <div className="relative z-10 gradient-border p-8 text-center card-hover">
-              <div className="w-14 h-14 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center mx-auto mb-5">
-                <Wallet className="w-6 h-6 text-indigo-400" />
+            <div className="relative z-10 card p-8 text-center card-hover">
+              <div className="w-14 h-14 rounded-2xl bg-sangria-500/10 border border-sangria-500/20 flex items-center justify-center mx-auto mb-5">
+                <Wallet className="w-6 h-6 text-sangria-500" />
               </div>
-              <div className="text-xs font-mono text-indigo-400 mb-2">03</div>
-              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">
+              <div className="text-xs font-mono text-sangria-500 mb-2">03</div>
+              <h3 className="text-xl italic font-normal text-gray-900 dark:text-white mb-3">
                 Client pays & gets data
               </h3>
               <p className="text-zinc-600 dark:text-zinc-400 text-sm leading-relaxed">
@@ -126,18 +127,18 @@ export default function Home() {
       >
         <div className="max-w-6xl mx-auto px-6">
           <div className="text-center mb-16">
-            <p className="text-sangria-400 font-mono text-sm mb-3">FEATURES</p>
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white">
+            <p className="text-sangria-500 font-mono text-sm mb-3">FEATURES</p>
+            <h2 className="text-3xl md:text-4xl italic font-normal text-gray-900 dark:text-white">
               Why x402?
             </h2>
           </div>
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            <div className="gradient-border p-6 card-hover">
+            <div className="card p-6 card-hover">
               <div className="w-10 h-10 rounded-xl bg-sangria-500/10 flex items-center justify-center mb-4">
-                <Zap className="w-5 h-5 text-sangria-400" />
+                <Zap className="w-5 h-5 text-sangria-500" />
               </div>
-              <h3 className="text-gray-900 dark:text-white font-semibold mb-2">
+              <h3 className="text-gray-900 dark:text-white italic mb-2">
                 True Micropayments
               </h3>
               <p className="text-zinc-600 dark:text-zinc-400 text-sm leading-relaxed">
@@ -146,11 +147,11 @@ export default function Home() {
               </p>
             </div>
 
-            <div className="gradient-border p-6 card-hover">
-              <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center mb-4">
-                <Lock className="w-5 h-5 text-purple-400" />
+            <div className="card p-6 card-hover">
+              <div className="w-10 h-10 rounded-xl bg-sangria-500/10 flex items-center justify-center mb-4">
+                <Lock className="w-5 h-5 text-sangria-500" />
               </div>
-              <h3 className="text-gray-900 dark:text-white font-semibold mb-2">
+              <h3 className="text-gray-900 dark:text-white italic mb-2">
                 No Accounts Required
               </h3>
               <p className="text-zinc-600 dark:text-zinc-400 text-sm leading-relaxed">
@@ -159,11 +160,11 @@ export default function Home() {
               </p>
             </div>
 
-            <div className="gradient-border p-6 card-hover">
-              <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center mb-4">
-                <Globe className="w-5 h-5 text-indigo-400" />
+            <div className="card p-6 card-hover">
+              <div className="w-10 h-10 rounded-xl bg-sangria-500/10 flex items-center justify-center mb-4">
+                <Globe className="w-5 h-5 text-sangria-500" />
               </div>
-              <h3 className="text-gray-900 dark:text-white font-semibold mb-2">
+              <h3 className="text-gray-900 dark:text-white italic mb-2">
                 Standard HTTP
               </h3>
               <p className="text-zinc-600 dark:text-zinc-400 text-sm leading-relaxed">
@@ -172,11 +173,11 @@ export default function Home() {
               </p>
             </div>
 
-            <div className="gradient-border p-6 card-hover">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center mb-4">
-                <Code2 className="w-5 h-5 text-emerald-400" />
+            <div className="card p-6 card-hover">
+              <div className="w-10 h-10 rounded-xl bg-sangria-500/10 flex items-center justify-center mb-4">
+                <Code2 className="w-5 h-5 text-sangria-500" />
               </div>
-              <h3 className="text-gray-900 dark:text-white font-semibold mb-2">
+              <h3 className="text-gray-900 dark:text-white italic mb-2">
                 Developer Friendly
               </h3>
               <p className="text-zinc-600 dark:text-zinc-400 text-sm leading-relaxed">
@@ -185,11 +186,11 @@ export default function Home() {
               </p>
             </div>
 
-            <div className="gradient-border p-6 card-hover">
-              <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center mb-4">
-                <Coins className="w-5 h-5 text-amber-400" />
+            <div className="card p-6 card-hover">
+              <div className="w-10 h-10 rounded-xl bg-sangria-500/10 flex items-center justify-center mb-4">
+                <Coins className="w-5 h-5 text-sangria-500" />
               </div>
-              <h3 className="text-gray-900 dark:text-white font-semibold mb-2">
+              <h3 className="text-gray-900 dark:text-white italic mb-2">
                 Blockchain Settled
               </h3>
               <p className="text-zinc-600 dark:text-zinc-400 text-sm leading-relaxed">
@@ -198,11 +199,11 @@ export default function Home() {
               </p>
             </div>
 
-            <div className="gradient-border p-6 card-hover">
-              <div className="w-10 h-10 rounded-xl bg-rose-500/10 flex items-center justify-center mb-4">
-                <ShieldCheck className="w-5 h-5 text-rose-400" />
+            <div className="card p-6 card-hover">
+              <div className="w-10 h-10 rounded-xl bg-sangria-500/10 flex items-center justify-center mb-4">
+                <ShieldCheck className="w-5 h-5 text-sangria-500" />
               </div>
-              <h3 className="text-gray-900 dark:text-white font-semibold mb-2">
+              <h3 className="text-gray-900 dark:text-white italic mb-2">
                 Testnet Ready
               </h3>
               <p className="text-zinc-600 dark:text-zinc-400 text-sm leading-relaxed">
@@ -222,15 +223,15 @@ export default function Home() {
         <div className="max-w-6xl mx-auto px-6">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div>
-              <p className="text-sangria-400 font-mono text-sm mb-3">
+              <p className="text-sangria-500 font-mono text-sm mb-3">
                 FOR DEVELOPERS
               </p>
-              <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-6">
+              <h2 className="text-3xl md:text-4xl italic font-normal text-gray-900 dark:text-white mb-6">
                 Add a paid endpoint in 3 lines
               </h2>
               <p className="text-zinc-600 dark:text-zinc-400 leading-relaxed mb-8">
                 Use the{" "}
-                <code className="px-2 py-0.5 rounded bg-zinc-100 dark:bg-white/5 text-sangria-400 font-mono text-sm">
+                <code className="px-2 py-0.5 rounded bg-zinc-100 dark:bg-white/5 text-sangria-500 font-mono text-sm">
                   @pay
                 </code>{" "}
                 decorator to protect any FastAPI endpoint. The x402 middleware
@@ -288,25 +289,25 @@ async def premium_endpoint():
         <div className="max-w-6xl mx-auto px-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
             <div>
-              <div className="text-3xl font-bold text-gray-900 dark:text-white mb-1">
+              <div className="text-3xl italic text-gray-900 dark:text-white mb-1">
                 $0.0001
               </div>
               <div className="text-sm text-zinc-500">Minimum Payment</div>
             </div>
             <div>
-              <div className="text-3xl font-bold text-gray-900 dark:text-white mb-1">
+              <div className="text-3xl italic text-gray-900 dark:text-white mb-1">
                 402
               </div>
               <div className="text-sm text-zinc-500">HTTP Status Code</div>
             </div>
             <div>
-              <div className="text-3xl font-bold text-gray-900 dark:text-white mb-1">
+              <div className="text-3xl italic text-gray-900 dark:text-white mb-1">
                 &lt;3s
               </div>
               <div className="text-sm text-zinc-500">Settlement Time</div>
             </div>
             <div>
-              <div className="text-3xl font-bold text-gray-900 dark:text-white mb-1">
+              <div className="text-3xl italic text-gray-900 dark:text-white mb-1">
                 100%
               </div>
               <div className="text-sm text-zinc-500">Open Source</div>
@@ -321,7 +322,7 @@ async def premium_endpoint():
         className="py-20 md:py-32 border-t border-zinc-100 dark:border-white/5"
       >
         <div className="max-w-2xl mx-auto px-6 text-center">
-          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-4">
+          <h2 className="text-3xl md:text-4xl italic font-normal text-gray-900 dark:text-white mb-4">
             Ready to try it?
           </h2>
           <p className="text-zinc-600 dark:text-zinc-400 mb-10 text-lg">
@@ -331,7 +332,7 @@ async def premium_endpoint():
           <div className="flex flex-col sm:flex-row gap-3 max-w-xl mx-auto justify-center">
             <Link
               href="https://github.com/GTG-Labs/sangria-net"
-              className="px-6 py-3 rounded-xl bg-gradient-to-r from-sangria-600 to-indigo-600 text-white font-semibold text-sm hover:opacity-90 transition-opacity whitespace-nowrap"
+              className="px-6 py-3 rounded-xl bg-sangria-500 text-white font-semibold text-sm hover:bg-sangria-600 transition-colors"
             >
               View on GitHub
             </Link>

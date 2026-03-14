@@ -8,11 +8,6 @@ export default function Layout({ children }: { children: ReactNode }) {
       tree={source.getPageTree()}
       nav={{ enabled: false }}
       sidebar={{ defaultOpenLevel: 1 }}
-      containerProps={{
-        style: {
-          "--fd-banner-height": "4rem",
-        } as React.CSSProperties,
-      }}
     >
       {children}
     </DocsLayout>
