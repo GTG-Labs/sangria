@@ -22,7 +22,7 @@
   --color-sangria-900: #420a13;
 
   --font-sans: "Ubuntu", system-ui, sans-serif;
-  --font-serif: "PT Serif", Georgia, serif;
+  --font-serif: "PT Serif", "georgia", serif;
   --font-mono: "JetBrains Mono", monospace;
 }
 
@@ -120,7 +120,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .flow-line {
   height: 2px;
-  background: #a51c30;
+  background: var(--color-sangria-500);
   animation: flowPulse 3s ease-in-out infinite;
 }
 

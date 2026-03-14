@@ -415,6 +415,9 @@ const PixelBlast: React.FC<PixelBlastProps> = ({
     composer?: EffectComposer;
     touch?: ReturnType<typeof createTouchTexture>;
     liquidEffect?: Effect;
+    onPointerDown?: (e: PointerEvent) => void;
+    onPointerMove?: (e: PointerEvent) => void;
+    intersectionObserver?: IntersectionObserver;
   } | null>(null);
   const prevConfigRef = useRef<ReinitConfig | null>(null);
   useEffect(() => {
@@ -440,7 +443,12 @@ const PixelBlast: React.FC<PixelBlastProps> = ({
       if (threeRef.current) {
         const t = threeRef.current;
         t.resizeObserver?.disconnect();
+        t.intersectionObserver?.disconnect();
         if (t.raf !== undefined) cancelAnimationFrame(t.raf);
+        if (t.onPointerDown)
+          t.renderer.domElement.removeEventListener("pointerdown", t.onPointerDown);
+        if (t.onPointerMove)
+          t.renderer.domElement.removeEventListener("pointermove", t.onPointerMove);
         t.quad?.geometry.dispose();
         t.material.dispose();
         t.composer?.dispose();
@@ -606,6 +614,16 @@ const PixelBlast: React.FC<PixelBlastProps> = ({
       renderer.domElement.addEventListener("pointermove", onPointerMove, {
         passive: true,
       });
+      let intersectionObserver: IntersectionObserver | undefined;
+      if (autoPauseOffscreen) {
+        intersectionObserver = new IntersectionObserver(
+          ([entry]) => {
+            visibilityRef.current.visible = entry.isIntersecting;
+          },
+          { threshold: 0 },
+        );
+        intersectionObserver.observe(container);
+      }
       let raf = 0;
       const animate = () => {
         if (autoPauseOffscreen && !visibilityRef.current.visible) {
@@ -656,6 +674,9 @@ const PixelBlast: React.FC<PixelBlastProps> = ({
         composer,
         touch,
         liquidEffect,
+        onPointerDown,
+        onPointerMove,
+        intersectionObserver,
       };
     } else {
       const t = threeRef.current!;
@@ -689,7 +710,12 @@ const PixelBlast: React.FC<PixelBlastProps> = ({
       if (mustReinit) return;
       const t = threeRef.current;
       t.resizeObserver?.disconnect();
+      t.intersectionObserver?.disconnect();
       if (t.raf !== undefined) cancelAnimationFrame(t.raf);
+      if (t.onPointerDown)
+        t.renderer.domElement.removeEventListener("pointerdown", t.onPointerDown);
+      if (t.onPointerMove)
+        t.renderer.domElement.removeEventListener("pointermove", t.onPointerMove);
       t.quad?.geometry.dispose();
       t.material.dispose();
       t.composer?.dispose();

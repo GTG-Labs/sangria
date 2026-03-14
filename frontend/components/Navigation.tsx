@@ -5,26 +5,29 @@ import { withAuth, getSignInUrl } from "@workos-inc/authkit-nextjs";
 import { SignOutButton } from "./SignOutButton";
 
 async function getStarCount(): Promise<number | null> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 3000);
   try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3000);
     const res = await fetch(
       "https://api.github.com/repos/GTG-Labs/sangria-net",
       { next: { revalidate: 3600 }, signal: controller.signal },
     );
-    clearTimeout(timeoutId);
     if (!res.ok) return null;
     const data = await res.json();
     return data.stargazers_count ?? null;
   } catch {
     return null;
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 
 export default async function Navigation() {
-  const { user } = await withAuth();
-  const signInUrl = await getSignInUrl();
-  const stars = await getStarCount();
+  const [{ user }, signInUrl, stars] = await Promise.all([
+    withAuth(),
+    getSignInUrl(),
+    getStarCount(),
+  ]);
 
   return (
     <nav className="fixed top-0 w-full z-50 border-b border-gray-200 dark:border-white/5 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-xl">
