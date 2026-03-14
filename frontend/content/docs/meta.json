@@ -1,0 +1,12 @@
+{
+  "title": "Sangria Docs",
+  "pages": [
+    "---Getting Started---",
+    "getting-started",
+    "---Protocol---",
+    "x402-protocol",
+    "variable-pricing",
+    "---Reference---",
+    "architecture"
+  ]
+}

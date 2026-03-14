@@ -1,0 +1,111 @@
+---
+title: Getting Started
+description: Prerequisites, setup, and running your first x402 micropayment demo.
+---
+
+This guide will walk you through setting up and running the Sangria x402 demo on your local machine.
+
+## Prerequisites
+
+- Python 3.10 or higher
+- [uv](https://docs.astral.sh/uv/) (Python package manager)
+- A [Coinbase Developer Platform](https://portal.cdp.coinbase.com/) account
+
+## Installation
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/GTG-Labs/sangria-net.git
+cd sangria-net
+```
+
+### 2. Install dependencies
+
+```bash
+uv sync
+```
+
+### 3. Set up environment variables
+
+Create a `.env` file from the example:
+
+```bash
+cp .env.example .env
+```
+
+Fill in your CDP credentials in `.env`:
+
+```
+CDP_API_KEY="your-api-key"
+CDP_SECRET_KEY="your-secret-key"
+CDP_WALLET_SECRET="your-wallet-secret"
+```
+
+You can get these from the [CDP Portal](https://portal.cdp.coinbase.com/). The wallet secret is an encryption key you choose — CDP uses it to encrypt your wallet private keys on their servers.
+
+## Running the Demo
+
+You'll need two terminal windows running simultaneously.
+
+### Terminal 1: Start the merchant server
+
+```bash
+uv run python -m merchant_server.run
+```
+
+This starts a FastAPI server on `http://127.0.0.1:8000` with:
+
+- `GET /` — health check endpoint
+- `GET /premium` — costs $0.0001 USDC per request (protected by x402)
+
+### Terminal 2: Run the buyer client
+
+```bash
+uv run python main.py
+```
+
+This will:
+
+1. Print initial USDC balances for both the merchant and buyer wallets
+2. Make a single paid request to `GET /premium`
+3. Wait a few seconds for on-chain settlement
+4. Print final balances showing the USDC transfer
+
+## Example Output
+
+```
+--- Initial Balances ---
+  Merchant (0xF44c...fd39): 10.050000 USDC
+  Buyer    (0x0b7b...e649):  9.950000 USDC
+
+Status: 200 | Body: {'message': 'You accessed the premium endpoint!', 'paid': True}
+
+Waiting for settlement...
+
+--- Final Balances ---
+  Merchant (0xF44c...fd39): 10.050100 USDC
+  Buyer    (0x0b7b...e649):  9.949900 USDC
+```
+
+## What Just Happened?
+
+1. The buyer client made an HTTP GET request to `/premium`
+2. The server responded with `402 Payment Required`
+3. The client's x402 library automatically signed a USDC payment authorization
+4. The client retried the request with the signed payment in the header
+5. The server verified the payment and returned the premium content
+6. The payment was settled on-chain (Base Sepolia testnet)
+7. Both wallets' balances were updated
+
+## Important Notes
+
+- This runs on **Base Sepolia testnet** — all funds are fake. No real money is involved.
+- CDP manages private keys server-side. The wallet secret in your `.env` encrypts them at rest.
+- The buyer's private key is exported from CDP only to sign x402 payment headers.
+
+## Next Steps
+
+- [Learn how the x402 protocol works](/docs/x402-protocol)
+- [Explore the project architecture](/docs/architecture)
+- [Implement variable pricing](/docs/variable-pricing)

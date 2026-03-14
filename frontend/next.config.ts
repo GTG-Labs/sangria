@@ -1,12 +1,10 @@
 import type { NextConfig } from "next";
-import createMDX from '@next/mdx'
+import { createMDX } from "fumadocs-mdx/next";
 
 const nextConfig: NextConfig = {
-  pageExtensions: ['js', 'jsx', 'md', 'mdx', 'ts', 'tsx'],
+  reactStrictMode: true,
 };
 
-const withMDX = createMDX({
-  // Add markdown plugins here, as desired
-})
+const withMDX = createMDX();
 
 export default withMDX(nextConfig);

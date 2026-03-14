@@ -1,7 +1,7 @@
-'use client';
+"use client";
 
-import { handleSignOut } from '@/lib/auth-actions';
-import { useState } from 'react';
+import { handleSignOut } from "@/lib/auth-actions";
+import { useState } from "react";
 
 interface SignOutButtonProps {
   className?: string;
@@ -14,18 +14,14 @@ export function SignOutButton({ className, children }: SignOutButtonProps) {
   const handleSubmit = async () => {
     setIsSigningOut(true);
     // Add a small delay to make it feel more natural
-    await new Promise(resolve => setTimeout(resolve, 800));
+    await new Promise((resolve) => setTimeout(resolve, 800));
     await handleSignOut();
   };
 
   return (
     <form action={handleSubmit}>
-      <button
-        type="submit"
-        disabled={isSigningOut}
-        className={className}
-      >
-        {isSigningOut ? 'Signing out...' : (children || 'Sign Out')}
+      <button type="submit" disabled={isSigningOut} className={className}>
+        {isSigningOut ? "Signing out..." : children || "Sign Out"}
       </button>
     </form>
   );

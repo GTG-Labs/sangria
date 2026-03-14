@@ -4,6 +4,7 @@ import "./globals.css";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import ThemeProvider from "@/components/ThemeProvider";
+import { RootProvider } from "fumadocs-ui/provider/next";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -17,7 +18,8 @@ const jetbrainsMono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: "Sangria — HTTP-native Micropayments with x402",
-  description: "A demo of the x402 payment protocol — HTTP-native micropayments using USDC on Base Sepolia.",
+  description:
+    "A demo of the x402 payment protocol — HTTP-native micropayments using USDC on Base Sepolia.",
 };
 
 export default function RootLayout({
@@ -31,11 +33,13 @@ export default function RootLayout({
       <body
         className={`${inter.variable} ${jetbrainsMono.variable} antialiased`}
       >
-        <ThemeProvider>
-          <Navigation />
-          {children}
-          <Footer />
-        </ThemeProvider>
+        <RootProvider theme={{ enabled: false }} search={{ enabled: false }}>
+          <ThemeProvider>
+            <Navigation />
+            {children}
+            <Footer />
+          </ThemeProvider>
+        </RootProvider>
       </body>
     </html>
   );

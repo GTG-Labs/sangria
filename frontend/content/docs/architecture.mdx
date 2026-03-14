@@ -1,0 +1,176 @@
+---
+title: Project Architecture
+description: Understanding the structure and components of the Sangria x402 demo.
+---
+
+## Project Structure
+
+```
+sangria-net/
+  main.py                  # Buyer client — checks balances, calls the paid endpoint
+  merchant_server/
+    __init__.py
+    app.py                 # FastAPI app with the @pay-protected endpoint
+    run.py                 # Entry point: python -m merchant_server.run
+  wallet/
+    __init__.py
+    wallet.py              # TestnetWallet class — create, fund, and check wallets via CDP
+  frontend/                # Next.js documentation and landing page
+  guides-and-knowledge/    # Markdown documentation files
+  .env                     # Environment variables (CDP credentials)
+  pyproject.toml          # Python dependencies and project metadata
+```
+
+## Core Components
+
+### 1. Merchant Server (`merchant_server/`)
+
+A FastAPI application that demonstrates a paid endpoint using the x402 protocol.
+
+**Key file: `app.py`**
+
+```python
+from fastapi import FastAPI
+from fastapi_x402 import pay
+
+app = FastAPI()
+
+MERCHANT_ADDRESS = "0xF44c...fd39"
+
+@app.get("/")
+async def root():
+    return {"status": "ok"}
+
+@app.get("/premium")
+@pay(
+    amount_required=0.0001,  # $0.0001 USDC
+    pay_to=MERCHANT_ADDRESS,
+)
+async def premium_endpoint():
+    return {
+        "message": "You accessed the premium endpoint!",
+        "paid": True
+    }
+```
+
+The `@pay` decorator from `fastapi-x402` handles:
+
+- Returning 402 responses with payment requirements
+- Verifying signed payment authorizations
+- Settling payments via the Coinbase facilitator
+- Adding payment receipts to response headers
+
+### 2. Buyer Client (`main.py`)
+
+A Python script that demonstrates how a client interacts with x402-protected endpoints.
+
+**Key responsibilities:**
+
+- Initialize buyer and merchant wallets via CDP
+- Check USDC balances before and after transactions
+- Make HTTP requests to paid endpoints (x402 library handles payment negotiation automatically)
+- Display transaction results
+
+The x402 client library transparently handles:
+
+- Detecting 402 responses
+- Signing ERC-3009 payment authorizations
+- Retrying requests with payment headers
+
+### 3. Wallet Management (`wallet/wallet.py`)
+
+The `TestnetWallet` class provides utilities for interacting with the Coinbase Developer Platform.
+
+**Key methods:**
+
+```python
+class TestnetWallet:
+    @classmethod
+    async def mint() -> TestnetWallet
+        # Creates a new wallet on Base Sepolia
+
+    async def fund_eth()
+        # Requests testnet ETH for gas fees
+
+    async def fund_usdc()
+        # Requests testnet USDC (100 USDC)
+
+    async def balance_usdc() -> Decimal
+        # Checks current USDC balance
+
+    async def export_private_key() -> str
+        # Exports private key for signing payments
+```
+
+## Key Dependencies
+
+| Package        | Purpose                                                                    |
+| -------------- | -------------------------------------------------------------------------- |
+| `cdp-sdk`      | Coinbase Developer Platform SDK — wallet creation, funding, balance checks |
+| `x402`         | Client-side x402 protocol — signs USDC payments for 402 responses          |
+| `fastapi-x402` | Server-side x402 middleware — adds `@pay` decorator to protect endpoints   |
+| `uvicorn`      | ASGI server to run FastAPI                                                 |
+| `fastapi`      | Modern Python web framework                                                |
+
+## Payment Flow Architecture
+
+### High-level sequence:
+
+1. **Client makes request**: `main.py` sends GET request to `/premium`
+2. **Server requires payment**: FastAPI middleware returns 402 with payment details
+3. **Client signs authorization**: x402 client library creates ERC-3009 signature
+4. **Client retries with payment**: Request includes `X-PAYMENT` header
+5. **Server verifies**: Calls Coinbase facilitator to verify signature and balance
+6. **Server settles**: Facilitator submits transaction to Base Sepolia
+7. **Server responds**: Returns content + transaction hash in `X-PAYMENT-RESPONSE` header
+
+## Wallet Management
+
+The project uses pre-created wallets with addresses hardcoded in `main.py` and `merchant_server/app.py`. This avoids needing to create and fund wallets every time you run the demo.
+
+### Creating new wallets:
+
+```python
+import asyncio
+from wallet import TestnetWallet
+
+async def setup():
+    wallet = await TestnetWallet.mint()    # creates a new wallet
+    await wallet.fund_eth()                # gas fees (free on testnet)
+    await wallet.fund_usdc()               # payment token (free on testnet)
+    print(wallet.address)                  # save this address
+
+asyncio.run(setup())
+```
+
+Then update `MERCHANT_ADDRESS` and `BUYER_ADDRESS` in the code with your new addresses.
+
+## Important Security Notes
+
+- **CDP manages private keys server-side**: The wallet secret in your `.env` encrypts them at rest — don't lose it or you lose access to your wallets
+- **Private key export**: The buyer's private key is exported from CDP only to sign x402 payment headers. This is the one place where the raw key is used locally
+- **Testnet only**: This demo runs on Base Sepolia testnet — all funds are fake, no real money is involved
+
+## Network Configuration
+
+The demo uses **Base Sepolia** testnet:
+
+- **Network**: Base Sepolia (Ethereum L2 testnet)
+- **Token**: USDC (testnet version)
+- **USDC Contract**: `0x036CbD53842c5426634e7929541eC2318f3dCF7e`
+- **Facilitator**: Coinbase hosted facilitator at `x402.org`
+
+## Frontend Architecture
+
+The documentation and landing page is built with Next.js:
+
+- **Framework**: Next.js 16 with App Router
+- **Styling**: Tailwind CSS with custom theme matching the original design
+- **Documentation**: Fumadocs with MDX content
+- **Icons**: Lucide React for consistent iconography
+
+## Next Steps
+
+- [Get started with the demo](/docs/getting-started)
+- [Learn about the x402 protocol](/docs/x402-protocol)
+- [Explore variable pricing](/docs/variable-pricing)

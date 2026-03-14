@@ -96,7 +96,7 @@ No environment variables required for the frontend.
 Edit `app/globals.css` to modify the color scheme:
 
 ```css
---color-sangria-500: #ec4899;  /* Primary brand color */
+--color-sangria-500: #ec4899; /* Primary brand color */
 ```
 
 ### Add New Documentation Pages

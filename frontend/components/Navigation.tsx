@@ -1,8 +1,8 @@
-import Link from 'next/link';
-import Image from 'next/image';
-import ThemeToggle from './ThemeToggle';
-import { withAuth, getSignInUrl } from '@workos-inc/authkit-nextjs';
-import { SignOutButton } from './SignOutButton';
+import Link from "next/link";
+import Image from "next/image";
+import ThemeToggle from "./ThemeToggle";
+import { withAuth, getSignInUrl } from "@workos-inc/authkit-nextjs";
+import { SignOutButton } from "./SignOutButton";
 
 export default async function Navigation() {
   const { user } = await withAuth();
@@ -19,14 +19,41 @@ export default async function Navigation() {
             height={32}
             className="w-8 h-8 dark:mix-blend-normal mix-blend-multiply"
           />
-          <span className="text-gray-900 dark:text-white font-semibold text-lg">Sangria</span>
+          <span className="text-gray-900 dark:text-white font-semibold text-lg">
+            Sangria
+          </span>
         </Link>
         <div className="hidden md:flex items-center gap-8 text-sm text-gray-600 dark:text-zinc-400">
-          <Link href="/#how-it-works" className="hover:text-gray-900 dark:hover:text-white transition-colors">How it Works</Link>
-          <Link href="/#features" className="hover:text-gray-900 dark:hover:text-white transition-colors">Features</Link>
-          <Link href="/#developers" className="hover:text-gray-900 dark:hover:text-white transition-colors">Developers</Link>
-          <Link href="/docs" className="hover:text-gray-900 dark:hover:text-white transition-colors">Docs</Link>
-          <Link href="/blog" className="hover:text-gray-900 dark:hover:text-white transition-colors">Blog</Link>
+          <Link
+            href="/#how-it-works"
+            className="hover:text-gray-900 dark:hover:text-white transition-colors"
+          >
+            How it Works
+          </Link>
+          <Link
+            href="/#features"
+            className="hover:text-gray-900 dark:hover:text-white transition-colors"
+          >
+            Features
+          </Link>
+          <Link
+            href="/#developers"
+            className="hover:text-gray-900 dark:hover:text-white transition-colors"
+          >
+            Developers
+          </Link>
+          <Link
+            href="/docs"
+            className="hover:text-gray-900 dark:hover:text-white transition-colors"
+          >
+            Docs
+          </Link>
+          <Link
+            href="/blog"
+            className="hover:text-gray-900 dark:hover:text-white transition-colors"
+          >
+            Blog
+          </Link>
         </div>
         <div className="flex items-center gap-3">
           <ThemeToggle />
