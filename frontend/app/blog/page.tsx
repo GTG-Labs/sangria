@@ -22,7 +22,7 @@ export default function BlogPage() {
         </Link>
 
         <div className="mb-12">
-          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-4">
+          <h1 className="text-4xl md:text-5xl italic font-normal text-gray-900 dark:text-white mb-4">
             Blog
           </h1>
           <p className="text-lg text-zinc-600 dark:text-zinc-400">
@@ -40,7 +40,7 @@ export default function BlogPage() {
               <Link
                 key={post.slug}
                 href={`/blog/${post.slug}`}
-                className="gradient-border p-6 card-hover block"
+                className="card p-6 card-hover block"
               >
                 <div className="flex items-center gap-3 text-xs text-zinc-500 dark:text-zinc-400 mb-3">
                   <span className="inline-flex items-center gap-1">
@@ -58,7 +58,7 @@ export default function BlogPage() {
                     </span>
                   )}
                 </div>
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+                <h2 className="text-xl italic font-normal text-gray-900 dark:text-white mb-2">
                   {post.title}
                 </h2>
                 <p className="text-zinc-600 dark:text-zinc-400 text-sm leading-relaxed">

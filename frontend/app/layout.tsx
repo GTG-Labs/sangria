@@ -1,14 +1,23 @@
 import type { Metadata } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
+import { PT_Serif, Ubuntu, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
-import ThemeProvider from "@/components/ThemeProvider";
+
 import { RootProvider } from "fumadocs-ui/provider/next";
 
-const inter = Inter({
-  variable: "--font-inter",
+const ptSerif = PT_Serif({
+  variable: "--font-pt-serif",
   subsets: ["latin"],
+  weight: ["400", "700"],
+  style: ["normal", "italic"],
+});
+
+const ubuntu = Ubuntu({
+  variable: "--font-ubuntu",
+  subsets: ["latin"],
+  weight: ["300", "400", "500", "700"],
+  style: ["normal", "italic"],
 });
 
 const jetbrainsMono = JetBrains_Mono({
@@ -28,17 +37,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="scroll-smooth">
+    <html lang="en" className="scroll-smooth dark">
       <head></head>
       <body
-        className={`${inter.variable} ${jetbrainsMono.variable} antialiased`}
+        className={`${ptSerif.variable} ${ubuntu.variable} ${jetbrainsMono.variable} antialiased`}
       >
         <RootProvider theme={{ enabled: false }} search={{ enabled: false }}>
-          <ThemeProvider>
             <Navigation />
             {children}
             <Footer />
-          </ThemeProvider>
         </RootProvider>
       </body>
     </html>
