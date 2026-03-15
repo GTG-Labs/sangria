@@ -186,6 +186,29 @@ func verifyWorkOSToken(ctx context.Context, tokenStr string) (string, error) {
 	return userIDStr, nil
 }
 
+// merchantAPIKeyMiddleware validates a merchant API key from the request
+// and stores the resolved Merchant in context locals.
+//
+// TODO: The API key lookup mechanism is being handled separately.
+// Currently this needs a strategy for O(1) bcrypt lookup (e.g. key prefix/identifier).
+func merchantAPIKeyMiddleware(pool *pgxpool.Pool) fiber.Handler {
+	return func(c fiber.Ctx) error {
+		apiKey := c.Get("X-API-Key")
+		if apiKey == "" {
+			return c.Status(401).JSON(fiber.Map{"error": "X-API-Key header required"})
+		}
+
+		// TODO: Implement merchant lookup by API key.
+		// bcrypt hashes can't be used in WHERE clauses, so this needs a
+		// prefix/identifier approach or a separate lookup table.
+		// For now, this middleware is a placeholder.
+		_ = pool
+		_ = apiKey
+
+		return c.Status(501).JSON(fiber.Map{"error": "API key authentication not yet implemented"})
+	}
+}
+
 // getallowedOrigins parses the ALLOWED_ORIGINS environment variable
 func getallowedOrigins() []string {
 	allowedOriginsEnv := os.Getenv("ALLOWED_ORIGINS")
@@ -453,6 +476,17 @@ func main() {
 			"code":  "NOT_IMPLEMENTED",
 		})
 	})
+
+	// --- x402 routes ---
+
+	// Merchant API key auth (payments + balance)
+	app.Post("/payments/generate-payment", merchantAPIKeyMiddleware(pool), handlers.GeneratePayment(pool))
+	app.Post("/payments/settle-payment", merchantAPIKeyMiddleware(pool), handlers.SettlePayment(pool))
+	app.Get("/merchants/balance", merchantAPIKeyMiddleware(pool), handlers.GetMerchantBalance(pool))
+
+	// Admin routes (WorkOS JWT auth)
+	app.Post("/merchants", workosAuthMiddleware, handlers.CreateMerchant(pool))
+	app.Post("/wallets/pool", workosAuthMiddleware, handlers.CreateWalletPool(pool))
 
 	log.Fatal(app.Listen(":8080"))
 }
