@@ -7,7 +7,8 @@ import {
   bigint,
   index,
   unique,
-  text
+  text,
+  boolean
 } from "drizzle-orm/pg-core";
 
 
@@ -27,6 +28,29 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+// ---------------------------------------------------------------------------
+// Merchant API Keys
+// ---------------------------------------------------------------------------
+
+export const merchants = pgTable(
+  "merchants",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.workosId),
+    apiKey: text("api_key").notNull(),
+    name: varchar({ length: 255 }).notNull(),
+    isActive: boolean("is_active").notNull().default(true),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("idx_merchants_user_id").on(table.userId),
+    unique("uq_merchants_api_key").on(table.apiKey),
+  ]
+);
 
 
 // ---------------------------------------------------------------------------

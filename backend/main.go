@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 	"github.com/lestrrat-go/jwx/v2/jwk"
 	"github.com/lestrrat-go/jwx/v2/jwt"
@@ -30,6 +31,9 @@ type WorkOSUser struct {
 
 // Global JWKS cache for WorkOS JWT validation
 var jwksCache *jwk.Cache
+
+// Global database pool
+var globalPool *pgxpool.Pool
 
 // workosAuthMiddleware validates WorkOS JWT session tokens and extracts user info
 func workosAuthMiddleware(c fiber.Ctx) error {
@@ -68,6 +72,42 @@ func workosAuthMiddleware(c fiber.Ctx) error {
 		FirstName: user.FirstName,
 		LastName:  user.LastName,
 	})
+
+	return c.Next()
+}
+
+// apiKeyAuthMiddleware validates API keys for merchant authentication
+func apiKeyAuthMiddleware(c fiber.Ctx) error {
+	// Get API key from Authorization header or X-API-Key header
+	var apiKey string
+
+	// Check Authorization header first (Bearer token style)
+	authHeader := c.Get("Authorization")
+	if authHeader != "" {
+		if strings.HasPrefix(authHeader, "Bearer ") {
+			apiKey = strings.TrimPrefix(authHeader, "Bearer ")
+		}
+	}
+
+	// Fall back to X-API-Key header
+	if apiKey == "" {
+		apiKey = c.Get("X-API-Key")
+	}
+
+	if apiKey == "" {
+		return c.Status(401).JSON(fiber.Map{"error": "API key required"})
+	}
+
+	// Validate and authenticate the API key
+	merchantKey, err := dbengine.AuthenticateAPIKey(c.Context(), globalPool, apiKey)
+	if err != nil {
+		log.Printf("API key authentication failed: %v", err)
+		return c.Status(401).JSON(fiber.Map{"error": "Invalid API key"})
+	}
+
+	// Store the authenticated merchant info in context
+	c.Locals("merchant_api_key", merchantKey)
+	c.Locals("merchant_user_id", merchantKey.UserID)
 
 	return c.Next()
 }
@@ -201,6 +241,10 @@ func main() {
 		log.Fatal(err)
 	}
 	defer pool.Close()
+
+	// Set global pool for middleware access
+	globalPool = pool
+
 	log.Println("Connected to database")
 
 	app := fiber.New()
@@ -250,6 +294,182 @@ func main() {
 		}
 
 		return c.Status(201).JSON(u)
+	})
+
+	// API Key management endpoints
+	apiKeysGroup := app.Group("/api-keys", workosAuthMiddleware)
+
+	// GET /api-keys — list user's API keys
+	apiKeysGroup.Get("/", func(c fiber.Ctx) error {
+		user := c.Locals("workos_user").(WorkOSUser)
+
+		apiKeys, err := dbengine.GetAPIKeysByUserID(c.Context(), pool, user.ID)
+		if err != nil {
+			log.Printf("Failed to get API keys for user %s: %v", user.ID, err)
+			return c.Status(500).JSON(fiber.Map{"error": "Failed to retrieve API keys"})
+		}
+
+		// Remove sensitive data before returning
+		for i := range apiKeys {
+			apiKeys[i].APIKey = "" // Never expose the hash
+		}
+
+		return c.JSON(apiKeys)
+	})
+
+	// POST /api-keys — create new API key
+	apiKeysGroup.Post("/", func(c fiber.Ctx) error {
+		user := c.Locals("workos_user").(WorkOSUser)
+
+		type CreateAPIKeyRequest struct {
+			Name   string `json:"name"`
+			IsLive bool   `json:"is_live"`
+		}
+
+		var req CreateAPIKeyRequest
+		if err := c.Bind().JSON(&req); err != nil {
+			return c.Status(400).JSON(fiber.Map{"error": "Invalid request body"})
+		}
+
+		if req.Name == "" {
+			return c.Status(400).JSON(fiber.Map{"error": "API key name is required"})
+		}
+
+		if len(req.Name) > 255 {
+			return c.Status(400).JSON(fiber.Map{"error": "API key name too long (max 255 characters)"})
+		}
+
+		// Check if user has too many active keys (limit to 10)
+		activeCount, err := dbengine.GetActiveAPIKeyCount(c.Context(), pool, user.ID)
+		if err != nil {
+			log.Printf("Failed to count active API keys for user %s: %v", user.ID, err)
+			return c.Status(500).JSON(fiber.Map{"error": "Failed to create API key"})
+		}
+
+		if activeCount >= 10 {
+			return c.Status(400).JSON(fiber.Map{"error": "Maximum number of API keys reached (10)"})
+		}
+
+		apiKey, fullKey, err := dbengine.CreateAPIKey(c.Context(), pool, user.ID, req.Name, req.IsLive)
+		if err != nil {
+			log.Printf("Failed to create API key for user %s: %v", user.ID, err)
+			return c.Status(500).JSON(fiber.Map{"error": "Failed to create API key"})
+		}
+
+		// Return the full key only once, and the safe API key object
+		response := fiber.Map{
+			"api_key": apiKey,
+			"key":     fullKey, // This is the only time the full key is returned
+		}
+
+		// Remove sensitive data from the api_key object
+		apiKey.APIKey = ""
+
+		return c.Status(201).JSON(response)
+	})
+
+	// DELETE /api-keys/:id — revoke/delete API key
+	apiKeysGroup.Delete("/:id", func(c fiber.Ctx) error {
+		user := c.Locals("workos_user").(WorkOSUser)
+		keyID := c.Params("id")
+
+		if keyID == "" {
+			return c.Status(400).JSON(fiber.Map{"error": "API key ID is required"})
+		}
+
+		err := dbengine.RevokeAPIKey(c.Context(), pool, keyID, user.ID)
+		if err != nil {
+			log.Printf("Failed to revoke API key %s for user %s: %v", keyID, user.ID, err)
+			return c.Status(500).JSON(fiber.Map{"error": "Failed to revoke API key"})
+		}
+
+		return c.Status(204).Send(nil)
+	})
+
+	// Merchant API endpoints (protected by API key authentication)
+	merchantGroup := app.Group("/merchant", apiKeyAuthMiddleware)
+
+	// GET /merchant/profile — get merchant profile using API key
+	merchantGroup.Get("/profile", func(c fiber.Ctx) error {
+		merchantKey := c.Locals("merchant_api_key").(*dbengine.Merchant)
+		userID := c.Locals("merchant_user_id").(string)
+
+		// Get user information
+		user, err := dbengine.GetUserByWorkosID(c.Context(), pool, userID)
+		if err != nil {
+			log.Printf("Failed to get user for API key %s: %v", merchantKey.ID, err)
+			return c.Status(500).JSON(fiber.Map{"error": "Failed to retrieve merchant profile"})
+		}
+
+		response := fiber.Map{
+			"user":    user,
+			"api_key": fiber.Map{
+				"id":          merchantKey.ID,
+				"name":        merchantKey.Name,
+				"is_active":   merchantKey.IsActive,
+				"last_used_at": merchantKey.LastUsedAt,
+				"created_at":  merchantKey.CreatedAt,
+			},
+		}
+
+		return c.JSON(response)
+	})
+
+	// Facilitator endpoints (x402 protocol) - protected by API key authentication
+	facilitatorGroup := app.Group("/facilitator", apiKeyAuthMiddleware)
+
+	// POST /facilitator/verify — verify a payment authorization
+	facilitatorGroup.Post("/verify", func(c fiber.Ctx) error {
+		merchantKey := c.Locals("merchant_api_key").(*dbengine.Merchant)
+
+		type VerifyPaymentRequest struct {
+			PaymentHeader string                    `json:"payment_header"`
+			Requirements  map[string]interface{}   `json:"requirements"`
+		}
+
+		var req VerifyPaymentRequest
+		if err := c.Bind().JSON(&req); err != nil {
+			return c.Status(400).JSON(fiber.Map{"error": "Invalid request body"})
+		}
+
+		// For now, return a simple success response
+		// In production, this would verify the payment authorization signature
+		// and check balances, nonces, etc.
+		response := fiber.Map{
+			"isValid": true,
+			"message": "Payment verification successful",
+			"merchant_id": merchantKey.UserID,
+			"api_key_name": merchantKey.Name,
+		}
+
+		return c.JSON(response)
+	})
+
+	// POST /facilitator/settle — settle a verified payment
+	facilitatorGroup.Post("/settle", func(c fiber.Ctx) error {
+		merchantKey := c.Locals("merchant_api_key").(*dbengine.Merchant)
+
+		type SettlePaymentRequest struct {
+			PaymentHeader string                    `json:"payment_header"`
+			Requirements  map[string]interface{}   `json:"requirements"`
+		}
+
+		var req SettlePaymentRequest
+		if err := c.Bind().JSON(&req); err != nil {
+			return c.Status(400).JSON(fiber.Map{"error": "Invalid request body"})
+		}
+
+		// For now, return a mock transaction hash
+		// In production, this would submit the payment to the blockchain
+		response := fiber.Map{
+			"success": true,
+			"transaction": "0x1234567890abcdef1234567890abcdef12345678",
+			"message": "Payment settled successfully",
+			"merchant_id": merchantKey.UserID,
+			"api_key_name": merchantKey.Name,
+		}
+
+		return c.JSON(response)
 	})
 
 	log.Fatal(app.Listen(":8080"))

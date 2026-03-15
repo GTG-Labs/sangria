@@ -67,3 +67,13 @@ type LedgerLine struct {
 	Direction Direction `json:"direction"`
 	AccountID string    `json:"account_id"`
 }
+
+type Merchant struct {
+	ID         string     `json:"id"`
+	UserID     string     `json:"user_id"`
+	APIKey     string     `json:"api_key"`
+	Name       string     `json:"name"`
+	IsActive   bool       `json:"is_active"`
+	LastUsedAt *time.Time `json:"last_used_at"`
+	CreatedAt  time.Time  `json:"created_at"`
+}
