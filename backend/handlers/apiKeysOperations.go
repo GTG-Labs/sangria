@@ -2,11 +2,15 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"sangrianet/backend/dbEngine"
 )
+
+// ErrMaxAPIKeysReached is returned when a user tries to create more than 10 API keys
+var ErrMaxAPIKeysReached = errors.New("max active API keys reached")
 
 // CreateAPIKey creates a new API key for a user
 func CreateAPIKey(ctx context.Context, pool *pgxpool.Pool, userID, name string, isLive bool) (*dbengine.Merchant, string, error) {
@@ -51,7 +55,7 @@ func CreateAPIKey(ctx context.Context, pool *pgxpool.Pool, userID, name string, 
 		return nil, "", fmt.Errorf("failed to check active API key count: %w", err)
 	}
 	if activeCount >= 10 {
-		return nil, "", fmt.Errorf("max active API keys reached (limit: 10)")
+		return nil, "", ErrMaxAPIKeysReached
 	}
 
 	// Insert new key
