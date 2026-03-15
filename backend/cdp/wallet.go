@@ -29,7 +29,9 @@ func GetClient() (*openapi.ClientWithResponses, error) {
 	return client, initErr
 }
 
-// CreateEvmAccount creates a new EVM account on CDP and returns the on-chain address.
+// CreateEvmAccount creates a new EVM account (EOA) on CDP and returns the on-chain address.
+// TODO: Research into the different kinds of accounts: pros and cons (EOA vs Smart Account).
+// See guides-and-knowledge/cdp-account-types.md
 func CreateEvmAccount(ctx context.Context) (string, error) {
 	c, err := GetClient()
 	if err != nil {
