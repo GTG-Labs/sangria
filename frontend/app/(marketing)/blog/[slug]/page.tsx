@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Calendar, Tag } from "lucide-react";
+import { ArrowLeft, Calendar, Tag, User } from "lucide-react";
 import { MDXRemote } from "next-mdx-remote/rsc";
 import { getAllSlugs, getPostBySlug } from "@/lib/blog";
 import { mdxComponents } from "@/components/MdxComponents";
@@ -46,6 +46,10 @@ export default async function BlogPostPage({
 
         <header className="mb-10">
           <div className="flex items-center gap-3 text-sm text-zinc-500 dark:text-zinc-400 mb-4">
+            <span className="inline-flex items-center gap-1.5">
+              <User className="w-4 h-4" />
+              {post.author}
+            </span>
             <span className="inline-flex items-center gap-1.5">
               <Calendar className="w-4 h-4" />
               {new Date(post.date).toLocaleDateString("en-US", {

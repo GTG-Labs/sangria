@@ -1,0 +1,104 @@
+---
+title: "What is x402? The Protocol Turning Web Payments on Their Head"
+author: "Jared Ee, co-founder of Sangria-Net"
+date: "2026-03-14"
+description: "Explore the x402 payment protocol and how it enables instant, pay-per-request micropayments over HTTP using stablecoins. Learn why this matters for AI agents, API providers, and how Sangria-Net makes x402 usable for real-world merchants."
+tags: ["x402", "micropayments", "USDC", "AI agents", "Sangria-Net"]
+---
+
+The internet has had an unresolved problem for decades: no native way to pay small amounts online without friction.
+
+Instead, we ended up with subscriptions, ad-heavy experiences, and long sign-up flows—largely because traditional payment rails make micropayments uneconomical. **x402** changes that by turning HTTP itself into a payment-aware protocol.
+
+## What is x402?
+
+x402 is an open protocol that lets websites and APIs charge per request using stablecoins like USDC. It is built around HTTP status code **402 Payment Required**—a code that existed for years without a practical standard.
+
+At a high level:
+
+1. A client (human app or AI agent) requests a protected resource.
+2. The server responds with `402 Payment Required` and payment terms.
+3. The client signs a payment authorization.
+4. The client retries with payment proof headers.
+5. The server verifies and returns the requested resource.
+
+No account creation. No API key provisioning. No subscription lock-in for one-off usage.
+
+## How x402 Works Under the Hood
+
+The flow is handled by three key headers:
+
+- `PAYMENT-REQUIRED`: Returned by the server with amount, token, destination, and facilitator details.
+- `X-PAYMENT`: Sent by the client with a signed ERC-3009 authorization.
+- `X-PAYMENT-RESPONSE`: Returned by the server after settlement with a transaction receipt/hash.
+
+A **facilitator** bridges HTTP and blockchain settlement. It verifies signatures, checks payment validity, and submits or coordinates on-chain settlement.
+
+This is what makes x402 practical: app developers can stay HTTP-native while still enabling programmable on-chain value transfer.
+
+## Why x402 Matters Now
+
+The ad/subscription model was a workaround for broken internet payments. But AI-native traffic is changing the economics of the web:
+
+- Agents don’t click ads.
+- Workflows need machine-speed transactions.
+- Services increasingly want pay-per-use monetization, not coarse monthly plans.
+
+x402 enables pricing at request granularity: per API call, per data lookup, per premium response, or per workflow step.
+
+## Where Sangria-Net Fits
+
+x402 defines **payment negotiation and transport**. Sangria-Net focuses on **execution, merchant usability, and operational reliability** for real-world deployments.
+
+Based on Sangria-Net’s architecture, we support three practical payment scenarios:
+
+1. **Client on Sangria, merchant external**  
+   The client pays in Sangria Credits; Sangria’s treasury handles USDC settlement to the external merchant over x402-compatible flows.
+
+2. **Client and merchant both on Sangria**  
+   Settlement can happen as an internal ledger/database transfer for speed and cost efficiency, with no unnecessary on-chain hop.
+
+3. **Client external, merchant on Sangria**  
+   Sangria receives USDC into treasury rails, then handles merchant-facing payout/settlement pathways cleanly.
+
+This model gives merchants better interoperability while insulating end users from unnecessary crypto complexity.
+
+## Why This Matters for AI Agents
+
+AI agents are natural users of x402 infrastructure:
+
+- They discover paid endpoints automatically.
+- They evaluate cost/utility in real time.
+- They execute transactions without human delay.
+
+Sangria-Net is built for this agentic future by combining:
+
+- HTTP-native payment flows,
+- reliable settlement orchestration,
+- and merchant-friendly abstractions (credits, treasury routing, and flexible payout paths).
+
+In short: x402 supplies the protocol primitive, while Sangria-Net delivers production-grade payment operations around it.
+
+## Account Types in Sangria-Net
+
+To keep fund flows clear and compliant, each user is assigned one of two account types:
+
+1. **Client Account**
+   - Can purchase Sangria Credits.
+   - Uses those credits to pay for services within Sangria-Net flows.
+   - Does **not** withdraw funds from Sangria wallet rails to a personal bank account.
+
+2. **Merchant Account**
+   - Receives value through Sangria-Net settlement flows.
+   - Can withdraw available balances from Sangria wallet rails into their own personal bank accounts.
+   - Does **not** purchase client-side spending credits as their primary account function.
+
+This separation helps Sangria-Net keep purchasing and payout responsibilities distinct while improving operational controls for treasury and settlement.
+
+## Conclusion
+
+x402 is a real attempt to solve one of the web’s oldest missing pieces: low-friction native payments for digital requests.
+
+As usage shifts toward autonomous software and pay-per-action services, protocols like x402 become foundational. Sangria-Net builds on that foundation to make these flows practical for both developers and merchants—without forcing users to become crypto experts.
+
+The next internet payment layer is not about bigger checkout pages. It’s about programmable value exchange at request speed.

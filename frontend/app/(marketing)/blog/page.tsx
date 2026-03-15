@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft, Calendar, Tag } from "lucide-react";
+import { ArrowLeft, Calendar, Tag, User } from "lucide-react";
 import { getAllPosts } from "@/lib/blog";
 
 export const metadata = {
@@ -43,6 +43,10 @@ export default function BlogPage() {
                 className="card p-6 card-hover block"
               >
                 <div className="flex items-center gap-3 text-xs text-zinc-500 dark:text-zinc-400 mb-3">
+                  <span className="inline-flex items-center gap-1">
+                    <User className="w-3.5 h-3.5" />
+                    {post.author}
+                  </span>
                   <span className="inline-flex items-center gap-1">
                     <Calendar className="w-3.5 h-3.5" />
                     {new Date(post.date).toLocaleDateString("en-US", {
