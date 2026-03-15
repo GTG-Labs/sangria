@@ -1,15 +1,12 @@
 import { handleAuth } from "@workos-inc/authkit-nextjs";
 
 export const GET = handleAuth({
+  returnPathname: "/dashboard",
   onSuccess: async (authData: { user?: any; accessToken?: string }) => {
-    // Validate required data and fail fast
     const accessToken = authData.accessToken;
-    if (!accessToken) {
-      throw new Error("No access token received from WorkOS");
-    }
-
-    if (!process.env.BACKEND_URL) {
-      throw new Error("BACKEND_URL environment variable is not set");
+    if (!accessToken || !process.env.BACKEND_URL) {
+      console.warn("Skipping user upsert: missing access token or BACKEND_URL");
+      return;
     }
 
     // Call Go backend to upsert user record on login
@@ -30,20 +27,13 @@ export const GET = handleAuth({
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(
-          `Failed to upsert user: ${response.status} ${errorText}`,
-        );
+        console.error(`Failed to upsert user: ${response.status} ${errorText}`);
+      } else {
+        console.log("User record upserted successfully");
       }
-
-      console.log("User record upserted successfully");
     } catch (error) {
       clearTimeout(timeoutId);
-
-      if (error instanceof Error) {
-        throw error;
-      } else {
-        throw new Error(`Error upserting user: ${error}`);
-      }
+      console.error("Error upserting user:", error);
     }
   },
 });

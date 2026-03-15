@@ -37,11 +37,10 @@ cp .env.example .env   # fill in your DATABASE_URL
 
 Defined in `schema.ts`:
 
-**accounts**
+**users**
 | Column | Type | Notes |
 |---|---|---|
-| id | bigserial | Primary key |
-| account_number | text | Unique, not null |
+| workos_id | text | Primary key |
 | owner | text | Not null |
 | created_at | timestamp (tz) | Defaults to now |
 | updated_at | timestamp (tz) | Defaults to now |

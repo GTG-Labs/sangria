@@ -6,20 +6,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// UpsertUser creates or updates a user (WorkOS identity) and returns the full row.
-func UpsertUser(ctx context.Context, pool *pgxpool.Pool, accountNumber, owner, workosID string) (User, error) {
-	var u User
-	err := pool.QueryRow(ctx,
-		`INSERT INTO users (account_number, owner, workos_id)
-		 VALUES ($1, $2, $3)
-		 ON CONFLICT (workos_id) DO UPDATE
-		 	SET owner = EXCLUDED.owner
-		 RETURNING id, account_number, owner, workos_id, created_at, updated_at`,
-		accountNumber, owner, workosID,
-	).Scan(&u.ID, &u.AccountNumber, &u.Owner, &u.WorkosID, &u.CreatedAt, &u.UpdatedAt)
-	return u, err
-}
-
 // GetAllAccounts returns all financial ledger accounts.
 func GetAllAccounts(ctx context.Context, pool *pgxpool.Pool) ([]Account, error) {
 	rows, err := pool.Query(ctx,

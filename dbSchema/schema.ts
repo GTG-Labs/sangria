@@ -7,7 +7,6 @@ import {
   bigint,
   index,
   unique,
-  bigserial,
   text
 } from "drizzle-orm/pg-core";
 
@@ -23,10 +22,8 @@ export const accountTypeEnum = pgEnum("account_type", [
 ]);
 
 export const users = pgTable("users", {
-  id: bigserial({ mode: "number" }).primaryKey(),
-  accountNumber: text("account_number").notNull().unique(),
+  workosId: text("workos_id").primaryKey(),
   owner: text().notNull(),
-  workosId: text("workos_id").notNull().unique(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

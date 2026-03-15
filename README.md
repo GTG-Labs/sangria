@@ -53,7 +53,7 @@ The API is now running at `http://localhost:3000`.
 curl http://localhost:3000/
 
 # Create an account
-curl -X POST "http://localhost:3000/accounts?account_number=ACC001&owner=Alice"
+curl -X POST "http://localhost:3000/accounts" -H "Content-Type: application/json" -d '{"name":"Cash","type":"ASSET","currency":"USD"}'
 
 # List accounts
 curl http://localhost:3000/accounts

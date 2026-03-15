@@ -118,8 +118,11 @@ func verifyWorkOSToken(ctx context.Context, tokenStr string) (string, error) {
 		return "", fmt.Errorf("failed to get JWKS from cache: %w", err)
 	}
 
-	// Parse and verify JWT token
-	token, err := jwt.ParseString(tokenStr, jwt.WithKeySet(keySet), jwt.WithValidate(true))
+	// Parse and verify JWT token.
+	// WithAcceptableSkew: WorkOS may issue tokens with an `iat` a few seconds
+	// ahead of this server's clock, causing "iat not satisfied" rejections.
+	// A 5-second window accounts for normal clock drift.
+	token, err := jwt.ParseString(tokenStr, jwt.WithKeySet(keySet), jwt.WithValidate(true), jwt.WithAcceptableSkew(5*time.Second))
 	if err != nil {
 		if errors.Is(err, jwt.ErrTokenExpired()) {
 			return "", fmt.Errorf("token expired, please refresh your session")
@@ -205,19 +208,15 @@ func main() {
 	// Configure allowed origins from environment
 	allowedOrigins := getallowedOrigins()
 
-	// Add secure CORS middleware
+	// Add secure CORS middleware — only set CORS headers for allowed origins (fail closed)
 	app.Use(func(c fiber.Ctx) error {
-		// Get the Origin header from the request
 		origin := c.Get("Origin")
 
-		// Check if origin is in allowlist
 		if isOriginAllowed(origin, allowedOrigins) {
 			c.Set("Access-Control-Allow-Origin", origin)
+			c.Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+			c.Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 		}
-		// If origin not allowed, don't set CORS headers (fail closed)
-
-		c.Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		c.Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 
 		if c.Method() == "OPTIONS" {
 			return c.SendStatus(200)
@@ -244,85 +243,13 @@ func main() {
 			owner = fmt.Sprintf("%s %s", user.FirstName, user.LastName)
 		}
 
-		accountNumber := fmt.Sprintf("ACC-%s", strings.ToUpper(user.ID[:8]))
-
-		u, err := dbengine.UpsertUser(c.Context(), pool, accountNumber, owner, user.ID)
+		u, err := dbengine.UpsertUser(c.Context(), pool, owner, user.ID)
 		if err != nil {
 			log.Printf("upsert user error: %v", err)
 			return c.Status(500).JSON(fiber.Map{"error": "failed to create user"})
 		}
 
 		return c.Status(201).JSON(u)
-	})
-
-	// POST /accounts — create a financial ledger account
-	app.Post("/accounts", workosAuthMiddleware, func(c fiber.Ctx) error {
-		var body struct {
-			Name     string               `json:"name"`
-			Type     dbengine.AccountType  `json:"type"`
-			Currency dbengine.Currency     `json:"currency"`
-		}
-		if err := c.Bind().JSON(&body); err != nil {
-			return c.Status(400).JSON(fiber.Map{"error": "invalid request body"})
-		}
-		if body.Name == "" || body.Type == "" || body.Currency == "" {
-			return c.Status(400).JSON(fiber.Map{"error": "name, type, and currency are required"})
-		}
-
-		user := c.Locals("workos_user").(WorkOSUser)
-		userID := user.ID
-
-		account, err := dbengine.CreateAccount(c.Context(), pool, body.Name, body.Type, body.Currency, &userID)
-		if err != nil {
-			log.Printf("create account error: %v", err)
-			return c.Status(500).JSON(fiber.Map{"error": "failed to create account"})
-		}
-
-		return c.Status(201).JSON(account)
-	})
-
-	// GET /accounts — list all financial ledger accounts
-	app.Get("/accounts", func(c fiber.Ctx) error {
-		accounts, err := dbengine.GetAllAccounts(c.Context(), pool)
-		if err != nil {
-			log.Printf("query error: %v", err)
-			return c.Status(500).JSON(fiber.Map{"error": "failed to fetch accounts"})
-		}
-
-		return c.JSON(accounts)
-	})
-
-	// POST /transactions — create a double-entry transaction
-	app.Post("/transactions", workosAuthMiddleware, func(c fiber.Ctx) error {
-		var body struct {
-			IdempotencyKey string              `json:"idempotency_key"`
-			Lines          []dbengine.LedgerLine `json:"lines"`
-		}
-		if err := c.Bind().JSON(&body); err != nil {
-			return c.Status(400).JSON(fiber.Map{"error": "invalid request body"})
-		}
-		if body.IdempotencyKey == "" || len(body.Lines) == 0 {
-			return c.Status(400).JSON(fiber.Map{"error": "idempotency_key and lines are required"})
-		}
-
-		entries, err := dbengine.InsertTransaction(c.Context(), pool, body.IdempotencyKey, body.Lines)
-		if err != nil {
-			log.Printf("insert transaction error: %v", err)
-			return c.Status(500).JSON(fiber.Map{"error": "failed to create transaction"})
-		}
-
-		return c.Status(201).JSON(entries)
-	})
-
-	// GET /transactions — list all transactions
-	app.Get("/transactions", func(c fiber.Ctx) error {
-		txns, err := dbengine.GetAllTransactions(c.Context(), pool)
-		if err != nil {
-			log.Printf("query error: %v", err)
-			return c.Status(500).JSON(fiber.Map{"error": "failed to fetch transactions"})
-		}
-
-		return c.JSON(txns)
 	})
 
 	log.Fatal(app.Listen(":8080"))

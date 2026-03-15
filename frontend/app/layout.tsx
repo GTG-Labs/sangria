@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
 import { PT_Serif, Ubuntu, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
-import Navigation from "@/components/Navigation";
-import Footer from "@/components/Footer";
 
 import { RootProvider } from "fumadocs-ui/provider/next";
 
@@ -43,9 +41,7 @@ export default function RootLayout({
         className={`${ptSerif.variable} ${ubuntu.variable} ${jetbrainsMono.variable} antialiased`}
       >
         <RootProvider theme={{ enabled: false }} search={{ enabled: false }}>
-            <Navigation />
             {children}
-            <Footer />
         </RootProvider>
       </body>
     </html>

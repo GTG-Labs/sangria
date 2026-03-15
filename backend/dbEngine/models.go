@@ -39,12 +39,10 @@ type Account struct {
 }
 
 type User struct {
-	ID            int64     `json:"id"`
-	AccountNumber string    `json:"account_number"`
-	Owner         string    `json:"owner"`
-	WorkosID      string    `json:"workos_id"`
-	CreatedAt     time.Time `json:"created_at"`
-	UpdatedAt     time.Time `json:"updated_at"`
+	WorkosID  string    `json:"workos_id"`
+	Owner     string    `json:"owner"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 type Transaction struct {
