@@ -36,7 +36,9 @@ The client uses **Sangria Credits**. The merchant is a raw x402 endpoint and rec
 
 1. **Initial request**: user (via Sangria SDK) calls a protected endpoint.
 2. **402 challenge**: merchant returns `HTTP 402 Payment Required` with headers specifying price, recipient, and network.
-3. **Credit check & signature**: SDK verifies sufficient credits, then generates an **ERC-3009 TransferWithAuthorization** signed by the **Treasury Wallet** authorizing Treasury USDC → merchant.
+3. **Credit check & authorization creation**: SDK verifies sufficient credits and requests payment authorization from Sangria backend; an **ERC-3009 TransferWithAuthorization** must be signed **server-side only** by secure treasury/orchestration systems holding the **Treasury Wallet** key material (or by an explicitly configured delegated signer), never by client-side SDKs.
+
+**Security note:** Treasury private keys must remain in hardened custody (for example HSM/KMS-backed signing). Recommended flow: SDK sends payment intent/context to backend → backend validates credits/policy limits and challenge fields → backend signs ERC-3009 authorization in secure infrastructure → backend returns signed payload for submission.
 
 **Phase III — Settlement & delivery**
 
@@ -63,7 +65,7 @@ The client is a raw x402 wallet paying in USDC. The merchant is on Sangria and w
 
 **Flow**
 
-1. External client follows normal x402 flow and pays USDC to **Sangria’s Combined Treasury Wallet** (for the merchant).
+1. External client follows normal x402 flow, signs the **ERC-3009 TransferWithAuthorization** with its own wallet, and pays USDC to **Sangria’s Combined Treasury Wallet** (for the merchant).
 2. Treasury receives USDC on-chain.
 3. Sangria converts USDC → fiat via off-ramp.
 4. Sangria credits merchant’s Sangria account balance (minus spread).

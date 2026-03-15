@@ -74,7 +74,7 @@ A Python client library extending HTTPX with x402 payment capabilities.
 - If an endpoint returns `402 Payment Required`, the SDK automatically:
     1. Reads payment terms from response headers.
     2. Verifies the user has sufficient Sangria Credits.
-    3. Signs an **ERC-3009 TransferWithAuthorization** (EIP-712 typed data).
+    3. For Sangria-credit flows (Scenario 1), requests a backend-generated **ERC-3009 TransferWithAuthorization** signed server-side by the Treasury wallet; for external raw x402 clients (Scenario 3), the client signs the **ERC-3009 TransferWithAuthorization** with its own wallet.
     4. Retries the request with the signed payment in the `X-PAYMENT` header.
 - Supports both `exact` (fixed price) and `upto` (variable price) schemes.
 

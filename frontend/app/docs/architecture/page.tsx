@@ -94,8 +94,9 @@ export default function Architecture() {
           </li>
           <li>
             <strong>Credit Check &amp; Signature</strong> — The Sangria SDK verifies the user has sufficient
-            Credits, then generates an <strong>ERC-3009 TransferWithAuthorization</strong> signed by the{' '}
-            <strong>Treasury Wallet</strong> — authorizing a transfer of Treasury USDC directly to the merchant.
+            Credits, then requests a backend-generated <strong>ERC-3009 TransferWithAuthorization</strong> signed
+            server-side by the <strong>Treasury Wallet</strong> (via secure orchestration/key custody), never by
+            client-side SDK keys, authorizing a transfer of Treasury USDC directly to the merchant.
           </li>
         </ol>
 
@@ -184,7 +185,8 @@ export default function Architecture() {
         <ol>
           <li>
             <strong>Standard x402 Request</strong> — The external client follows the normal x402 protocol,
-            paying USDC to <strong>Sangria&apos;s Combined Treasury Wallet</strong> on behalf of the merchant.
+            signing the <strong>ERC-3009 TransferWithAuthorization</strong> with its own wallet and paying USDC
+            to <strong>Sangria&apos;s Combined Treasury Wallet</strong> on behalf of the merchant.
           </li>
           <li><strong>USDC Received</strong> — Sangria&apos;s treasury receives the USDC on-chain.</li>
           <li>
@@ -269,7 +271,7 @@ export default function Architecture() {
             <ol>
               <li>Reads payment terms from the response headers</li>
               <li>Verifies the user has sufficient Sangria Credits</li>
-              <li>Signs an <strong>ERC-3009 TransferWithAuthorization</strong> using the user&apos;s key</li>
+              <li>For Sangria-credit flows (Scenario 1), requests a backend-generated <strong>ERC-3009 TransferWithAuthorization</strong> signed server-side by the <strong>Treasury Wallet</strong> via secure orchestration/key custody (not client-side keys)</li>
               <li>Retries the request with the signed payment in the <code>X-PAYMENT</code> header</li>
             </ol>
           </li>
@@ -455,7 +457,7 @@ POST /run       → Variable cost based on work performed (upto scheme)`}</code>
 
         <ul>
           <li><strong>CDP key management</strong> — Private keys stored server-side by Coinbase, encrypted with <code>CDP_WALLET_SECRET</code>. Losing the secret = losing wallet access.</li>
-          <li><strong>Client-side signing only</strong> — Private keys exported from CDP only momentarily for ERC-3009 signature generation.</li>
+          <li><strong>Scenario-specific signing</strong> — In Scenario 1, <strong>ERC-3009 TransferWithAuthorization</strong> is signed server-side by the <strong>Treasury Wallet</strong> through secure orchestration/key custody; in Scenario 3, the external client signs with its own wallet.</li>
           <li><strong>Nonce protection</strong> — Each ERC-3009 authorization has a unique nonce, preventing replay attacks.</li>
           <li><strong>Transaction mutexes</strong> — Prevent double-settlement of concurrent payment requests.</li>
           <li><strong>Facilitator trust</strong> — Coinbase operates the facilitator; it must be trusted to verify and settle honestly.</li>

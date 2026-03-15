@@ -29,7 +29,10 @@ export function getAllPosts(): BlogPostMeta[] {
 
     return {
       slug,
-      author: data.author ?? "Sangria Team",
+      author:
+        typeof data.author === "string" && data.author.trim() !== ""
+          ? data.author.trim()
+          : "Sangria Team",
       title: data.title ?? slug,
       date: data.date ?? "",
       description: data.description ?? "",
@@ -53,7 +56,10 @@ export function getPostBySlug(slug: string): BlogPost | null {
 
   return {
     slug,
-    author: data.author ?? "Sangria Team",
+    author:
+      typeof data.author === "string" && data.author.trim() !== ""
+        ? data.author.trim()
+        : "Sangria Team",
     title: data.title ?? slug,
     date: data.date ?? "",
     description: data.description ?? "",

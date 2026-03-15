@@ -11,17 +11,28 @@ We're excited to introduce **Sangria** — a payment network that makes it dead 
 
 The internet was supposed to have native payments. HTTP 402 "Payment Required" has been in the spec since the 90s, but nobody ever built a real protocol around it — until now.
 
-With the [x402 protocol](https://www.x402.org/), any HTTP endpoint can require payment, and clients can automatically pay and get access. No accounts, no API keys, no subscriptions.
+With the [x402 protocol](https://www.x402.org/), any HTTP endpoint can require payment, and clients can automatically pay and get access. In many deployments, this can reduce or avoid account creation, static API keys, and subscription lock-in for one-off usage, though some merchants or environments may still require app-level identity, API keys, or pre-authorization controls.
 
 ## How It Works
 
-The flow is simple:
+At a high level, Sangria supports three scenarios depending on who is on the platform:
+
+1. **Scenario 1 — Client on Sangria, Merchant external (raw x402)**: the client pays with **Sangria Credits** while Sangria’s **Treasury Wallet** settles USDC on-chain.
+2. **Scenario 2 — Both on Sangria**: an internal ledger debit/credit (no blockchain, no ERC-3009 signing).
+3. **Scenario 3 — Client external, Merchant on Sangria**: the external client pays USDC on-chain and Sangria credits the merchant’s fiat balance.
+
+The basic x402 request loop looks like this:
 
 1. Client makes a normal HTTP request
 2. Server responds with `402 Payment Required` and a price
-3. Client signs a USDC payment authorization
+3. A payment authorization is signed via **ERC-3009 TransferWithAuthorization**
 4. Client retries the request with the payment header
 5. Server verifies, settles on-chain, and returns the data
+
+**Signing model by scenario:**
+- **Scenario 1:** the Sangria backend signs ERC-3009 server-side with the **Treasury Wallet** (secure key custody; never client-side SDK keys).
+- **Scenario 2:** no signing; purely internal ledger updates.
+- **Scenario 3:** the external client signs ERC-3009 with its own wallet.
 
 ```python
 from fastapi import FastAPI
