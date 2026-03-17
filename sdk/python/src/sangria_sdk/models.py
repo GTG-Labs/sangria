@@ -106,7 +106,15 @@ class SettlementResult:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "SettlementResult":
-        success = bool(data.get("success", False))
+        raw_success = data.get("success", False)
+        if isinstance(raw_success, bool):
+            success = raw_success
+        elif isinstance(raw_success, str):
+            success = raw_success.strip().lower() in {"true", "1", "yes"}
+        elif isinstance(raw_success, (int, float)):
+            success = raw_success != 0
+        else:
+            success = False
         transaction = data.get("transaction") or data.get("transaction_hash")
         error = data.get("error") or data.get("reason")
         return cls(
