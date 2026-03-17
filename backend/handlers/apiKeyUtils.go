@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"crypto/rand"
-	"crypto/subtle"
 	"encoding/hex"
 	"fmt"
 	"strings"
@@ -180,10 +179,4 @@ func ExtractKeyID(fullKey string) (string, error) {
 	}
 
 	return keyID, nil
-}
-
-// SecureCompare performs constant-time comparison of API key hashes
-// to prevent timing attacks
-func SecureCompare(a, b string) bool {
-	return subtle.ConstantTimeCompare([]byte(a), []byte(b)) == 1
 }

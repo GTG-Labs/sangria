@@ -125,7 +125,8 @@ export const cards = pgTable(
     userId: text("user_id")
       .notNull()
       .references(() => users.workosId),
-    apiKey: text("api_key").notNull().unique(),
+    apiKey: text("api_key").notNull(),
+    keyId: varchar("key_id", { length: 8 }).notNull(),
     name: varchar({ length: 255 }).notNull(),
     isActive: boolean("is_active").notNull().default(true),
     lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
@@ -133,7 +134,11 @@ export const cards = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (table) => [index("idx_cards_user_id").on(table.userId)],
+  (table) => [
+    index("idx_cards_user_id").on(table.userId),
+    index("idx_cards_key_id").on(table.keyId),
+    unique("uq_cards_api_key").on(table.apiKey),
+  ],
 );
 
 // ---------------------------------------------------------------------------

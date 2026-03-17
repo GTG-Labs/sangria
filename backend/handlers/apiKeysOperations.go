@@ -4,9 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"sangrianet/backend/dbEngine"
+	dbengine "sangrianet/backend/dbEngine"
 )
 
 // ErrMaxAPIKeysReached is returned when a user tries to create more than 10 API keys
@@ -132,27 +133,10 @@ func GetAPIKeysByUserID(ctx context.Context, pool *pgxpool.Pool, userID string) 
 
 // GetAPIKeyByID retrieves a specific API key by ID
 func GetAPIKeyByID(ctx context.Context, pool *pgxpool.Pool, keyID string) (*dbengine.Merchant, error) {
-	query := `
-		SELECT id, user_id, api_key, key_id, name, is_active, last_used_at, created_at
-		FROM merchants
-		WHERE id = $1
-	`
-
-	var merchant dbengine.Merchant
-	err := pool.QueryRow(ctx, query, keyID).Scan(
-		&merchant.ID,
-		&merchant.UserID,
-		&merchant.APIKey,
-		&merchant.KeyID,
-		&merchant.Name,
-		&merchant.IsActive,
-		&merchant.LastUsedAt,
-		&merchant.CreatedAt,
-	)
+	merchant, err := dbengine.GetMerchantByID(ctx, pool, keyID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get merchant: %w", err)
 	}
-
 	return &merchant, nil
 }
 
@@ -202,13 +186,9 @@ func AuthenticateAPIKey(ctx context.Context, pool *pgxpool.Pool, providedKey str
 
 		// Verify the key against this hash
 		if VerifyAPIKey(providedKey, merchant.APIKey) {
-			// Update last used timestamp
-			_, updateErr := pool.Exec(ctx,
-				"UPDATE merchants SET last_used_at = NOW() WHERE id = $1",
-				merchant.ID)
-			if updateErr != nil {
-				// Log but don't fail authentication
-				fmt.Printf("Failed to update last_used_at for merchant %s: %v\n", merchant.ID, updateErr)
+			// Update last used timestamp — log but don't fail authentication
+			if err := dbengine.UpdateMerchantLastUsedAt(ctx, pool, merchant.ID); err != nil {
+				log.Printf("failed to update last_used_at for merchant %s: %v", merchant.ID, err)
 			}
 
 			return &merchant, nil
@@ -243,38 +223,3 @@ func RevokeAPIKey(ctx context.Context, pool *pgxpool.Pool, keyID, userID string)
 	return nil
 }
 
-// DeleteAPIKey permanently deletes an API key
-func DeleteAPIKey(ctx context.Context, pool *pgxpool.Pool, keyID, userID string) error {
-	query := `
-		DELETE FROM merchants
-		WHERE id = $1 AND user_id = $2
-	`
-
-	result, err := pool.Exec(ctx, query, keyID, userID)
-	if err != nil {
-		return fmt.Errorf("failed to delete API key: %w", err)
-	}
-
-	if result.RowsAffected() == 0 {
-		return fmt.Errorf("API key not found or not owned by user")
-	}
-
-	return nil
-}
-
-// GetActiveAPIKeyCount returns the number of active API keys for a user
-func GetActiveAPIKeyCount(ctx context.Context, pool *pgxpool.Pool, userID string) (int, error) {
-	query := `
-		SELECT COUNT(*)
-		FROM merchants
-		WHERE user_id = $1 AND is_active = true
-	`
-
-	var count int
-	err := pool.QueryRow(ctx, query, userID).Scan(&count)
-	if err != nil {
-		return 0, fmt.Errorf("failed to count active API keys: %w", err)
-	}
-
-	return count, nil
-}

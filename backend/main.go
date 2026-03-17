@@ -20,7 +20,7 @@ import (
 
 	dbengine "sangrianet/backend/dbEngine"
 	handlers "sangrianet/backend/handlers"
-	"sangrianet/backend/merchantPaymentHandler"
+	merchantPaymentHandler "sangrianet/backend/merchantPaymentHandler"
 )
 
 // WorkOSUser contains user information from validated session
@@ -186,29 +186,6 @@ func verifyWorkOSToken(ctx context.Context, tokenStr string) (string, error) {
 	return userIDStr, nil
 }
 
-// merchantAPIKeyMiddleware validates a merchant API key from the request
-// and stores the resolved Merchant in context locals.
-//
-// TODO: The API key lookup mechanism is being handled separately.
-// Currently this needs a strategy for O(1) bcrypt lookup (e.g. key prefix/identifier).
-func merchantAPIKeyMiddleware(pool *pgxpool.Pool) fiber.Handler {
-	return func(c fiber.Ctx) error {
-		apiKey := c.Get("X-API-Key")
-		if apiKey == "" {
-			return c.Status(401).JSON(fiber.Map{"error": "X-API-Key header required"})
-		}
-
-		// TODO: Implement merchant lookup by API key.
-		// bcrypt hashes can't be used in WHERE clauses, so this needs a
-		// prefix/identifier approach or a separate lookup table.
-		// For now, this middleware is a placeholder.
-		_ = pool
-		_ = apiKey
-
-		return c.Status(501).JSON(fiber.Map{"error": "API key authentication not yet implemented"})
-	}
-}
-
 // getallowedOrigins parses the ALLOWED_ORIGINS environment variable
 func getallowedOrigins() []string {
 	allowedOriginsEnv := os.Getenv("ALLOWED_ORIGINS")
@@ -298,9 +275,6 @@ func main() {
 		return c.SendString("Hello, Sangria!")
 	})
 
-	// --- Stub payment routes (no auth / DB required) ---
-	merchantPaymentHandler.RegisterRoutes(app)
-
 	// POST /users — register/upsert a user on login (requires authentication)
 	app.Post("/users", workosAuthMiddleware, func(c fiber.Ctx) error {
 		user := c.Locals("workos_user").(WorkOSUser)
@@ -345,49 +319,9 @@ func main() {
 		return c.JSON(apiKeys)
 	})
 
-	// POST /api-keys — create new API key
-	apiKeysGroup.Post("/", func(c fiber.Ctx) error {
-		user := c.Locals("workos_user").(WorkOSUser)
-
-		type CreateAPIKeyRequest struct {
-			Name   string `json:"name"`
-			IsLive bool   `json:"is_live"`
-		}
-
-		var req CreateAPIKeyRequest
-		if err := c.Bind().JSON(&req); err != nil {
-			return c.Status(400).JSON(fiber.Map{"error": "Invalid request body"})
-		}
-
-		if req.Name == "" {
-			return c.Status(400).JSON(fiber.Map{"error": "API key name is required"})
-		}
-
-		if len(req.Name) > 255 {
-			return c.Status(400).JSON(fiber.Map{"error": "API key name too long (max 255 characters)"})
-		}
-
-		apiKey, fullKey, err := handlers.CreateAPIKey(c.Context(), pool, user.ID, req.Name, req.IsLive)
-		if err != nil {
-			// Check if it's the max keys error and return appropriate response
-			if errors.Is(err, handlers.ErrMaxAPIKeysReached) {
-				return c.Status(400).JSON(fiber.Map{"error": "Maximum number of API keys reached (10)"})
-			}
-			log.Printf("Failed to create API key for user %s: %v", user.ID, err)
-			return c.Status(500).JSON(fiber.Map{"error": "Failed to create API key"})
-		}
-
-		// Return the full key only once, and the safe API key object
-		response := fiber.Map{
-			"api_key": apiKey,
-			"key":     fullKey, // This is the only time the full key is returned
-		}
-
-		// Remove sensitive data from the api_key object
-		apiKey.APIKey = ""
-
-		return c.Status(201).JSON(response)
-	})
+	// NOTE: Use POST /merchants to create merchant API keys instead.
+	// POST /api-keys creation is disabled — all key creation goes through
+	// the merchant endpoint which also sets up the USDC LIABILITY account.
 
 	// DELETE /api-keys/:id — revoke/delete API key
 	apiKeysGroup.Delete("/:id", func(c fiber.Ctx) error {
@@ -407,36 +341,20 @@ func main() {
 		return c.Status(204).Send(nil)
 	})
 
-	// Merchant API endpoints (protected by API key authentication)
-	merchantGroup := app.Group("/merchant", apiKeyAuthMiddleware)
+	// --- Merchant endpoints (API key auth) ---
+	merchantGroup := app.Group("/merchants", apiKeyAuthMiddleware)
+	merchantGroup.Get("/profile", merchantPaymentHandler.GetMerchantProfile(pool))
+	merchantGroup.Get("/balance", merchantPaymentHandler.GetMerchantBalance(pool))
 
-	// GET /merchant/profile — get merchant profile using API key
-	merchantGroup.Get("/profile", func(c fiber.Ctx) error {
-		merchantKey := c.Locals("merchant_api_key").(*dbengine.Merchant)
-		userID := c.Locals("merchant_user_id").(string)
+	// --- Admin endpoints (WorkOS JWT auth) ---
+	app.Post("/merchants", workosAuthMiddleware, handlers.CreateMerchantAPIKey(pool))
+	app.Post("/wallets/pool", workosAuthMiddleware, handlers.CreateWalletPool(pool))
 
-		// Get user information
-		user, err := dbengine.GetUserByWorkosID(c.Context(), pool, userID)
-		if err != nil {
-			log.Printf("Failed to get user for API key %s: %v", merchantKey.ID, err)
-			return c.Status(500).JSON(fiber.Map{"error": "Failed to retrieve merchant profile"})
-		}
+	// --- Payment endpoints (API key auth) ---
+	app.Post("/payments/generate-payment", apiKeyAuthMiddleware, merchantPaymentHandler.GeneratePayment(pool))
+	app.Post("/payments/settle-payment", apiKeyAuthMiddleware, merchantPaymentHandler.SettlePayment(pool))
 
-		response := fiber.Map{
-			"user": user,
-			"api_key": fiber.Map{
-				"id":           merchantKey.ID,
-				"name":         merchantKey.Name,
-				"is_active":    merchantKey.IsActive,
-				"last_used_at": merchantKey.LastUsedAt,
-				"created_at":   merchantKey.CreatedAt,
-			},
-		}
-
-		return c.JSON(response)
-	})
-
-	// Facilitator endpoints (x402 protocol) - protected by API key authentication
+	// --- Facilitator endpoints (x402 protocol, API key auth) ---
 	facilitatorGroup := app.Group("/facilitator", apiKeyAuthMiddleware)
 
 	// POST /facilitator/verify — verify a payment authorization
@@ -476,17 +394,6 @@ func main() {
 			"code":  "NOT_IMPLEMENTED",
 		})
 	})
-
-	// --- x402 routes ---
-
-	// Merchant API key auth (payments + balance)
-	app.Post("/payments/generate-payment", merchantAPIKeyMiddleware(pool), handlers.GeneratePayment(pool))
-	app.Post("/payments/settle-payment", merchantAPIKeyMiddleware(pool), handlers.SettlePayment(pool))
-	app.Get("/merchants/balance", merchantAPIKeyMiddleware(pool), handlers.GetMerchantBalance(pool))
-
-	// Admin routes (WorkOS JWT auth)
-	app.Post("/merchants", workosAuthMiddleware, handlers.CreateMerchant(pool))
-	app.Post("/wallets/pool", workosAuthMiddleware, handlers.CreateWalletPool(pool))
 
 	log.Fatal(app.Listen(":8080"))
 }
