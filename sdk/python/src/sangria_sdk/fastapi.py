@@ -23,6 +23,19 @@ def build_402_response(challenge: dict[str, Any]) -> JSONResponse:
     )
 
 
+def build_error_response(exc: Exception) -> JSONResponse:
+    if isinstance(exc, SettlementFailedError):
+        return JSONResponse(
+            status_code=403,
+            content={"detail": exc.reason or "Payment verification failed"},
+        )
+    if isinstance(exc, APIError):
+        status_code = 502 if exc.status_code is None else exc.status_code
+        payload = exc.payload or {"error": str(exc)}
+        return JSONResponse(status_code=status_code, content=payload)
+    return JSONResponse(status_code=500, content={"detail": "Unexpected Sangria SDK error"})
+
+
 def require_sangria_payment(
     merchant_client: SangriaMerchantClient,
     amount: float,
@@ -47,14 +60,17 @@ def require_sangria_payment(
             payment_signature = request.headers.get("PAYMENT-SIGNATURE")
 
             if not payment_signature:
-                challenge = await merchant_client.generate_payment(
-                    GeneratePaymentRequest(
-                        amount=amount,
-                        resource=resource,
-                        scheme=scheme,
-                        description=description,
+                try:
+                    challenge = await merchant_client.generate_payment(
+                        GeneratePaymentRequest(
+                            amount=amount,
+                            resource=resource,
+                            scheme=scheme,
+                            description=description,
+                        )
                     )
-                )
+                except APIError as exc:
+                    return build_error_response(exc)
                 return build_402_response(challenge.to_dict())
 
             settle_req = SettlePaymentRequest(
@@ -65,7 +81,10 @@ def require_sangria_payment(
                 idempotency_key=request.headers.get("Idempotency-Key"),
             )
 
-            verification = await merchant_client.settle_payment(settle_req)
+            try:
+                verification = await merchant_client.settle_payment(settle_req)
+            except (SettlementFailedError, APIError) as exc:
+                return build_error_response(exc)
             request.state.sangria_verification = verification
             return await func(*args, **kwargs)
 
