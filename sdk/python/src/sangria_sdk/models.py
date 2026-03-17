@@ -1,7 +1,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from decimal import Decimal
 from typing import Any
+
+
+def _coerce_decimal(value: Decimal | int | float | str) -> Decimal:
+    if isinstance(value, Decimal):
+        return value
+    return Decimal(str(value))
 
 
 @dataclass(slots=True)
@@ -14,14 +21,17 @@ class MerchantContext:
 
 @dataclass(slots=True)
 class GeneratePaymentRequest:
-    amount: float
+    amount: Decimal
     resource: str
     scheme: str = "exact"
     description: str | None = None
 
+    def __post_init__(self) -> None:
+        self.amount = _coerce_decimal(self.amount)
+
     def to_dict(self) -> dict[str, Any]:
         payload: dict[str, Any] = {
-            "amount": self.amount,
+            "amount": str(self.amount),
             "resource": self.resource,
             "scheme": self.scheme,
         }
@@ -68,15 +78,18 @@ class ChallengeConfig:
 class SettlePaymentRequest:
     payment_header: str
     resource: str
-    amount: float
+    amount: Decimal
     scheme: str = "exact"
     idempotency_key: str | None = None
+
+    def __post_init__(self) -> None:
+        self.amount = _coerce_decimal(self.amount)
 
     def to_dict(self) -> dict[str, Any]:
         payload: dict[str, Any] = {
             "paymentHeader": self.payment_header,
             "resource": self.resource,
-            "amount": self.amount,
+            "amount": str(self.amount),
             "scheme": self.scheme,
         }
         if self.idempotency_key is not None:

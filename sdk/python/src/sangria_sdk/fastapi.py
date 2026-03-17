@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 import base64
 import json
+from decimal import Decimal
 from functools import wraps
 from typing import Any
 
@@ -38,7 +39,7 @@ def build_error_response(exc: Exception) -> JSONResponse:
 
 def require_sangria_payment(
     merchant_client: SangriaMerchantClient,
-    amount: float,
+    amount: Decimal,
     scheme: str = "exact",
     description: str | None = None,
     resource_resolver: Callable[[Request], str] | None = None,
@@ -57,13 +58,14 @@ def require_sangria_payment(
                 raise HTTPException(status_code=500, detail="FastAPI request not available")
 
             resource = resource_resolver(request) if resource_resolver else request.url.path
+            normalized_amount = amount if isinstance(amount, Decimal) else Decimal(str(amount))
             payment_signature = request.headers.get("PAYMENT-SIGNATURE")
 
             if not payment_signature:
                 try:
                     challenge = await merchant_client.generate_payment(
                         GeneratePaymentRequest(
-                            amount=amount,
+                            amount=normalized_amount,
                             resource=resource,
                             scheme=scheme,
                             description=description,
@@ -76,7 +78,7 @@ def require_sangria_payment(
             settle_req = SettlePaymentRequest(
                 payment_header=payment_signature,
                 resource=resource,
-                amount=amount,
+                amount=normalized_amount,
                 scheme=scheme,
                 idempotency_key=request.headers.get("Idempotency-Key"),
             )
@@ -93,7 +95,7 @@ def require_sangria_payment(
     return decorator
 
 
-async def map_sangria_error(exc: Exception) -> HTTPException:
+def map_sangria_error(exc: Exception) -> HTTPException:
     if isinstance(exc, SettlementFailedError):
         return HTTPException(status_code=403, detail=exc.reason or "Payment verification failed")
     if isinstance(exc, APIError):
