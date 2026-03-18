@@ -4,3 +4,4 @@ backend/backend
 __pycache__/
 *.pyc
 node_modules
+*.egg-info/
