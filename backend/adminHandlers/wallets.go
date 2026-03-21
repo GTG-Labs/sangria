@@ -27,36 +27,28 @@ func CreateWalletPool(pool *pgxpool.Pool) fiber.Handler {
 			return c.Status(400).JSON(fiber.Map{"error": "unsupported network"})
 		}
 
-		// Create CDP EVM account.
+		// Create CDP EVM account on-chain.
 		address, err := cdpHandlers.CreateEvmAccount(c.Context())
 		if err != nil {
 			log.Printf("create evm account: %v", err)
 			return c.Status(500).JSON(fiber.Map{"error": "failed to create wallet"})
 		}
 
-		// Fund with testnet ETH for gas.
+		// Create the USDC ASSET ledger account and crypto wallet record
+		// in a single transaction — both succeed or both rollback.
+		wallet, _, err := dbengine.CreateCryptoWalletWithAccount(
+			c.Context(), pool, address, dbengine.Network(req.Network),
+			"Hot Wallet USDC - "+address[:10],
+		)
+		if err != nil {
+			log.Printf("create crypto wallet with account: %v", err)
+			return c.Status(500).JSON(fiber.Map{"error": "failed to create wallet record"})
+		}
+
+		// Fund with testnet ETH for gas — best-effort after DB records exist.
 		if err := cdpHandlers.FundETH(c.Context(), address, req.Network); err != nil {
 			log.Printf("fund eth: %v", err)
 			// Non-fatal — wallet is created, can be funded later.
-		}
-
-		// Create USDC ASSET account in ledger for this wallet.
-		acct, err := dbengine.CreateAccount(c.Context(), pool,
-			"Hot Wallet USDC - "+address[:10],
-			dbengine.AccountTypeAsset,
-			dbengine.USDC,
-			nil,
-		)
-		if err != nil {
-			log.Printf("create asset account: %v", err)
-			return c.Status(500).JSON(fiber.Map{"error": "failed to create ledger account"})
-		}
-
-		// Insert into crypto_wallets table.
-		wallet, err := dbengine.CreateCryptoWallet(c.Context(), pool, address, dbengine.Network(req.Network), acct.ID)
-		if err != nil {
-			log.Printf("create crypto wallet: %v", err)
-			return c.Status(500).JSON(fiber.Map{"error": "failed to create wallet record"})
 		}
 
 		return c.Status(201).JSON(fiber.Map{
