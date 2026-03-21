@@ -2,8 +2,10 @@ package dbengine
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -33,7 +35,12 @@ func EnsureUSDCLiabilityAccount(ctx context.Context, pool *pgxpool.Pool, userID 
 		return a, nil
 	}
 
-	// Account doesn't exist — create it.
+	// Only create if the account genuinely doesn't exist.
+	// Any other error (connection failure, scan error, etc.) should be surfaced.
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return Account{}, fmt.Errorf("query liability account: %w", err)
+	}
+
 	return CreateAccount(ctx, pool, "USDC Liability", AccountTypeLiability, USDC, &userID)
 }
 

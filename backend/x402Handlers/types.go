@@ -68,9 +68,9 @@ type NetworkConfig struct {
 // NetworkConfigs maps human-readable network names to their CAIP-2 IDs
 // and USDC contract addresses.
 var NetworkConfigs = map[string]NetworkConfig{
-	"base-sepolia":  {CAIP2: "eip155:84532", USDCAddress: "0x036CbD53842c5426634e7929541eC2318f3dCF7e"},
-	"base":          {CAIP2: "eip155:8453", USDCAddress: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"},
-	"polygon":       {CAIP2: "eip155:137", USDCAddress: "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359"},
-	"solana":        {CAIP2: "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp", USDCAddress: ""},  // TODO: Solana USDC address
-	"solana-devnet": {CAIP2: "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1", USDCAddress: ""}, // TODO: Solana devnet USDC address
+	"base-sepolia": {CAIP2: "eip155:84532", USDCAddress: "0x036CbD53842c5426634e7929541eC2318f3dCF7e"},
+	"base":         {CAIP2: "eip155:8453", USDCAddress: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"},
+	"polygon":      {CAIP2: "eip155:137", USDCAddress: "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359"},
+	"solana":        {CAIP2: "solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp", USDCAddress: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"},
+	"solana-devnet": {CAIP2: "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1", USDCAddress: "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU"},
 }

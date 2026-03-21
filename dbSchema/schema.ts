@@ -191,6 +191,7 @@ export const cryptoWallets = pgTable(
   (table) => [
     index("idx_crypto_wallets_last_used_at").on(table.lastUsedAt),
     index("idx_crypto_wallets_network").on(table.network),
+    unique("uq_crypto_wallets_account_id").on(table.accountId),
   ],
 );
 

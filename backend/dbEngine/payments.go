@@ -63,20 +63,32 @@ func UpdatePaymentSettled(ctx context.Context, pool *pgxpool.Pool, id, txHash, p
 
 // UpdatePaymentFailed marks a payment as failed.
 func UpdatePaymentFailed(ctx context.Context, pool *pgxpool.Pool, id string) error {
-	_, err := pool.Exec(ctx,
+	result, err := pool.Exec(ctx,
 		`UPDATE payments SET status = $1 WHERE id = $2 AND status = 'pending'`,
 		PaymentStatusFailed, id,
 	)
-	return err
+	if err != nil {
+		return fmt.Errorf("update payment failed: %w", err)
+	}
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("payment %s is not pending", id)
+	}
+	return nil
 }
 
 // UpdatePaymentExpired marks a payment as expired.
 func UpdatePaymentExpired(ctx context.Context, pool *pgxpool.Pool, id string) error {
-	_, err := pool.Exec(ctx,
+	result, err := pool.Exec(ctx,
 		`UPDATE payments SET status = $1 WHERE id = $2 AND status = 'pending'`,
 		PaymentStatusExpired, id,
 	)
-	return err
+	if err != nil {
+		return fmt.Errorf("update payment expired: %w", err)
+	}
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("payment %s is not pending", id)
+	}
+	return nil
 }
 
 // IsPaymentExpired checks if a payment has passed its expiry time.

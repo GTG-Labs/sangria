@@ -39,6 +39,10 @@ func GeneratePayment(pool *pgxpool.Pool) fiber.Handler {
 			return c.Status(400).JSON(fiber.Map{"error": "amount must be positive"})
 		}
 
+		if req.Currency != "USDC" {
+			return c.Status(400).JSON(fiber.Map{"error": "only USDC is supported"})
+		}
+
 		// Look up network config for CAIP-2 and USDC address.
 		netConfig, ok := x402Handlers.NetworkConfigs[req.Network]
 		if !ok {
@@ -86,8 +90,10 @@ func GeneratePayment(pool *pgxpool.Pool) fiber.Handler {
 					},
 				},
 			},
-			"description": req.Description,
-			"resource":    req.Resource,
+			"resource": x402Handlers.ResourceInfo{
+				URL:         req.Resource,
+				Description: req.Description,
+			},
 		})
 	}
 }

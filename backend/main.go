@@ -221,6 +221,10 @@ func main() {
 	})
 
 	// --- Admin endpoints (WorkOS JWT auth) ---
+	// TODO: Add admin role authorization. Currently any authenticated user can
+	// call these endpoints. Decide on an admin mechanism (e.g., is_admin flag on
+	// users, WorkOS roles/permissions, or internal secret) and add middleware to
+	// restrict access.
 	app.Post("/merchants", auth.WorkosAuthMiddleware, adminHandlers.CreateMerchantAPIKey(pool))
 	app.Post("/wallets/pool", auth.WorkosAuthMiddleware, adminHandlers.CreateWalletPool(pool))
 

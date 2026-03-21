@@ -109,11 +109,20 @@ func GetAPIKeysByUserID(ctx context.Context, pool *pgxpool.Pool, userID string) 
 	return merchants, nil
 }
 
-// GetAPIKeyByID retrieves a specific API key by ID.
-func GetAPIKeyByID(ctx context.Context, pool *pgxpool.Pool, keyID string) (*dbengine.Merchant, error) {
-	merchant, err := dbengine.GetMerchantByID(ctx, pool, keyID)
+// GetAPIKeyByKeyID retrieves a specific API key by its key_id (the 8-char hex
+// identifier embedded in the API key, not the merchant UUID).
+func GetAPIKeyByKeyID(ctx context.Context, pool *pgxpool.Pool, keyID string) (*dbengine.Merchant, error) {
+	var merchant dbengine.Merchant
+	err := pool.QueryRow(ctx,
+		`SELECT id, user_id, api_key, key_id, name, is_active, last_used_at, created_at
+		 FROM merchants WHERE key_id = $1`,
+		keyID,
+	).Scan(
+		&merchant.ID, &merchant.UserID, &merchant.APIKey, &merchant.KeyID,
+		&merchant.Name, &merchant.IsActive, &merchant.LastUsedAt, &merchant.CreatedAt,
+	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get merchant: %w", err)
+		return nil, fmt.Errorf("failed to get merchant by key_id: %w", err)
 	}
 	return &merchant, nil
 }
@@ -172,10 +181,10 @@ func AuthenticateAPIKey(ctx context.Context, pool *pgxpool.Pool, providedKey str
 }
 
 // RevokeAPIKey deactivates an API key.
-func RevokeAPIKey(ctx context.Context, pool *pgxpool.Pool, keyID, userID string) error {
+func RevokeAPIKey(ctx context.Context, pool *pgxpool.Pool, merchantID, userID string) error {
 	result, err := pool.Exec(ctx,
 		`UPDATE merchants SET is_active = false WHERE id = $1 AND user_id = $2`,
-		keyID, userID,
+		merchantID, userID,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to revoke API key: %w", err)

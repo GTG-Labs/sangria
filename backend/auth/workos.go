@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/lestrrat-go/jwx/v2/jwk"
@@ -13,16 +12,18 @@ import (
 	"github.com/workos/workos-go/v4/pkg/usermanagement"
 )
 
-// Global JWKS cache for WorkOS JWT validation
+// Global JWKS cache and URL for WorkOS JWT validation
 var jwksCache *jwk.Cache
+var jwksURL string
 
 // InitJWKSCache initializes the global JWKS cache with proper security settings.
 func InitJWKSCache(clientID string) error {
-	// Get JWKS URL for this client
-	jwksURL, err := usermanagement.GetJWKSURL(clientID)
+	// Get JWKS URL for this client and store it for reuse
+	parsedURL, err := usermanagement.GetJWKSURL(clientID)
 	if err != nil {
 		return fmt.Errorf("failed to get JWKS URL: %w", err)
 	}
+	jwksURL = parsedURL.String()
 
 	// Create HTTP client with timeout to avoid indefinite hangs
 	httpClient := &http.Client{
@@ -33,11 +34,11 @@ func InitJWKSCache(clientID string) error {
 	jwksCache = jwk.NewCache(context.Background())
 
 	// Register the JWKS URL with the cache, using custom HTTP client and fetch whitelist
-	jwksCache.Register(jwksURL.String(),
+	jwksCache.Register(jwksURL,
 		jwk.WithHTTPClient(httpClient),
 		jwk.WithFetchWhitelist(jwk.WhitelistFunc(func(u string) bool {
 			// Only allow fetching the expected WorkOS JWKS URL
-			return u == jwksURL.String()
+			return u == jwksURL
 		})))
 
 	return nil
@@ -45,19 +46,12 @@ func InitJWKSCache(clientID string) error {
 
 // VerifyWorkOSToken validates a WorkOS JWT token and extracts the user ID.
 func VerifyWorkOSToken(ctx context.Context, tokenStr string) (string, error) {
-	clientID := os.Getenv("WORKOS_CLIENT_ID")
-	if clientID == "" {
-		return "", fmt.Errorf("WORKOS_CLIENT_ID not configured")
-	}
-
-	// Get JWKS URL for this client
-	jwksURL, err := usermanagement.GetJWKSURL(clientID)
-	if err != nil {
-		return "", fmt.Errorf("failed to get JWKS URL: %w", err)
+	if jwksCache == nil {
+		return "", fmt.Errorf("jwks cache not initialized — call InitJWKSCache first")
 	}
 
 	// Get key set from cache (this will automatically fetch/refresh as needed)
-	keySet, err := jwksCache.Get(ctx, jwksURL.String())
+	keySet, err := jwksCache.Get(ctx, jwksURL)
 	if err != nil {
 		return "", fmt.Errorf("failed to get JWKS from cache: %w", err)
 	}
