@@ -34,12 +34,20 @@ func InitJWKSCache(clientID string) error {
 	jwksCache = jwk.NewCache(context.Background())
 
 	// Register the JWKS URL with the cache, using custom HTTP client and fetch whitelist
-	jwksCache.Register(jwksURL,
+	err = jwksCache.Register(jwksURL,
 		jwk.WithHTTPClient(httpClient),
 		jwk.WithFetchWhitelist(jwk.WhitelistFunc(func(u string) bool {
-			// Only allow fetching the expected WorkOS JWKS URL
 			return u == jwksURL
 		})))
+	if err != nil {
+		return fmt.Errorf("failed to register JWKS URL: %w", err)
+	}
+
+	// Fetch and validate the JWKS immediately so we fail fast at startup
+	// if the endpoint is unreachable or returns invalid keys.
+	if _, err := jwksCache.Refresh(context.Background(), jwksURL); err != nil {
+		return fmt.Errorf("failed to fetch JWKS on startup: %w", err)
+	}
 
 	return nil
 }

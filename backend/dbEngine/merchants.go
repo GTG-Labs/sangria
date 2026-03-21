@@ -21,10 +21,28 @@ func GetMerchantByID(ctx context.Context, pool *pgxpool.Pool, id string) (Mercha
 }
 
 // EnsureUSDCLiabilityAccount returns the user's USDC LIABILITY account,
-// creating one if it doesn't exist yet.
+// creating one if it doesn't exist yet. Uses a transaction with a row lock
+// to prevent concurrent requests from creating duplicate accounts.
 func EnsureUSDCLiabilityAccount(ctx context.Context, pool *pgxpool.Pool, userID string) (Account, error) {
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		return Account{}, fmt.Errorf("begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	// Lock the user row to serialize concurrent calls for the same user.
+	var lockedUserID string
+	err = tx.QueryRow(ctx,
+		`SELECT workos_id FROM users WHERE workos_id = $1 FOR UPDATE`,
+		userID,
+	).Scan(&lockedUserID)
+	if err != nil {
+		return Account{}, fmt.Errorf("lock user row: %w", err)
+	}
+
+	// Check if the account already exists (under the lock).
 	var a Account
-	err := pool.QueryRow(ctx,
+	err = tx.QueryRow(ctx,
 		`SELECT id, name, type, currency, user_id, created_at
 		 FROM accounts
 		 WHERE user_id = $1 AND type = 'LIABILITY' AND currency = 'USDC'`,
@@ -32,16 +50,30 @@ func EnsureUSDCLiabilityAccount(ctx context.Context, pool *pgxpool.Pool, userID 
 	).Scan(&a.ID, &a.Name, &a.Type, &a.Currency, &a.UserID, &a.CreatedAt)
 
 	if err == nil {
+		tx.Commit(ctx)
 		return a, nil
 	}
 
-	// Only create if the account genuinely doesn't exist.
-	// Any other error (connection failure, scan error, etc.) should be surfaced.
 	if !errors.Is(err, pgx.ErrNoRows) {
 		return Account{}, fmt.Errorf("query liability account: %w", err)
 	}
 
-	return CreateAccount(ctx, pool, "USDC Liability", AccountTypeLiability, USDC, &userID)
+	// Account doesn't exist — create it within the same transaction.
+	err = tx.QueryRow(ctx,
+		`INSERT INTO accounts (name, type, currency, user_id)
+		 VALUES ($1, $2, $3, $4)
+		 RETURNING id, name, type, currency, user_id, created_at`,
+		"USDC Liability", AccountTypeLiability, USDC, userID,
+	).Scan(&a.ID, &a.Name, &a.Type, &a.Currency, &a.UserID, &a.CreatedAt)
+	if err != nil {
+		return Account{}, fmt.Errorf("create liability account: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return Account{}, fmt.Errorf("commit transaction: %w", err)
+	}
+
+	return a, nil
 }
 
 // GetMerchantUSDCLiabilityAccount returns the USDC LIABILITY account for a

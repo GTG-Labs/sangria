@@ -3,6 +3,7 @@ package merchantHandlers
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"strconv"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	dbengine "sangrianet/backend/dbEngine"
@@ -47,6 +49,9 @@ func GeneratePayment(pool *pgxpool.Pool) fiber.Handler {
 		netConfig, ok := x402Handlers.NetworkConfigs[req.Network]
 		if !ok {
 			return c.Status(400).JSON(fiber.Map{"error": "unsupported network"})
+		}
+		if !netConfig.IsEVM() {
+			return c.Status(400).JSON(fiber.Map{"error": "only EVM networks are supported for payments"})
 		}
 
 		// Pick LRU wallet on the requested network.
@@ -115,7 +120,11 @@ func SettlePayment(pool *pgxpool.Pool) fiber.Handler {
 		// Look up payment record.
 		payment, err := dbengine.GetPaymentByID(c.Context(), pool, req.PaymentID)
 		if err != nil {
-			return c.Status(404).JSON(fiber.Map{"error": "payment not found"})
+			if errors.Is(err, pgx.ErrNoRows) {
+				return c.Status(404).JSON(fiber.Map{"error": "payment not found"})
+			}
+			log.Printf("get payment by id: %v", err)
+			return c.Status(500).JSON(fiber.Map{"error": "failed to look up payment"})
 		}
 
 		// Verify payment belongs to this merchant.
@@ -149,6 +158,9 @@ func SettlePayment(pool *pgxpool.Pool) fiber.Handler {
 		if !ok {
 			return c.Status(500).JSON(fiber.Map{"error": "network config not found for payment"})
 		}
+		if !netConfig.IsEVM() {
+			return c.Status(500).JSON(fiber.Map{"error": "payment network does not support EVM settlement"})
+		}
 
 		canonicalRequirements := x402Handlers.PaymentRequirements{
 			Scheme:            "exact",
@@ -164,16 +176,18 @@ func SettlePayment(pool *pgxpool.Pool) fiber.Handler {
 			},
 		}
 
-		// Decode base64 payment payload.
+		// Decode base64 payment payload and preserve as raw JSON to avoid
+		// numeric coercion (e.g., large integers in crypto signatures).
 		payloadBytes, err := base64.StdEncoding.DecodeString(req.PaymentPayload)
 		if err != nil {
 			return c.Status(400).JSON(fiber.Map{"error": "invalid payment_payload encoding"})
 		}
 
-		var payload map[string]any
-		if err := json.Unmarshal(payloadBytes, &payload); err != nil {
+		// Validate it's valid JSON without deserializing.
+		if !json.Valid(payloadBytes) {
 			return c.Status(400).JSON(fiber.Map{"error": "invalid payment_payload JSON"})
 		}
+		payload := json.RawMessage(payloadBytes)
 
 		// Call facilitator /verify.
 		verifyResp, err := x402Handlers.Verify(c.Context(), payload, canonicalRequirements)

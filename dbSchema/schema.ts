@@ -227,5 +227,9 @@ export const payments = pgTable(
     index("idx_payments_merchant_id").on(table.merchantId),
     index("idx_payments_status").on(table.status),
     index("idx_payments_idempotency_key").on(table.idempotencyKey),
+    // Prevents the same on-chain tx from being attached to multiple payments.
+    // PostgreSQL allows multiple NULLs in unique constraints, so unsettled
+    // payments (null tx hash) are unaffected.
+    unique("uq_payments_settlement_tx_hash").on(table.settlementTxHash),
   ],
 );

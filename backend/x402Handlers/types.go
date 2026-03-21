@@ -1,5 +1,7 @@
 package x402Handlers
 
+import "encoding/json"
+
 // PaymentRequirements specifies the terms for an x402 payment.
 type PaymentRequirements struct {
 	Scheme            string         `json:"scheme"`
@@ -30,7 +32,7 @@ type ResourceInfo struct {
 // VerifyRequest is the payload sent to the facilitator /verify endpoint.
 type VerifyRequest struct {
 	X402Version  int                 `json:"x402Version"`
-	Payload      map[string]any      `json:"payload"`
+	Payload      json.RawMessage     `json:"payload"`
 	Requirements PaymentRequirements `json:"requirements"`
 }
 
@@ -45,7 +47,7 @@ type VerifyResponse struct {
 // SettleRequest is the payload sent to the facilitator /settle endpoint.
 type SettleRequest struct {
 	X402Version  int                 `json:"x402Version"`
-	Payload      map[string]any      `json:"payload"`
+	Payload      json.RawMessage     `json:"payload"`
 	Requirements PaymentRequirements `json:"requirements"`
 }
 
@@ -63,6 +65,12 @@ type SettleResponse struct {
 type NetworkConfig struct {
 	CAIP2       string
 	USDCAddress string
+}
+
+// IsEVM returns true if the network uses EIP-155 (EVM-compatible).
+// Only EVM networks support the EIP-712/EIP-3009 payment flow.
+func (n NetworkConfig) IsEVM() bool {
+	return len(n.CAIP2) >= 6 && n.CAIP2[:6] == "eip155"
 }
 
 // NetworkConfigs maps human-readable network names to their CAIP-2 IDs

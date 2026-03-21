@@ -50,6 +50,7 @@ func CreateMerchantAPIKey(pool *pgxpool.Pool) fiber.Handler {
 			"id":         merchant.ID,
 			"user_id":    merchant.UserID,
 			"name":       merchant.Name,
+			"key_id":     merchant.KeyID,
 			"api_key":    fullKey,
 			"is_active":  merchant.IsActive,
 			"created_at": merchant.CreatedAt,

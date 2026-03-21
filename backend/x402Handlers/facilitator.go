@@ -17,6 +17,9 @@ import (
 
 var httpClient = &http.Client{Timeout: 30 * time.Second}
 
+// maxFacilitatorBody caps the size of facilitator responses to prevent OOM.
+const maxFacilitatorBody = 1 << 20 // 1 MB
+
 // FacilitatorURL returns the configured facilitator URL from the
 // X402_FACILITATOR_URL environment variable. Returns an error if unset.
 func FacilitatorURL() (string, error) {
@@ -29,7 +32,7 @@ func FacilitatorURL() (string, error) {
 
 // Verify calls the facilitator /verify endpoint to validate a payment
 // authorization (EIP-712 signature, balance, nonce, etc.).
-func Verify(ctx context.Context, payload map[string]any, requirements PaymentRequirements) (*VerifyResponse, error) {
+func Verify(ctx context.Context, payload json.RawMessage, requirements PaymentRequirements) (*VerifyResponse, error) {
 	facilitatorURL, err := FacilitatorURL()
 	if err != nil {
 		return nil, err
@@ -58,7 +61,7 @@ func Verify(ctx context.Context, payload map[string]any, requirements PaymentReq
 	}
 	defer resp.Body.Close()
 
-	respBody, err := io.ReadAll(resp.Body)
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxFacilitatorBody))
 	if err != nil {
 		return nil, fmt.Errorf("read verify response: %w", err)
 	}
@@ -77,7 +80,7 @@ func Verify(ctx context.Context, payload map[string]any, requirements PaymentReq
 
 // Settle calls the facilitator /settle endpoint to submit the
 // transferWithAuthorization (EIP-3009) on-chain and move USDC.
-func Settle(ctx context.Context, payload map[string]any, requirements PaymentRequirements) (*SettleResponse, error) {
+func Settle(ctx context.Context, payload json.RawMessage, requirements PaymentRequirements) (*SettleResponse, error) {
 	facilitatorURL, err := FacilitatorURL()
 	if err != nil {
 		return nil, err
@@ -106,7 +109,7 @@ func Settle(ctx context.Context, payload map[string]any, requirements PaymentReq
 	}
 	defer resp.Body.Close()
 
-	respBody, err := io.ReadAll(resp.Body)
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxFacilitatorBody))
 	if err != nil {
 		return nil, fmt.Errorf("read settle response: %w", err)
 	}
