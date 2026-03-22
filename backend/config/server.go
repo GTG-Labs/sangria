@@ -2,6 +2,7 @@ package config
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 
@@ -22,11 +23,11 @@ func LoadEnvironment() {
 func SetupWorkOS() error {
 	workosAPIKey := os.Getenv("WORKOS_API_KEY")
 	if workosAPIKey == "" {
-		log.Fatal("WORKOS_API_KEY environment variable is required")
+		return fmt.Errorf("WORKOS_API_KEY environment variable is required")
 	}
 	workosClientID := os.Getenv("WORKOS_CLIENT_ID")
 	if workosClientID == "" {
-		log.Fatal("WORKOS_CLIENT_ID environment variable is required")
+		return fmt.Errorf("WORKOS_CLIENT_ID environment variable is required")
 	}
 
 	usermanagement.SetAPIKey(workosAPIKey)
@@ -38,7 +39,7 @@ func SetupWorkOS() error {
 func ConnectDatabase(ctx context.Context) (*pgxpool.Pool, error) {
 	connStr := os.Getenv("DATABASE_URL")
 	if connStr == "" {
-		log.Fatal("DATABASE_URL is not set")
+		return nil, fmt.Errorf("DATABASE_URL is not set")
 	}
 
 	pool, err := dbengine.Connect(ctx, connStr)

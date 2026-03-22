@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/gofiber/fiber/v3"
@@ -19,61 +20,85 @@ import (
 	dbengine "sangrianet/backend/dbEngine"
 )
 
-// Global JWKS cache, URL, and issuer for WorkOS JWT validation
-var jwksCache *jwk.Cache
-var jwksURL string
-var expectedIssuer string
+// jwksState holds the JWKS cache and URL for WorkOS JWT validation
+type jwksState struct {
+	cache *jwk.Cache
+	url   string
+}
+
+// Global state for WorkOS JWT validation
+var (
+	state          jwksState
+	expectedIssuer string
+	stateMu        sync.RWMutex
+	initOnce       sync.Once
+	initErr        error
+)
 
 // InitJWKSCache initializes the global JWKS cache with proper security settings.
 func InitJWKSCache(clientID string) error {
-	// Validate issuer first — fail fast if not configured.
-	expectedIssuer = os.Getenv("WORKOS_TOKEN_ISSUER")
-	if expectedIssuer == "" {
-		return fmt.Errorf("WORKOS_TOKEN_ISSUER environment variable is required")
-	}
+	initOnce.Do(func() {
+		// Validate issuer first — fail fast if not configured.
+		expectedIssuer = os.Getenv("WORKOS_TOKEN_ISSUER")
+		if expectedIssuer == "" {
+			initErr = fmt.Errorf("WORKOS_TOKEN_ISSUER environment variable is required")
+			return
+		}
 
-	// Get JWKS URL for this client and store it for reuse
-	parsedURL, err := usermanagement.GetJWKSURL(clientID)
-	if err != nil {
-		return fmt.Errorf("failed to get JWKS URL: %w", err)
-	}
-	jwksURL = parsedURL.String()
+		// Get JWKS URL for this client and store it for reuse
+		parsedURL, err := usermanagement.GetJWKSURL(clientID)
+		if err != nil {
+			initErr = fmt.Errorf("failed to get JWKS URL: %w", err)
+			return
+		}
 
-	// Create HTTP client with timeout to avoid indefinite hangs
-	httpClient := &http.Client{
-		Timeout: 10 * time.Second,
-	}
+		// Create HTTP client with timeout to avoid indefinite hangs
+		httpClient := &http.Client{
+			Timeout: 10 * time.Second,
+		}
 
-	// Initialize JWKS cache with security restrictions
-	jwksCache = jwk.NewCache(context.Background())
+		// Initialize JWKS cache with security restrictions
+		cache := jwk.NewCache(context.Background())
+		url := parsedURL.String()
 
-	// Register the JWKS URL with the cache, using custom HTTP client and fetch whitelist
-	err = jwksCache.Register(jwksURL,
-		jwk.WithHTTPClient(httpClient),
-		jwk.WithFetchWhitelist(jwk.WhitelistFunc(func(u string) bool {
-			return u == jwksURL
-		})))
-	if err != nil {
-		return fmt.Errorf("failed to register JWKS URL: %w", err)
-	}
+		// Register the JWKS URL with the cache, using custom HTTP client and fetch whitelist
+		err = cache.Register(url,
+			jwk.WithHTTPClient(httpClient),
+			jwk.WithFetchWhitelist(jwk.WhitelistFunc(func(u string) bool {
+				return u == url
+			})))
+		if err != nil {
+			initErr = fmt.Errorf("failed to register JWKS URL: %w", err)
+			return
+		}
 
-	// Fetch and validate the JWKS immediately so we fail fast at startup
-	// if the endpoint is unreachable or returns invalid keys.
-	if _, err := jwksCache.Refresh(context.Background(), jwksURL); err != nil {
-		return fmt.Errorf("failed to fetch JWKS on startup: %w", err)
-	}
+		// Fetch and validate the JWKS immediately so we fail fast at startup
+		// if the endpoint is unreachable or returns invalid keys.
+		if _, err := cache.Refresh(context.Background(), url); err != nil {
+			initErr = fmt.Errorf("failed to fetch JWKS on startup: %w", err)
+			return
+		}
 
-	return nil
+		stateMu.Lock()
+		state = jwksState{cache: cache, url: url}
+		stateMu.Unlock()
+	})
+	return initErr
 }
 
 // VerifyWorkOSToken validates a WorkOS JWT token and extracts the user ID.
 func VerifyWorkOSToken(ctx context.Context, tokenStr string) (string, error) {
-	if jwksCache == nil {
+	stateMu.RLock()
+	cache := state.cache
+	url := state.url
+	stateMu.RUnlock()
+
+	if cache == nil || url == "" {
 		return "", fmt.Errorf("jwks cache not initialized — call InitJWKSCache first")
 	}
 
 	// Get key set from cache (this will automatically fetch/refresh as needed)
-	keySet, err := jwksCache.Get(ctx, jwksURL)
+	keySet, err := cache.Get(ctx, url)
 	if err != nil {
 		return "", fmt.Errorf("failed to get JWKS from cache: %w", err)
 	}
