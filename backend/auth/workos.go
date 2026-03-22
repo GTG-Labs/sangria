@@ -146,7 +146,7 @@ func CreateUser(pool *pgxpool.Pool) fiber.Handler {
 		user := c.Locals("workos_user").(WorkOSUser)
 
 		if user.ID == "" {
-			log.Printf("User missing WorkOS ID: %+v", user)
+			log.Printf("CreateUser received session without WorkOS ID")
 			return c.Status(500).JSON(fiber.Map{"error": "Invalid user session"})
 		}
 
