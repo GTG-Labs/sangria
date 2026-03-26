@@ -8,7 +8,7 @@ Sangria is a **Digital Financial Bridge** — a platform connecting fiat-funded 
 
 ## 1. End-to-End Operational Flow
 
-Sangria supports three distinct transaction scenarios depending on which parties are on the platform.
+The three scenarios below describe the **target-state design** for Sangria — the full payment flows the platform is being built toward. Settlement, treasury management, and the internal credit ledger are not yet implemented; see [Section 6 (Implementation Status)](#6-implementation-status) for current status. In particular, `/v1/settle-payment` currently returns a stub failure (`success: false`) and `/facilitator/verify` and `/facilitator/settle` return 501.
 
 | Scenario | Client | Merchant | Settlement Method |
 | --- | --- | --- | --- |
@@ -173,7 +173,7 @@ Merchant-facing SDKs in TypeScript and Python. Both share the same backend-call 
 
 ### Sangria Backend (Orchestration Layer)
 
-A **Go / Fiber v3** API server on port `8080` with two authentication models: **WorkOS JWT** for user-facing session routes, and **API keys** (bcrypt-hashed, prefixed `sg_live_` / `sg_test_`) for merchant SDK calls.
+A **Go / Fiber v3** API server on port `8080` with two authentication models: **WorkOS JWT** for user-facing session routes (`/users`, `/api-keys`), and **API keys** (bcrypt-hashed, prefixed `sg_live_` / `sg_test_`) for `/merchant/*` and `/facilitator/*`. The payment stub routes `/v1/generate-payment` and `/v1/settle-payment` are registered without any auth middleware and are open to unauthenticated requests today.
 
 - **API Key Management** — create, list, and revoke keys (max 10 per user), backed by PostgreSQL
 - **Payment Routes** — `/v1/generate-payment` returns an x402 v2 challenge; `/v1/settle-payment` verifies and settles (currently stubbed)
