@@ -104,34 +104,11 @@ body {
 }
 
 h1, h2, h3, h4, h5, h6 {
-  font-family: var(--font-serif);
-}
-
-.card {
-  position: relative;
-  background: var(--bg-secondary);
-  border-radius: 1rem;
-  border: 1px solid var(--border-color);
+  font-family: var(--font-sans);
 }
 
 .glow {
   box-shadow: 0 0 60px -12px rgba(165, 28, 48, 0.25);
-}
-
-.flow-line {
-  height: 2px;
-  background: var(--color-sangria-500);
-  animation: flowPulse 3s ease-in-out infinite;
-}
-
-@keyframes flowPulse {
-  0%,
-  100% {
-    opacity: 0.3;
-  }
-  50% {
-    opacity: 1;
-  }
 }
 
 .fade-in {
@@ -150,16 +127,85 @@ h1, h2, h3, h4, h5, h6 {
   }
 }
 
-.card-hover {
-  transition:
-    transform 0.2s ease,
-    box-shadow 0.2s ease;
-}
-.card-hover:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 12px 40px rgba(165, 28, 48, 0.1);
+/* Arcade button — outer = fixed slot, inner span = moving face */
+.btn-raised {
+  position: relative;
+  display: inline-flex;
+  border: 1.5px solid var(--color-sangria-800);
+  border-radius: 0.75rem;
+  background: var(--color-sangria-900);
 }
 
-.code-block {
-  background: var(--bg-secondary);
+.btn-raised > span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid var(--color-sangria-800);
+  border-radius: 0.75rem;
+  margin: -1.5px;
+  background: var(--color-sangria-500);
+  color: white;
+  font-weight: 700;
+  transform: translateY(-2px);
+  transition: transform 0.1s ease;
+  user-select: none;
 }
+
+.btn-raised:hover > span {
+  transform: translateY(-3px);
+}
+
+.btn-raised:active > span {
+  transform: translateY(-0.5px);
+  transition: transform 50ms ease;
+}
+
+.btn-raised:focus-visible,
+.btn-raised-secondary:focus-visible {
+  outline: 2px solid var(--color-sangria-500);
+  outline-offset: 2px;
+}
+
+/* Secondary variant — light face */
+.btn-raised-secondary {
+  position: relative;
+  display: inline-flex;
+  border: 1.5px solid var(--border-color);
+  border-radius: 0.75rem;
+  background: var(--bg-tertiary);
+}
+
+.dark .btn-raised-secondary {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.btn-raised-secondary > span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid var(--border-color);
+  border-radius: 0.75rem;
+  margin: -1.5px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-weight: 700;
+  transform: translateY(-2px);
+  transition: transform 0.1s ease;
+  user-select: none;
+}
+
+.dark .btn-raised-secondary > span {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.btn-raised-secondary:hover > span {
+  transform: translateY(-3px);
+}
+
+.btn-raised-secondary:active > span {
+  transform: translateY(-0.5px);
+  transition: transform 50ms ease;
+}
+
