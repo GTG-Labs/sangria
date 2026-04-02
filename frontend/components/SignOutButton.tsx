@@ -13,8 +13,6 @@ export function SignOutButton({ className, children }: SignOutButtonProps) {
 
   const handleSubmit = async () => {
     setIsSigningOut(true);
-    // Add a small delay to make it feel more natural
-    await new Promise((resolve) => setTimeout(resolve, 800));
     await handleSignOut();
   };
 

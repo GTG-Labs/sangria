@@ -2,8 +2,8 @@ import Link from "next/link";
 import Image from "next/image";
 
 import { withAuth, getSignInUrl } from "@workos-inc/authkit-nextjs";
-import { SignOutButton } from "./SignOutButton";
 import ScrollNav from "./ScrollNav";
+import ArcadeButton from "./ArcadeButton";
 
 async function getStarCount(): Promise<number | null> {
   const controller = new AbortController();
@@ -47,24 +47,6 @@ export default async function Navigation() {
         </Link>
         <div className="hidden md:flex items-center gap-8 text-sm text-gray-600 dark:text-zinc-400">
           <Link
-            href="/#how-it-works"
-            className="hover:text-gray-900 dark:hover:text-white transition-colors"
-          >
-            How it Works
-          </Link>
-          <Link
-            href="/#features"
-            className="hover:text-gray-900 dark:hover:text-white transition-colors"
-          >
-            Features
-          </Link>
-          <Link
-            href="/#developers"
-            className="hover:text-gray-900 dark:hover:text-white transition-colors"
-          >
-            Developers
-          </Link>
-          <Link
             href="/docs"
             className="hover:text-gray-900 dark:hover:text-white transition-colors"
           >
@@ -79,21 +61,13 @@ export default async function Navigation() {
         </div>
         <div className="flex items-center gap-3 ml-8">
           {user ? (
-            <div className="flex items-center gap-3">
-              <span className="text-sm text-gray-600 dark:text-zinc-400">
-                {user.email}
-              </span>
-              <SignOutButton className="text-sm font-medium px-4 py-2 rounded-lg border border-zinc-200 dark:border-white/10 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-white/5 transition-colors">
-                Sign Out
-              </SignOutButton>
-            </div>
+            <ArcadeButton href="/dashboard/api-keys" size="sm">
+              Go to Dashboard →
+            </ArcadeButton>
           ) : (
-            <Link
-              href={signInUrl}
-              className="text-sm font-medium px-4 py-2 rounded-lg bg-sangria-500 text-white hover:bg-sangria-600 transition-colors"
-            >
-              Sign In
-            </Link>
+            <ArcadeButton href={signInUrl} size="sm">
+              Sign In →
+            </ArcadeButton>
           )}
           <Link
             href="https://github.com/GTG-Labs/sangria-net"

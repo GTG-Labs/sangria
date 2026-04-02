@@ -1,120 +1,50 @@
-import {
-  Globe,
-  Repeat,
-  Wallet,
-  Zap,
-  Lock,
-  Code2,
-  Coins,
-  ShieldCheck,
-} from "lucide-react";
-import Link from "next/link";
-import HeroBackground from "@/components/HeroBackground";
+import Image from "next/image";
+import ArcadeButton from "@/components/ArcadeButton";
 
 export default function Home() {
   return (
     <div className="min-h-screen">
       {/* Hero */}
       <section className="relative pt-32 pb-20 md:pt-44 md:pb-32 overflow-hidden">
-        {/* PixelBlast background */}
-        <HeroBackground />
+        <div className="relative max-w-7xl mx-auto px-6">
+          <div className="grid md:grid-cols-2 gap-12 items-center">
+            {/* Left: text */}
+            <div className="text-left fade-in relative z-10">
+              <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold text-gray-900 dark:text-white leading-[1.1] tracking-tight mb-6">
+                Let agents pay
+                <br />
+                <span className="text-sangria-500">for your API.</span>
+              </h1>
 
-        <div className="relative max-w-4xl mx-auto px-6 text-center fade-in">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-zinc-200 dark:border-white/10 bg-zinc-100 dark:bg-white/5 text-xs text-zinc-500 dark:text-zinc-400 mb-8">
-            <span className="w-1.5 h-1.5 rounded-full bg-sangria-500 animate-pulse"></span>
-            Demo of the x402 payment protocol
-          </div>
+              <p className="text-base md:text-lg text-zinc-600 dark:text-zinc-400 max-w-md mb-10 leading-relaxed">
+                sangriaNet is a drop-in SDK that integrates with your backend
+                and allows you to monetize your endpoints so agents can
+                call and pay for them.
+              </p>
 
-          <h1 className="text-4xl sm:text-5xl md:text-7xl italic font-normal text-gray-900 dark:text-white leading-[1.1] tracking-tight mb-6">
-            HTTP-native
-            <br />
-            <span className="text-sangria-500">micropayments.</span>
-          </h1>
-
-          <p className="text-lg md:text-xl text-zinc-600 dark:text-zinc-400 max-w-2xl mx-auto mb-10 leading-relaxed">
-            A working demo of x402 — the protocol that brings micropayments to
-            HTTP using USDC on Base Sepolia. No payment UI. No checkout flow.
-            Just an HTTP request that costs money.
-          </p>
-
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link
-              href="https://github.com/GTG-Labs/sangria-net"
-              className="w-full sm:w-auto px-8 py-3.5 rounded-xl bg-sangria-500 text-white font-semibold text-base hover:bg-sangria-600 transition-colors glow"
-            >
-              View on GitHub
-            </Link>
-            <Link
-              href="/docs"
-              className="w-full sm:w-auto px-8 py-3.5 rounded-xl border border-zinc-200 dark:border-white/10 text-zinc-700 dark:text-zinc-300 font-medium text-base hover:bg-zinc-100 dark:hover:bg-white/5 transition-colors"
-            >
-              Read the Docs
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* How it Works */}
-      <section id="how-it-works" className="py-20 md:py-32">
-        <div className="max-w-6xl mx-auto px-6">
-          <div className="text-center mb-16">
-            <p className="text-sangria-500 font-mono text-sm mb-3">
-              HOW IT WORKS
-            </p>
-            <h2 className="text-3xl md:text-4xl italic font-normal text-gray-900 dark:text-white">
-              Three steps. One seamless flow.
-            </h2>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-6 relative">
-            {/* Connector line (desktop) */}
-            <div className="hidden md:block absolute top-1/2 left-[16.6%] right-[16.6%] -translate-y-1/2 z-0">
-              <div className="flow-line"></div>
+              <div className="flex flex-col sm:flex-row items-start gap-4">
+                <ArcadeButton href="/docs" glow>
+                  Get Started →
+                </ArcadeButton>
+                <ArcadeButton
+                  href="https://github.com/GTG-Labs/sangria-net"
+                  variant="secondary"
+                >
+                  View on GitHub →
+                </ArcadeButton>
+              </div>
             </div>
 
-            {/* Step 1 */}
-            <div className="relative z-10 card p-8 text-center card-hover">
-              <div className="w-14 h-14 rounded-2xl bg-sangria-500/10 border border-sangria-500/20 flex items-center justify-center mx-auto mb-5">
-                <Globe className="w-6 h-6 text-sangria-500" />
-              </div>
-              <div className="text-xs font-mono text-sangria-500 mb-2">01</div>
-              <h3 className="text-xl italic font-normal text-gray-900 dark:text-white mb-3">
-                Client requests resource
-              </h3>
-              <p className="text-zinc-600 dark:text-zinc-400 text-sm leading-relaxed">
-                Buyer makes a normal HTTP GET request to a premium endpoint
-                without any payment headers.
-              </p>
-            </div>
-
-            {/* Step 2 */}
-            <div className="relative z-10 card p-8 text-center card-hover">
-              <div className="w-14 h-14 rounded-2xl bg-sangria-500/10 border border-sangria-500/20 flex items-center justify-center mx-auto mb-5">
-                <Repeat className="w-6 h-6 text-sangria-500" />
-              </div>
-              <div className="text-xs font-mono text-sangria-500 mb-2">02</div>
-              <h3 className="text-xl italic font-normal text-gray-900 dark:text-white mb-3">
-                Server requires payment
-              </h3>
-              <p className="text-zinc-600 dark:text-zinc-400 text-sm leading-relaxed">
-                Server responds with 402 Payment Required and details: price,
-                token, network, and merchant wallet.
-              </p>
-            </div>
-
-            {/* Step 3 */}
-            <div className="relative z-10 card p-8 text-center card-hover">
-              <div className="w-14 h-14 rounded-2xl bg-sangria-500/10 border border-sangria-500/20 flex items-center justify-center mx-auto mb-5">
-                <Wallet className="w-6 h-6 text-sangria-500" />
-              </div>
-              <div className="text-xs font-mono text-sangria-500 mb-2">03</div>
-              <h3 className="text-xl italic font-normal text-gray-900 dark:text-white mb-3">
-                Client pays & gets data
-              </h3>
-              <p className="text-zinc-600 dark:text-zinc-400 text-sm leading-relaxed">
-                Client signs USDC payment, retries request with payment header,
-                and receives the resource + receipt.
-              </p>
+            {/* Right: illustration */}
+            <div className="hidden md:flex items-center justify-center">
+              <Image
+                src="/computey2.png"
+                alt="Pixel art computer holding a sangria"
+                width={500}
+                height={500}
+                className="w-full max-w-md"
+                priority
+              />
             </div>
           </div>
         </div>
