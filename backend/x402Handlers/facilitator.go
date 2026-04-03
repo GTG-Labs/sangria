@@ -42,7 +42,7 @@ func Verify(ctx context.Context, payload json.RawMessage, requirements PaymentRe
 	}
 
 	reqBody := VerifyRequest{
-		X402Version:  1,
+		X402Version:  2,
 		Payload:      payload,
 		Requirements: requirements,
 	}
@@ -90,7 +90,7 @@ func Settle(ctx context.Context, payload json.RawMessage, requirements PaymentRe
 	}
 
 	reqBody := SettleRequest{
-		X402Version:  1,
+		X402Version:  2,
 		Payload:      payload,
 		Requirements: requirements,
 	}

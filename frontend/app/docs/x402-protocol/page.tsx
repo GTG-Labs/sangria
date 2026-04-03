@@ -112,7 +112,7 @@ export default function X402Protocol() {
   "description": "Access requires payment",
   "payTo": "0xABC...DEF",
   "asset": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
-  "network": "base-sepolia"
+  "network": "eip155:84532"
 }`}</code></pre>
 
         <ul>
@@ -176,22 +176,42 @@ export default function X402Protocol() {
         <p>Adding x402 to a FastAPI server:</p>
 
         <pre><code>{`from fastapi import FastAPI
-from fastapi_x402 import pay
+from x402.http import FacilitatorConfig, HTTPFacilitatorClient, PaymentOption
+from x402.http.middleware.fastapi import PaymentMiddlewareASGI
+from x402.http.types import RouteConfig
+from x402.mechanisms.evm.exact import ExactEvmServerScheme
+from x402.server import x402ResourceServer
 
 app = FastAPI()
 
-@app.get("/premium")
-@pay(
-    amount_required=0.0001,  # $0.0001 USDC
-    pay_to="0xF44c...fd39",
+facilitator = HTTPFacilitatorClient(
+    FacilitatorConfig(url="https://x402.org/facilitator")
 )
+server = x402ResourceServer(facilitator)
+server.register("eip155:84532", ExactEvmServerScheme())
+
+routes = {
+    "GET /premium": RouteConfig(
+        accepts=[PaymentOption(
+            scheme="exact",
+            pay_to="0xF44c...fd39",
+            price="$0.0001",
+            network="eip155:84532",
+        )],
+        mime_type="application/json",
+        description="Premium endpoint",
+    ),
+}
+app.add_middleware(PaymentMiddlewareASGI, routes=routes, server=server)
+
+@app.get("/premium")
 async def premium_endpoint():
     return {
         "message": "You accessed the premium endpoint!",
         "paid": True
     }`}</code></pre>
 
-        <p>The <code>@pay</code> decorator handles the 402 response, verification, and settlement automatically.</p>
+        <p>The <code>PaymentMiddlewareASGI</code> handles the 402 response, verification, and settlement automatically.</p>
 
         <h2>Payment Schemes</h2>
 

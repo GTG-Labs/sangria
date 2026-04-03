@@ -1,11 +1,11 @@
-export default function APIKeysPage() {
+export default function TransactionsPage() {
   return (
     <div className="mx-auto max-w-6xl">
       <h1 className="text-4xl font-semibold tracking-tight text-gray-900">
-        API Keys
+        Transactions
       </h1>
       <p className="mt-2 text-gray-500">
-        Manage your API keys for authenticating with Sangria services.
+        View and manage your payment transactions.
       </p>
     </div>
   );

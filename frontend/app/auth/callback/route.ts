@@ -1,7 +1,7 @@
 import { handleAuth } from "@workos-inc/authkit-nextjs";
 
 export const GET = handleAuth({
-  returnPathname: "/dashboard",
+  returnPathname: "/dashboard/api-keys",
   onSuccess: async (authData: { user?: any; accessToken?: string }) => {
     const accessToken = authData.accessToken;
     if (!accessToken || !process.env.BACKEND_URL) {

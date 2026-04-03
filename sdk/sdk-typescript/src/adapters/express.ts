@@ -17,7 +17,7 @@ declare global {
 export function fixedPrice(
   sangrianet: SangriaNet,
   options: FixedPriceOptions,
-  config?: ExpressConfig,
+  config?: ExpressConfig
 ) {
   sangrianet.validateFixedPriceOptions(options);
 
@@ -29,12 +29,12 @@ export function fixedPrice(
 
     const result = await sangrianet.handleFixedPrice(
       {
-        paymentHeader: Array.isArray(req.headers["x-payment"])
-          ? req.headers["x-payment"][0]
-          : req.headers["x-payment"],
+        paymentHeader: Array.isArray(req.headers["payment-signature"])
+          ? req.headers["payment-signature"][0]
+          : req.headers["payment-signature"],
         resourceUrl: `${req.protocol}://${req.hostname}${req.originalUrl}`,
       },
-      options,
+      options
     );
 
     if (result.action === "respond") {

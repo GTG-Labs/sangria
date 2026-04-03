@@ -28,7 +28,7 @@ Client                          Server                      Facilitator (Coinbas
   |  (ERC-3009 authorization)     |                               |
   |                               |                               |
   |  4. GET /api/data             |                               |
-  |  + X-PAYMENT header           |                               |
+  |  + PAYMENT-SIGNATURE header   |                               |
   |------------------------------>|                               |
   |                               |  5. POST /verify              |
   |                               |  (forward signed payload)     |
@@ -45,7 +45,7 @@ Client                          Server                      Facilitator (Coinbas
   |                               |<------------------------------|
   |                               |                               |
   |  9. 200 OK + data             |                               |
-  |  + X-PAYMENT-RESPONSE header  |                               |
+  |  + PAYMENT-RESPONSE header    |                               |
   |  (TX hash as receipt)         |                               |
   |<------------------------------|                               |
 ```
@@ -65,8 +65,8 @@ Client                          Server                      Facilitator (Coinbas
 | Header               | Direction       | What it contains                                                                                 |
 | -------------------- | --------------- | ------------------------------------------------------------------------------------------------ |
 | `PAYMENT-REQUIRED`   | Server → Client | "Here's what you need to pay" — price, token address, network, recipient wallet, facilitator URL |
-| `X-PAYMENT`          | Client → Server | The signed payment authorization (ERC-3009 signature)                                            |
-| `X-PAYMENT-RESPONSE` | Server → Client | Settlement receipt — the blockchain transaction hash                                             |
+| `PAYMENT-SIGNATURE`  | Client → Server | The signed payment authorization (ERC-3009 signature)                                            |
+| `PAYMENT-RESPONSE`   | Server → Client | Settlement receipt — the blockchain transaction hash                                             |
 
 ## The 402 Response (What the Server Sends Back)
 
@@ -74,19 +74,29 @@ When you hit a paywalled endpoint without paying:
 
 ```json
 {
-  "maxAmountRequired": "0.10",
-  "resource": "/api/data",
-  "description": "Access requires payment",
-  "payTo": "0xABC...DEF",
-  "asset": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
-  "network": "base-sepolia"
+  "x402Version": 2,
+  "accepts": [
+    {
+      "scheme": "exact",
+      "network": "eip155:84532",
+      "amount": "100000",
+      "asset": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+      "payTo": "0xABC...DEF",
+      "maxTimeoutSeconds": 300,
+      "extra": { "name": "USDC", "version": "1", "assetTransferMethod": "eip3009" }
+    }
+  ],
+  "resource": { "url": "/api/data", "description": "Access requires payment" }
 }
 ```
 
-- **maxAmountRequired** — The price (in USDC, so $0.10)
+- **x402Version** — Always `2` for the v2 protocol
+- **accepts** — Array of payment options the server will accept
+- **scheme** — `"exact"` means the client pays a fixed amount
+- **amount** — The price in USDC base units (6 decimals), so `"100000"` = $0.10
 - **payTo** — The seller's wallet address (where the money goes)
-- **asset** — The token contract address (USDC's address on that chain)
-- **network** — Which blockchain to pay on
+- **asset** — The token contract address (USDC on Base Sepolia)
+- **network** — Which blockchain to pay on, in CAIP-2 format
 
 ## ERC-3009: TransferWithAuthorization
 
@@ -95,7 +105,7 @@ This is the clever part. Instead of the client actually _sending_ a transaction 
 ### How it works:
 
 1. **Client signs a message** (not a transaction) that says: "I authorize transferring X USDC from my wallet to wallet Y, valid between time A and time B, with nonce Z"
-2. **This signature gets sent in the `X-PAYMENT` header** — it's just bytes, no blockchain involved yet
+2. **This signature gets sent in the `PAYMENT-SIGNATURE` header** — it's just bytes, no blockchain involved yet
 3. **The facilitator** takes that signature and submits it to the blockchain on your behalf
 4. **The USDC contract** verifies the signature is valid and executes the transfer
 
@@ -126,15 +136,37 @@ Adding x402 to a FastAPI server:
 
 ```python
 from fastapi import FastAPI
-from fastapi_x402 import pay
+from x402.http import FacilitatorConfig, HTTPFacilitatorClient, PaymentOption
+from x402.http.middleware.fastapi import PaymentMiddlewareASGI
+from x402.http.types import RouteConfig
+from x402.mechanisms.evm.exact import ExactEvmServerScheme
+from x402.server import x402ResourceServer
 
 app = FastAPI()
 
-@app.get("/premium")
-@pay(
-    amount_required=0.0001,  # $0.0001 USDC
-    pay_to="0xF44c...fd39",
+facilitator = HTTPFacilitatorClient(
+    FacilitatorConfig(url="https://x402.org/facilitator")
 )
+server = x402ResourceServer(facilitator)
+server.register("eip155:84532", ExactEvmServerScheme())
+
+routes = {
+    "GET /premium": RouteConfig(
+        accepts=[
+            PaymentOption(
+                scheme="exact",
+                pay_to="0xF44c...fd39",
+                price="$0.0001",
+                network="eip155:84532",
+            ),
+        ],
+        mime_type="application/json",
+        description="Premium endpoint",
+    ),
+}
+app.add_middleware(PaymentMiddlewareASGI, routes=routes, server=server)
+
+@app.get("/premium")
 async def premium_endpoint():
     return {
         "message": "You accessed the premium endpoint!",
@@ -142,7 +174,7 @@ async def premium_endpoint():
     }
 ```
 
-The `@pay` decorator handles the 402 response, verification, and settlement automatically.
+The `PaymentMiddlewareASGI` handles the 402 response, verification, and settlement automatically.
 
 ## Payment Schemes
 

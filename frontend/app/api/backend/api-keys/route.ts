@@ -1,121 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
-import { withAuth } from "@workos-inc/authkit-nextjs";
-
-const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:8080";
+import { proxyToBackend } from "@/lib/api-proxy";
 
 export async function GET() {
-  try {
-    // Get authenticated user and access token from session
-    const { user, accessToken } = await withAuth();
-
-    if (!user || !accessToken) {
-      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
-    }
-
-    // Create AbortController for timeout handling
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-
-    try {
-      // Forward request to backend with access token
-      const response = await fetch(`${BACKEND_URL}/api-keys`, {
-        method: "GET",
-        headers: {
-          "Authorization": `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        return NextResponse.json(data, { status: response.status });
-      }
-
-      return NextResponse.json(data);
-    } catch (fetchError: any) {
-      clearTimeout(timeoutId);
-
-      // Check if request was aborted due to timeout
-      if (fetchError.name === 'AbortError' || controller.signal.aborted) {
-        return NextResponse.json(
-          { error: "Gateway timeout - backend request took too long" },
-          { status: 504 }
-        );
-      }
-
-      // Re-throw other fetch errors to be handled by outer catch
-      throw fetchError;
-    }
-  } catch (error) {
-    console.error("API Keys GET error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
-  }
+  return proxyToBackend("GET", "/api-keys");
 }
 
 export async function POST(request: NextRequest) {
+  let body;
   try {
-    // Get authenticated user and access token from session
-    const { user, accessToken } = await withAuth();
-
-    if (!user || !accessToken) {
-      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
-    }
-
-    // Get request body and add user_id from authenticated user
-    const body = await request.json();
-    body.user_id = user.id;
-
-    // Create AbortController for timeout handling
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-
-    try {
-      // Forward request to backend with access token
-      const response = await fetch(`${BACKEND_URL}/merchants`, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        return NextResponse.json(data, { status: response.status });
-      }
-
-      return NextResponse.json(data);
-    } catch (fetchError: any) {
-      clearTimeout(timeoutId);
-
-      // Check if request was aborted due to timeout
-      if (fetchError.name === 'AbortError' || controller.signal.aborted) {
-        return NextResponse.json(
-          { error: "Gateway timeout - backend request took too long" },
-          { status: 504 }
-        );
-      }
-
-      // Re-throw other fetch errors to be handled by outer catch
-      throw fetchError;
-    }
-  } catch (error) {
-    console.error("API Keys POST error:", error);
+    body = await request.json();
+  } catch {
     return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
+      { error: "Invalid JSON body" },
+      { status: 400 }
     );
   }
+  return proxyToBackend("POST", "/api-keys", { body });
 }

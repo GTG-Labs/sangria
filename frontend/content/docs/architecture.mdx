@@ -1,177 +1,385 @@
 ---
-title: Project Architecture
-description: Understanding the structure and components of the Sangria x402 demo.
+title: System Design & Architecture
+description: End-to-end architecture, operational flows, and component breakdown for Sangria.
 icon: LayoutGrid
 ---
 
-## Project Structure
+Sangria is a **Digital Financial Bridge** — a platform connecting fiat-funded digital wallets with the **x402 HTTP-native payment protocol**. It enables developers and AI agents to make programmatic micropayments using pre-funded Sangria Credits, while letting API merchants monetize without managing subscriptions or user accounts.
+
+## 1. End-to-End Operational Flow
+
+The three scenarios below describe the **target-state design** for Sangria — the full payment flows the platform is being built toward. Settlement, treasury management, and the internal credit ledger are not yet implemented; see [Section 6 (Implementation Status)](#6-implementation-status) for current status. In particular, `/v1/settle-payment` currently returns a stub failure (`success: false`) and `/facilitator/verify` and `/facilitator/settle` return 501.
+
+| Scenario | Client | Merchant | Settlement Method |
+| --- | --- | --- | --- |
+| **Scenario 1** | On Sangria (Credits) | External (raw x402) | Sangria Treasury pays USDC on-chain on client's behalf |
+| **Scenario 2** | On Sangria (Credits) | On Sangria (Credits) | Internal ledger debit/credit — no blockchain |
+| **Scenario 3** | External (raw wallet) | On Sangria (Credits) | On-chain USDC → Sangria converts to fiat for merchant |
+
+### Scenario 1 — Client on Sangria, Merchant is External x402
+
+The client funds a Sangria-powered digital wallet with Sangria Credits. The merchant is a raw x402 endpoint with no Sangria account — they receive USDC directly on-chain.
+
+**Key insight:** The client never holds USDC. Sangria's **Combined Treasury Wallet** holds all the USDC and pays the merchant on the client's behalf. The client's Credits are purely the internal accounting layer — when a payment fires, Sangria spends Treasury USDC and deducts the equivalent Credits from the client's balance.
+
+**Phase I — On-Ramping (Credit Purchase)**
+
+1. **Wallet Funding** — The User funds their Sangria digital wallet with fiat, which Sangria converts into internal Credits.
+2. **Credit Issuance** — Sangria updates its Internal Ledger, issuing **Sangria Credits** to the user's account and holds the equivalent USDC in the **Combined Treasury Wallet**.
+
+**Phase II — The x402 Request Loop**
+
+1. **Initial Request** — The User (via Sangria SDK) hits a protected endpoint (e.g., `GET /premium`).
+2. **402 Challenge** — The Merchant Server returns `HTTP 402 Payment Required` with headers specifying the price, recipient address, and network.
+3. **Credit Check & Signature** — The Sangria SDK verifies the user has sufficient Credits, then requests a backend-generated **ERC-3009 TransferWithAuthorization** signed server-side by the **Treasury Wallet** (via secure orchestration/key custody), never by client-side SDK keys, authorizing a transfer of Treasury USDC directly to the merchant.
+
+**Phase III — Settlement & Data Delivery**
+
+1. **Payment Submission** — The SDK retries with the Treasury-signed authorization in the `PAYMENT-SIGNATURE` header.
+2. **Verify & Settle** — The Merchant calls the **Facilitator (Coinbase)** to verify the Treasury signature and settle on Base.
+3. **Data Release** — The Merchant receives USDC from Sangria's Treasury; the User receives the data and a TX hash.
+4. **Ledger Update** — Sangria deducts the equivalent Credits from the User's internal balance.
+
+```
+User (Sangria SDK)   Sangria Treasury Wallet   Merchant Server   Facilitator   Base Blockchain
+      │                       │                      │                 │               │
+      │  1. GET /premium      │                      │                 │               │
+      │────────────────────────────────────────────>│                 │               │
+      │  2. HTTP 402          │                      │                 │               │
+      │<────────────────────────────────────────────│                 │               │
+      │  3. Check Credits     │                      │                 │               │
+      │──────────────────────>│                      │                 │               │
+      │                       │  Sign ERC-3009 auth  │                 │               │
+      │                       │  (Treasury→Merchant) │                 │               │
+      │<──────────────────────│                      │                 │               │
+      │  4. Retry + PAYMENT-SIGNATURE │              │                 │               │
+      │  (Treasury signature) │                      │                 │               │
+      │────────────────────────────────────────────>│                 │               │
+      │                       │                      │  5. verify()    │               │
+      │                       │                      │────────────────>│               │
+      │                       │                      │  6. Valid ✓     │               │
+      │                       │                      │<────────────────│               │
+      │                       │                      │  7. settle()    │               │
+      │                       │                      │────────────────>│               │
+      │                       │                      │                 │  8. ERC-3009  │
+      │                       │                      │                 │──────────────>│
+      │                       │ Treasury USDC spent  │  9. USDC rcvd   │<──────────────│
+      │                       │<─────────────────────┼─────────────────│               │
+      │  10. 200 OK + data    │                      │                 │               │
+      │<────────────────────────────────────────────│                 │               │
+      │  11. Deduct Credits   │ (internal ledger)    │                 │               │
+      │──────────────────────>│                      │                 │               │
+```
+
+### Scenario 2 — Both Client and Merchant are on Sangria
+
+Both parties hold Sangria Credits. No blockchain interaction occurs. The entire transaction is an atomic internal ledger update — instant, gasless, and fully off-chain.
+
+1. **Request** — The User hits a Sangria-registered endpoint.
+2. **Credit Check** — Sangria Backend verifies the User has sufficient Credits.
+3. **Atomic Ledger Update** — Sangria debits the User's Credit balance and credits the Merchant's Credit balance in a single database transaction.
+4. **Data Release** — The Merchant's endpoint returns the requested data.
+5. **Receipt** — Both parties receive an internal transaction record.
+
+```
+User (Sangria SDK)        Sangria Backend            Merchant Server
+      │                        │                           │
+      │  1. GET /premium       │                           │
+      │───────────────────────>│                           │
+      │                        │  2. Check User Credits    │
+      │                        │  3. Debit User,           │
+      │                        │     Credit Merchant       │
+      │                        │  (atomic DB transaction)  │
+      │                        │──────────────────────────>│
+      │                        │  4. 200 OK + data         │
+      │                        │<──────────────────────────│
+      │  5. Data + receipt     │                           │
+      │<───────────────────────│                           │
+```
+
+**No x402 negotiation, no blockchain, no gas.** Sangria acts as a pure payment rail between two internal accounts.
+
+### Scenario 3 — Client is External, Merchant is on Sangria
+
+The client is a raw x402 wallet (not on Sangria) paying in USDC. The merchant is on Sangria and wants to receive fiat, not USDC. Sangria acts as the receiving intermediary on the merchant's behalf.
+
+1. **Standard x402 Request** — The external client follows the normal x402 protocol, signing the **ERC-3009 TransferWithAuthorization** with its own wallet and paying USDC to **Sangria's Combined Treasury Wallet** on behalf of the merchant.
+2. **USDC Received** — Sangria's treasury receives the USDC on-chain.
+3. **USDC → Fiat Conversion** — Sangria converts the received USDC to fiat via its off-ramp process.
+4. **Fiat Deposit** — Sangria deposits the fiat equivalent (minus Sangria's spread) into the Merchant's Sangria account balance.
+5. **Data Release** — The merchant endpoint releases data to the client upon confirmation.
+
+```
+External Client      Merchant Server    Sangria Treasury    Merchant Sangria Acct
+(raw x402 wallet)         │             (Combined Wallet)           │
+      │                   │                    │                     │
+      │  1. GET /premium  │                    │                     │
+      │──────────────────>│                    │                     │
+      │  2. HTTP 402      │                    │                     │
+      │<──────────────────│                    │                     │
+      │  3. Sign ERC-3009 │                    │                     │
+      │  4. Retry+PAYMENT-SIGNATURE │          │                     │
+      │──────────────────>│                    │                     │
+      │                   │  5. Settle to      │                     │
+      │                   │     Sangria Wallet │                     │
+      │                   │───────────────────>│                     │
+      │                   │  6. USDC received  │                     │
+      │                   │<───────────────────│                     │
+      │  7. 200 OK + data │                    │  7. Convert USDC→Fiat
+      │<──────────────────│                    │  8. Credit Merchant │
+      │                   │                    │────────────────────>│
+```
+
+## 2. Technical Architecture
+
+Sangria uses a **hybrid stack** to manage the transition from centralized fiat to decentralized protocols.
+
+| Layer | Technology | Responsibility |
+| --- | --- | --- |
+| **Client** | Python, HTTPX, x402, eth_account | 402 negotiation, EIP-712 signing, credit verification |
+| **Orchestration** | Go, CDP SDK | Treasury wallets, mutexes, settlement, ledger management |
+| **Persistence** | PostgreSQL, Drizzle ORM | User balances, API keys, audit logs |
+| **Infrastructure** | Coinbase Facilitator, Base Blockchain | Gas-free settlement, on-chain USDC transfer |
+| **Frontend** | Next.js 16, React 19, Tailwind CSS 4 | Merchant dashboard, documentation, auth (planned) |
+
+## 3. Project Structure
 
 ```
 sangria-net/
-  main.py                  # Buyer client — checks balances, calls the paid endpoint
-  merchant_server/
-    __init__.py
-    app.py                 # FastAPI app with the @pay-protected endpoint
-    run.py                 # Entry point: python -m merchant_server.run
-  wallet/
-    __init__.py
-    wallet.py              # TestnetWallet class — create, fund, and check wallets via CDP
-  frontend/                # Next.js documentation and landing page
-  guides-and-knowledge/    # Markdown documentation files
-  .env                     # Environment variables (CDP credentials)
-  pyproject.toml          # Python dependencies and project metadata
+  backend/                    # Go/Fiber API server (port 8080)
+    main.go                   # Entry point — Fiber app, auth middleware, route registration
+    handlers/                 # API key management (create, list, revoke, authenticate)
+    merchantPaymentHandler/   # x402-compatible payment route stubs
+    dbEngine/                 # PostgreSQL data layer (pgx pool, models, queries)
+  sdk/
+    sdk-typescript/           # TypeScript merchant SDK (Express, Fastify, Hono adapters)
+    python/                   # Python merchant SDK (FastAPI decorator)
+  dbSchema/                   # Drizzle ORM schema — source of truth for DB shape
+  frontend/                   # Next.js documentation and marketing site
 ```
 
-## Core Components
+## 4. Component Breakdown
 
-### 1. Merchant Server (`merchant_server/`)
+### Sangria SDK (Client Layer)
 
-A FastAPI application that demonstrates a paid endpoint using the x402 protocol.
+Merchant-facing SDKs in TypeScript and Python. Both share the same backend-call pattern: on a missing `PAYMENT-SIGNATURE` header, they call `POST /v1/generate-payment` on the Sangria backend and return a `402`; on a valid header, they call `POST /v1/settle-payment` and pass the request through on success.
 
-**Key file: `app.py`**
+- **TypeScript SDK** — framework adapters for Express, Fastify, and Hono. Reads `PAYMENT-SIGNATURE` from incoming headers, calls the backend with `Authorization: Bearer <apiKey>`.
+- **Python SDK** — a `@require_sangria_payment` FastAPI decorator. Returns `402` with a base64-encoded `PAYMENT-REQUIRED` header; on settlement success, attaches `SettlementResult` to `request.state.sangria_verification`.
+- Supports both `exact` (fixed price) and `upto` (variable price) schemes
+- Future: SDKs in additional languages
 
-```python
-from fastapi import FastAPI
-from fastapi_x402 import pay
+**Key files:** `sdk/sdk-typescript/src/`, `sdk/python/src/sangria_sdk/`
 
-app = FastAPI()
+### Sangria Backend (Orchestration Layer)
 
-MERCHANT_ADDRESS = "0xF44c...fd39"
+A **Go / Fiber v3** API server on port `8080` with two authentication models: **WorkOS JWT** for user-facing session routes (`/users`, `/api-keys`), and **API keys** (bcrypt-hashed, prefixed `sg_live_` / `sg_test_`) for `/merchant/*` and `/facilitator/*`. The payment stub routes `/v1/generate-payment` and `/v1/settle-payment` are registered without any auth middleware and are open to unauthenticated requests today.
 
-@app.get("/")
-async def root():
-    return {"status": "ok"}
+- **API Key Management** — create, list, and revoke keys (max 10 per user), backed by PostgreSQL
+- **Payment Routes** — `/v1/generate-payment` returns an x402 v2 challenge; `/v1/settle-payment` verifies and settles (currently stubbed)
+- **Merchant Profile** — `/merchant/profile` returns user + key metadata for API-key-authenticated requests
+- **Facilitator Endpoints** — `/facilitator/verify` and `/facilitator/settle` are defined but return 501 (planned)
+- **Internal Ledger** — double-entry credit accounting via `dbEngine.InsertTransaction`
 
-@app.get("/premium")
-@pay(
-    amount_required=0.0001,  # $0.0001 USDC
-    pay_to=MERCHANT_ADDRESS,
-)
-async def premium_endpoint():
-    return {
-        "message": "You accessed the premium endpoint!",
-        "paid": True
-    }
+**Key files:** `backend/main.go`, `backend/handlers/`, `backend/merchantPaymentHandler/`, `backend/dbEngine/`
+
+**API Routes:**
+
+| Method | Path | Auth | Status |
+| --- | --- | --- | --- |
+| `GET` | `/` | None | Health check |
+| `POST` | `/v1/generate-payment` | None | Returns x402 v2 challenge |
+| `POST` | `/v1/settle-payment` | None | Stub — always `success: false` |
+| `POST` | `/users` | WorkOS JWT | Upsert user on login |
+| `GET` | `/api-keys` | WorkOS JWT | List API keys |
+| `POST` | `/api-keys` | WorkOS JWT | Create API key |
+| `DELETE` | `/api-keys/:id` | WorkOS JWT | Revoke API key |
+| `GET` | `/merchant/profile` | API Key | User + key metadata |
+| `POST` | `/facilitator/verify` | API Key | **501 Not Implemented** |
+| `POST` | `/facilitator/settle` | API Key | **501 Not Implemented** |
+
+### Database (Persistence Layer)
+
+PostgreSQL managed via **Drizzle ORM** (schema source of truth in `dbSchema/`), accessed from Go via **pgx v5**. Stores:
+
+- **Users** — accounts keyed by WorkOS ID, credit balances
+- **Merchants** — profiles, API keys (bcrypt hashes), treasury wallet addresses
+- **Transactions** — double-entry ledger records, settlement receipts, audit log
+
+**Key files:** `dbSchema/schema.ts`, `backend/dbEngine/models.go`
+
+### Facilitator (Infrastructure Layer)
+
+Coinbase's hosted service that:
+
+- **Verifies** — Checks ERC-3009 signature validity, wallet balance, nonce freshness
+- **Settles** — Submits signed authorization to the blockchain
+- **Covers gas** — Pays transaction gas fees so the client pays zero gas
+
+### Frontend
+
+A Next.js documentation site and merchant dashboard.
+
+- **Current:** Landing page, docs, dark/light mode
+- **Planned:** Login & authentication, merchant API key management, wallet funding UI
+
+**Key files:** `frontend/app/page.tsx`, `frontend/app/docs/`
+
+## 5. Payment Route Flow
+
+Both SDKs call the same Sangria backend endpoints and read the same `PAYMENT-SIGNATURE` request header, but they differ in how they encode the 402 response back to the client.
+
+**TypeScript SDK (Express / Fastify / Hono) — JSON body only**
+
+```
+Client                  Merchant Server (TS SDK)    Sangria Backend (:8080)
+  │                            │                            │
+  │  GET /premium              │                            │
+  │  (no PAYMENT-SIGNATURE)    │                            │
+  │───────────────────────────>│                            │
+  │                            │  POST /v1/generate-payment │
+  │                            │  Authorization: Bearer ... │
+  │                            │  { amount, resource, scheme: "exact" }
+  │                            │───────────────────────────>│
+  │                            │  200 OK                    │
+  │                            │  x402 v2 challenge JSON    │
+  │                            │<───────────────────────────│
+  │  HTTP 402                  │                            │
+  │  body: x402 v2 JSON        │                            │
+  │<───────────────────────────│                            │
+  │                            │                            │
+  │  GET /premium              │                            │
+  │  PAYMENT-SIGNATURE: <sig>  │                            │
+  │───────────────────────────>│                            │
+  │                            │  POST /v1/settle-payment   │
+  │                            │  Authorization: Bearer ... │
+  │                            │  { paymentHeader, resource, amount }
+  │                            │───────────────────────────>│
+  │                            │  { success: true, tx }     │
+  │                            │<───────────────────────────│
+  │  HTTP 200 + data           │                            │
+  │<───────────────────────────│                            │
 ```
 
-The `@pay` decorator from `fastapi-x402` handles:
+**Python SDK (`@require_sangria_payment`) — JSON body + base64 header**
 
-- Returning 402 responses with payment requirements
-- Verifying signed payment authorizations
-- Settling payments via the Coinbase facilitator
-- Adding payment receipts to response headers
-
-### 2. Buyer Client (`main.py`)
-
-A Python script that demonstrates how a client interacts with x402-protected endpoints.
-
-**Key responsibilities:**
-
-- Initialize buyer and merchant wallets via CDP
-- Check USDC balances before and after transactions
-- Make HTTP requests to paid endpoints (x402 library handles payment negotiation automatically)
-- Display transaction results
-
-The x402 client library transparently handles:
-
-- Detecting 402 responses
-- Signing ERC-3009 payment authorizations
-- Retrying requests with payment headers
-
-### 3. Wallet Management (`wallet/wallet.py`)
-
-The `TestnetWallet` class provides utilities for interacting with the Coinbase Developer Platform.
-
-**Key methods:**
-
-```python
-class TestnetWallet:
-    @classmethod
-    async def mint() -> TestnetWallet
-        # Creates a new wallet on Base Sepolia
-
-    async def fund_eth()
-        # Requests testnet ETH for gas fees
-
-    async def fund_usdc()
-        # Requests testnet USDC (100 USDC)
-
-    async def balance_usdc() -> Decimal
-        # Checks current USDC balance
-
-    async def export_private_key() -> str
-        # Exports private key for signing payments
+```
+Client                  Merchant Server (Py SDK)    Sangria Backend (:8080)
+  │                            │                            │
+  │  GET /premium              │                            │
+  │  (no PAYMENT-SIGNATURE)    │                            │
+  │───────────────────────────>│                            │
+  │                            │  POST /v1/generate-payment │
+  │                            │  Authorization: Bearer ... │
+  │                            │  { amount, resource, scheme: "exact" }
+  │                            │───────────────────────────>│
+  │                            │  200 OK                    │
+  │                            │  x402 v2 challenge JSON    │
+  │                            │<───────────────────────────│
+  │  HTTP 402                  │                            │
+  │  PAYMENT-REQUIRED: <b64>   │  ← base64(json(challenge)) │
+  │  body: x402 v2 JSON        │                            │
+  │<───────────────────────────│                            │
+  │                            │                            │
+  │  GET /premium              │                            │
+  │  PAYMENT-SIGNATURE: <sig>  │                            │
+  │───────────────────────────>│                            │
+  │                            │  POST /v1/settle-payment   │
+  │                            │  Authorization: Bearer ... │
+  │                            │  { paymentHeader, resource, amount }
+  │                            │───────────────────────────>│
+  │                            │  { success: true, tx }     │
+  │                            │<───────────────────────────│
+  │  HTTP 200 + data           │                            │
+  │<───────────────────────────│                            │
 ```
 
-## Key Dependencies
+## 6. Implementation Status
 
-| Package        | Purpose                                                                    |
-| -------------- | -------------------------------------------------------------------------- |
-| `cdp-sdk`      | Coinbase Developer Platform SDK — wallet creation, funding, balance checks |
-| `x402`         | Client-side x402 protocol — signs USDC payments for 402 responses          |
-| `fastapi-x402` | Server-side x402 middleware — adds `@pay` decorator to protect endpoints   |
-| `uvicorn`      | ASGI server to run FastAPI                                                 |
-| `fastapi`      | Modern Python web framework                                                |
+| Component | Status |
+| --- | --- |
+| WorkOS JWT authentication | ✅ Implemented |
+| API key management (CRUD, bcrypt) | ✅ Implemented |
+| PostgreSQL data layer | ✅ Implemented |
+| TypeScript SDK (Express / Fastify / Hono) | ✅ Implemented |
+| Python FastAPI decorator | ✅ Implemented |
+| `/v1/generate-payment` | 🚧 Stub — returns hardcoded x402 v2 challenge |
+| `/v1/settle-payment` | 🚧 Stub — always returns `success: false` |
+| `/facilitator/verify` | ❌ Not implemented (501) |
+| `/facilitator/settle` | ❌ Not implemented (501) |
+| Treasury wallet management | 🗓 Planned |
+| Internal credit ledger | 🗓 Planned |
 
-## Payment Flow Architecture
+## 7. Business & Revenue Model
 
-### High-level sequence:
+Sangria monetizes the friction between traditional cash and autonomous agentic payments.
 
-1. **Client makes request**: `main.py` sends GET request to `/premium`
-2. **Server requires payment**: FastAPI middleware returns 402 with payment details
-3. **Client signs authorization**: x402 client library creates ERC-3009 signature
-4. **Client retries with payment**: Request includes `X-PAYMENT` header
-5. **Server verifies**: Calls Coinbase facilitator to verify signature and balance
-6. **Server settles**: Facilitator submits transaction to Base Sepolia
-7. **Server responds**: Returns content + transaction hash in `X-PAYMENT-RESPONSE` header
+| Stream | Description |
+| --- | --- |
+| **Transaction Spread** | Charge a margin on Credits vs. raw on-chain USDC cost (e.g., sell $1.00 of credits for $1.10 in cash) |
+| **Facilitator Management** | Charge merchants a flat monthly SaaS fee to manage Coinbase Facilitator API & gas sponsorship |
+| **Breakage** | Revenue from unused or expired small-balance credits |
 
-## Wallet Management
+**Target actors:**
 
-The project uses pre-created wallets with addresses hardcoded in `main.py` and `merchant_server/app.py`. This avoids needing to create and fund wallets every time you run the demo.
+| Actor | Role | Integration |
+| --- | --- | --- |
+| **Merchant** | API providers (LLMs, data scrapers) wanting per-request monetization | Sangria SDK (server-side) |
+| **User** | Developers or AI Agents making programmatic micropayments | Sangria SDK (client-side) |
 
-### Creating new wallets:
+## 8. Compliance & Risk Mitigation
 
-```python
-import asyncio
-from wallet import TestnetWallet
+| Risk Category | Mitigation Strategy |
+| --- | --- |
+| **Regulatory** | Maintain CA DFAL License and FinCEN MSB registration; hold all "Credit" value in segregated statutory trusts |
+| **Taxation** | Automate Form 1099-DA generation for every on-chain disposal; track state-level Economic Nexus thresholds |
+| **Financial** | Maintain a liquid USDC Treasury to satisfy 100% of issued credits at all times (prevent liquidity runs) |
+| **Security** | Utilize CDP Wallet Secrets for server-side signing; enforce unique Nonces per ERC-3009 authorization to prevent replay attacks |
 
-async def setup():
-    wallet = await TestnetWallet.mint()    # creates a new wallet
-    await wallet.fund_eth()                # gas fees (free on testnet)
-    await wallet.fund_usdc()               # payment token (free on testnet)
-    print(wallet.address)                  # save this address
+## 9. Protocols & Standards
 
-asyncio.run(setup())
+| Protocol | Role |
+| --- | --- |
+| **x402** | HTTP-native payment protocol using the `402 Payment Required` status code |
+| **ERC-3009** | USDC standard for gasless `TransferWithAuthorization` — allows third parties to submit pre-signed transfers |
+| **EIP-712** | Typed structured data signing — the format used to sign ERC-3009 authorizations |
+
+**Payment schemes:**
+
+| Scheme | Description | Use Case |
+| --- | --- | --- |
+| **exact** | Fixed price known before the request | Simple API calls, static content |
+| **upto** | Maximum price set upfront; actual price determined after work is done | LLM inference, automation, variable-cost operations |
+
+## 10. Security Considerations
+
+- **CDP key management** — Private keys stored server-side by Coinbase, encrypted with `CDP_WALLET_SECRET`. Losing the secret = losing wallet access.
+- **Scenario-specific signing** — In Scenario 1, **ERC-3009 TransferWithAuthorization** is signed server-side by the **Treasury Wallet** through secure orchestration/key custody; in Scenario 3, the external client signs with its own wallet.
+- **Nonce protection** — Each ERC-3009 authorization has a unique nonce, preventing replay attacks.
+- **Transaction mutexes** — Prevent double-settlement of concurrent payment requests.
+- **Facilitator trust** — Coinbase operates the facilitator; it must be trusted to verify and settle honestly.
+- **Segregated reserves** — All user Credits are backed 1:1 by USDC held in trust to prevent insolvency.
+
+## 11. Network & Contract Details
+
+| Parameter | Value |
+| --- | --- |
+| Network (Production) | Base Mainnet (`eip155:8453`) |
+| Network (Development) | Base Sepolia (`eip155:84532`) |
+| USDC Contract (Sepolia) | `0x036CbD53842c5426634e7929541eC2318f3dCF7e` |
+| Settlement Time | ~3 seconds |
+| Gas Cost to Client | $0 (facilitator covers gas) |
+
+## 12. Environment Variables
+
 ```
-
-Then update `MERCHANT_ADDRESS` and `BUYER_ADDRESS` in the code with your new addresses.
-
-## Important Security Notes
-
-- **CDP manages private keys server-side**: The wallet secret in your `.env` encrypts them at rest — don't lose it or you lose access to your wallets
-- **Private key export**: The buyer's private key is exported from CDP only to sign x402 payment headers. This is the one place where the raw key is used locally
-- **Testnet only**: This demo runs on Base Sepolia testnet — all funds are fake, no real money is involved
-
-## Network Configuration
-
-The demo uses **Base Sepolia** testnet:
-
-- **Network**: Base Sepolia (Ethereum L2 testnet)
-- **Token**: USDC (testnet version)
-- **USDC Contract**: `0x036CbD53842c5426634e7929541eC2318f3dCF7e`
-- **Facilitator**: Coinbase hosted facilitator at `x402.org`
-
-## Frontend Architecture
-
-The documentation and landing page is built with Next.js:
-
-- **Framework**: Next.js 16 with App Router
-- **Styling**: Tailwind CSS with custom theme matching the original design
-- **Documentation**: Fumadocs with MDX content
-- **Icons**: Lucide React for consistent iconography
+DATABASE_URL=postgres://user:pass@host:5432/db?sslmode=verify-full&sslrootcert=system
+WORKOS_API_KEY=
+WORKOS_CLIENT_ID=
+ALLOWED_ORIGINS=http://localhost:3000
+```
 
 ## Next Steps
 
-- [Get started with the demo](/docs/getting-started)
 - [Learn about the x402 protocol](/docs/x402-protocol)
 - [Explore variable pricing](/docs/variable-pricing)

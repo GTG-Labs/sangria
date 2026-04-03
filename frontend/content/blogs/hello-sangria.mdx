@@ -36,12 +36,27 @@ The basic x402 request loop looks like this:
 
 ```python
 from fastapi import FastAPI
-from fastapi_x402 import pay
+from x402.http import FacilitatorConfig, HTTPFacilitatorClient, PaymentOption
+from x402.http.middleware.fastapi import PaymentMiddlewareASGI
+from x402.http.types import RouteConfig
+from x402.mechanisms.evm.exact import ExactEvmServerScheme
+from x402.server import x402ResourceServer
 
 app = FastAPI()
 
+facilitator = HTTPFacilitatorClient(FacilitatorConfig(url="https://x402.org/facilitator"))
+server = x402ResourceServer(facilitator)
+server.register("eip155:84532", ExactEvmServerScheme())
+
+routes = {
+    "GET /premium": RouteConfig(
+        accepts=[PaymentOption(scheme="exact", pay_to="0xYourWallet...", price="$0.0001", network="eip155:84532")],
+        mime_type="application/json",
+    ),
+}
+app.add_middleware(PaymentMiddlewareASGI, routes=routes, server=server)
+
 @app.get("/premium")
-@pay(amount_required=0.0001, pay_to="0xYourWallet...")
 async def premium():
     return {"message": "Paid content!", "paid": True}
 ```

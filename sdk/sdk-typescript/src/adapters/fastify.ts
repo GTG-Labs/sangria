@@ -23,13 +23,13 @@ export const sangrianetPlugin = fp(
   async (fastify: FastifyInstance) => {
     fastify.decorateRequest("sangrianet", undefined);
   },
-  { name: "sangrianet" },
+  { name: "sangrianet" }
 );
 
 export function fixedPrice(
   sangrianet: SangriaNet,
   options: FixedPriceOptions,
-  config?: FastifyConfig,
+  config?: FastifyConfig
 ): preHandlerAsyncHookHandler {
   sangrianet.validateFixedPriceOptions(options);
 
@@ -41,12 +41,12 @@ export function fixedPrice(
 
     const result = await sangrianet.handleFixedPrice(
       {
-        paymentHeader: Array.isArray(request.headers["x-payment"])
-          ? request.headers["x-payment"][0]
-          : request.headers["x-payment"],
+        paymentHeader: Array.isArray(request.headers["payment-signature"])
+          ? request.headers["payment-signature"][0]
+          : request.headers["payment-signature"],
         resourceUrl: `${request.protocol}://${request.hostname}${request.url}`,
       },
-      options,
+      options
     );
 
     if (result.action === "respond") {

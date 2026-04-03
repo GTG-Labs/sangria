@@ -15,14 +15,16 @@ export interface HonoConfig {
   bypassPaymentIf?: (c: SangriaNetContext) => boolean;
 }
 
-export function getSangriaNet(c: SangriaNetContext): SangriaRequestData | undefined {
+export function getSangriaNet(
+  c: SangriaNetContext
+): SangriaRequestData | undefined {
   return c.get("sangrianet");
 }
 
 export function fixedPrice(
   sangrianet: SangriaNet,
   options: FixedPriceOptions,
-  config?: HonoConfig,
+  config?: HonoConfig
 ): MiddlewareHandler<SangriaNetEnv> {
   sangrianet.validateFixedPriceOptions(options);
 
@@ -35,16 +37,16 @@ export function fixedPrice(
     const url = new URL(c.req.url);
     const result = await sangrianet.handleFixedPrice(
       {
-        paymentHeader: c.req.header("x-payment"),
+        paymentHeader: c.req.header("payment-signature"),
         resourceUrl: url.origin + url.pathname + url.search,
       },
-      options,
+      options
     );
 
     if (result.action === "respond") {
       return c.json(
         result.body as Record<string, unknown>,
-        result.status as ContentfulStatusCode,
+        result.status as ContentfulStatusCode
       );
     }
 
