@@ -14,10 +14,9 @@ import (
 func GetMerchantProfile(pool *pgxpool.Pool) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		merchantKey := c.Locals("merchant_api_key").(*dbengine.Merchant)
-		userID := c.Locals("merchant_user_id").(string)
 
 		// Get user information
-		user, err := dbengine.GetUserByWorkosID(c.Context(), pool, userID)
+		user, err := dbengine.GetUserByWorkosID(c.Context(), pool, merchantKey.UserID)
 		if err != nil {
 			log.Printf("Failed to get user for API key %s: %v", merchantKey.ID, err)
 			return c.Status(500).JSON(fiber.Map{"error": "Failed to retrieve merchant profile"})

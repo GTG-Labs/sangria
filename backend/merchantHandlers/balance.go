@@ -24,12 +24,15 @@ func GetMerchantBalance(pool *pgxpool.Pool) fiber.Handler {
 
 		// Convert microunits to display string using integer math (no float rounding).
 		// 1 USDC = 1,000,000 microunits. Preserves full 6-digit precision.
-		whole := balance / 1_000_000
-		frac := balance % 1_000_000
-		if frac < 0 {
-			frac = -frac
+		sign := ""
+		abs := balance
+		if balance < 0 {
+			sign = "-"
+			abs = -balance
 		}
-		displayBalance := fmt.Sprintf("%d.%06d USDC", whole, frac)
+		whole := abs / 1_000_000
+		frac := abs % 1_000_000
+		displayBalance := fmt.Sprintf("%s%d.%06d USDC", sign, whole, frac)
 
 		return c.Status(200).JSON(fiber.Map{
 			"balance":         balance,
