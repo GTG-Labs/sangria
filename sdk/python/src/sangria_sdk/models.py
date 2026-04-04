@@ -79,14 +79,10 @@ class ChallengeConfig:
 
 @dataclass(slots=True)
 class SettlePaymentRequest:
-    payment_id: str
     payment_payload: str
 
     def to_dict(self) -> dict[str, Any]:
-        return {
-            "payment_id": self.payment_id,
-            "payment_payload": self.payment_payload,
-        }
+        return {"payment_payload": self.payment_payload}
 
 
 @dataclass(slots=True)
@@ -113,7 +109,6 @@ class SettlementResult:
             success = False
         return cls(
             success=success,
-            payment_id=data.get("payment_id"),
             transaction=data.get("transaction"),
             network=data.get("network"),
             payer=data.get("payer"),

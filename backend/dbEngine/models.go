@@ -82,15 +82,6 @@ const (
 	NetworkSolanaDevnet Network = "solana-devnet"   // solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1
 )
 
-type PaymentStatus string
-
-const (
-	PaymentStatusPending PaymentStatus = "pending"
-	PaymentStatusSettled PaymentStatus = "settled"
-	PaymentStatusFailed  PaymentStatus = "failed"
-	PaymentStatusExpired PaymentStatus = "expired"
-)
-
 type Card struct {
 	ID         string     `json:"id"`
 	UserID     string     `json:"user_id"`
@@ -122,17 +113,3 @@ type CryptoWallet struct {
 	CreatedAt  time.Time `json:"created_at"`
 }
 
-type Payment struct {
-	ID               string        `json:"id"`
-	MerchantID       string        `json:"merchant_id"`
-	CryptoWalletID   string        `json:"crypto_wallet_id"`
-	Amount           int64         `json:"amount"`
-	Network          Network       `json:"network"`
-	Status           PaymentStatus `json:"status"`
-	SettlementTxHash *string       `json:"settlement_tx_hash"`
-	PayerAddress     *string       `json:"payer_address"`
-	IdempotencyKey   string        `json:"idempotency_key"`
-	ExpiresAt        time.Time     `json:"expires_at"`
-	CreatedAt        time.Time     `json:"created_at"`
-	SettledAt        *time.Time    `json:"settled_at"`
-}

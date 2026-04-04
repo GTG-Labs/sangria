@@ -110,13 +110,6 @@ export const networkEnum = pgEnum("network", [
   "solana-devnet", // solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1
 ]);
 
-export const paymentStatusEnum = pgEnum("payment_status", [
-  "pending", // generate-payment called, awaiting settlement
-  "settled", // settle-payment succeeded, USDC received
-  "failed", // settle-payment failed
-  "expired", // payment timed out (never settled)
-]);
-
 // ---------------------------------------------------------------------------
 // Cards — API keys for companies/developers integrating the Sangria user SDK
 // ---------------------------------------------------------------------------
@@ -172,7 +165,7 @@ export const merchants = pgTable(
 );
 
 // ---------------------------------------------------------------------------
-// Crypto Wallets — Sangria-owned CDP wallet pool with LRU tracking
+// Crypto Wallets — Sangria-owned CDP wallets (one per network)
 // ---------------------------------------------------------------------------
 
 export const cryptoWallets = pgTable(
@@ -199,42 +192,3 @@ export const cryptoWallets = pgTable(
   ],
 );
 
-// ---------------------------------------------------------------------------
-// Payments — tracks each x402 payment lifecycle
-// ---------------------------------------------------------------------------
-
-export const payments = pgTable(
-  "payments",
-  {
-    id: uuid().primaryKey().defaultRandom(),
-    merchantId: uuid("merchant_id")
-      .notNull()
-      .references(() => merchants.id),
-    cryptoWalletId: uuid("crypto_wallet_id")
-      .notNull()
-      .references(() => cryptoWallets.id),
-    amount: bigint({ mode: "bigint" }).notNull(),
-    network: networkEnum().notNull(),
-    status: paymentStatusEnum().notNull().default("pending"),
-    settlementTxHash: text("settlement_tx_hash"),
-    payerAddress: text("payer_address"),
-    idempotencyKey: varchar("idempotency_key", { length: 255 })
-      .notNull()
-      .unique(),
-    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-    settledAt: timestamp("settled_at", { withTimezone: true }),
-  },
-  (table) => [
-    index("idx_payments_merchant_id").on(table.merchantId),
-    index("idx_payments_status").on(table.status),
-    index("idx_payments_idempotency_key").on(table.idempotencyKey),
-    check("chk_payments_amount_positive", sql`${table.amount} > 0`),
-    // Prevents the same on-chain tx from being attached to multiple payments.
-    // PostgreSQL allows multiple NULLs in unique constraints, so unsettled
-    // payments (null tx hash) are unaffected.
-    unique("uq_payments_settlement_tx_hash").on(table.settlementTxHash),
-  ],
-);

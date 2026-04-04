@@ -74,7 +74,6 @@ export class SangriaNet {
 
     try {
       const result = (await this.post("/v1/settle-payment", {
-        payment_id: paymentId,
         payment_payload: ctx.paymentHeader,
       })) as {
         success: boolean;

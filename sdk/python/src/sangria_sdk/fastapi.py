@@ -11,7 +11,7 @@ from fastapi import HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from .client import SangriaMerchantClient
-from .errors import APIError, SangriaSDKError, SettlementFailedError
+from .errors import APIError, SettlementFailedError
 from .models import GeneratePaymentRequest
 
 
@@ -76,7 +76,6 @@ def require_sangria_payment(
             try:
                 verification = await merchant_client.settle_payment(
                     payment_payload=payment_signature,
-                    resource=resource,
                 )
             except (SettlementFailedError, APIError) as exc:
                 return build_error_response(exc)

@@ -63,12 +63,8 @@ class SangriaMerchantClient:
             self._set_cached_payment_id(req.resource, challenge.payment_id)
         return challenge
 
-    async def settle_payment(self, payment_payload: str, resource: str) -> SettlementResult:
-        payment_id = self._get_cached_payment_id(resource)
-        if payment_id is None:
-            raise SangriaSDKError("No cached payment_id for resource. Payment may have expired.")
-
-        req = SettlePaymentRequest(payment_id=payment_id, payment_payload=payment_payload)
+    async def settle_payment(self, payment_payload: str) -> SettlementResult:
+        req = SettlePaymentRequest(payment_payload=payment_payload)
         data = await self._http.post_json(self.settle_endpoint, req.to_dict())
         result = SettlementResult.from_dict(data)
         if not result.success:

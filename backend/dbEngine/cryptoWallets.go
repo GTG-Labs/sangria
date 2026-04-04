@@ -48,44 +48,30 @@ func CreateCryptoWalletWithAccount(ctx context.Context, pool *pgxpool.Pool, addr
 	return w, a, nil
 }
 
-// SelectLRUWallet picks the least-recently-used wallet on the given network
-// and updates its last_used_at timestamp. Uses SELECT ... FOR UPDATE to
-// prevent two concurrent requests from picking the same wallet.
-func SelectLRUWallet(ctx context.Context, pool *pgxpool.Pool, network Network) (CryptoWallet, error) {
-	tx, err := pool.Begin(ctx)
-	if err != nil {
-		return CryptoWallet{}, fmt.Errorf("begin transaction: %w", err)
-	}
-	defer tx.Rollback(ctx)
-
+// GetWalletByNetwork returns the wallet for the given network.
+func GetWalletByNetwork(ctx context.Context, pool *pgxpool.Pool, network Network) (CryptoWallet, error) {
 	var w CryptoWallet
-	err = tx.QueryRow(ctx,
+	err := pool.QueryRow(ctx,
 		`SELECT id, address, network, account_id, last_used_at, created_at
 		 FROM crypto_wallets
 		 WHERE network = $1
-		 ORDER BY last_used_at ASC
-		 LIMIT 1
-		 FOR UPDATE SKIP LOCKED`,
+		 LIMIT 1`,
 		network,
 	).Scan(&w.ID, &w.Address, &w.Network, &w.AccountID, &w.LastUsedAt, &w.CreatedAt)
-	if err != nil {
-		return CryptoWallet{}, fmt.Errorf("select lru wallet: %w", err)
-	}
+	return w, err
+}
 
-	err = tx.QueryRow(ctx,
-		`UPDATE crypto_wallets SET last_used_at = NOW() WHERE id = $1
-		 RETURNING last_used_at`,
-		w.ID,
-	).Scan(&w.LastUsedAt)
-	if err != nil {
-		return CryptoWallet{}, fmt.Errorf("update last_used_at: %w", err)
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		return CryptoWallet{}, fmt.Errorf("commit transaction: %w", err)
-	}
-
-	return w, nil
+// GetWalletByAddress returns a wallet by its on-chain address.
+// Uses case-insensitive comparison for EIP-55 checksum compatibility.
+func GetWalletByAddress(ctx context.Context, pool *pgxpool.Pool, address string) (CryptoWallet, error) {
+	var w CryptoWallet
+	err := pool.QueryRow(ctx,
+		`SELECT id, address, network, account_id, last_used_at, created_at
+		 FROM crypto_wallets
+		 WHERE LOWER(address) = LOWER($1)`,
+		address,
+	).Scan(&w.ID, &w.Address, &w.Network, &w.AccountID, &w.LastUsedAt, &w.CreatedAt)
+	return w, err
 }
 
 // GetCryptoWalletByID returns a crypto wallet by its UUID.
