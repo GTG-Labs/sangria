@@ -11,8 +11,9 @@ class FixedPriceOptions:
     description: str | None = None
 
     def __post_init__(self) -> None:
-        if not isinstance(self.price, (int, float)) or self.price <= 0:
-            raise ValueError("price must be a number greater than 0")
+        import math
+        if not isinstance(self.price, (int, float)) or not math.isfinite(self.price) or self.price <= 0:
+            raise ValueError("price must be a finite number greater than 0")
 
     def to_generate_dict(self) -> dict[str, Any]:
         payload: dict[str, Any] = {
