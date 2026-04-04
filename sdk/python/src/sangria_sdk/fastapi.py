@@ -41,7 +41,6 @@ def require_sangria_payment(
     merchant_client: SangriaMerchantClient,
     amount: Decimal,
     description: str | None = None,
-    resource_resolver: Callable[[Request], str] | None = None,
 ) -> Callable[[Callable[..., Awaitable[Any]]], Callable[..., Awaitable[Any]]]:
     def decorator(func: Callable[..., Awaitable[Any]]) -> Callable[..., Awaitable[Any]]:
         @wraps(func)
@@ -56,7 +55,7 @@ def require_sangria_payment(
             if request is None:
                 raise HTTPException(status_code=500, detail="FastAPI request not available")
 
-            resource = resource_resolver(request) if resource_resolver else request.url.path
+            resource = request.url.path
             normalized_amount = amount if isinstance(amount, Decimal) else Decimal(str(amount))
             payment_signature = request.headers.get("PAYMENT-SIGNATURE")
 

@@ -31,42 +31,6 @@ async def premium(request: Request):
     return {"data": "premium content"}
 ```
 
-## Manual Usage
-
-If you need more control over the payment flow, use the client directly:
-
-```python
-from sangria_sdk import SangriaMerchantClient, GeneratePaymentRequest
-
-client = SangriaMerchantClient(
-    base_url="https://api.sangria.net",
-    api_key="sg_live_...",
-)
-
-# Step 1: Generate payment terms
-challenge = await client.generate_payment(
-    GeneratePaymentRequest(amount=Decimal("0.01"), resource="/premium")
-)
-# challenge.accepts contains x402 v2 payment requirements
-
-# Step 2: Settle (after client signs and retries with payment-signature header)
-result = await client.settle_payment(payment_payload="<base64 signed payload>")
-# result.transaction == "0x..."
-# result.payer == "0x..."
-```
-
-## Decorator Options
-
-```python
-@require_sangria_payment(
-    merchant_client,
-    amount=Decimal("0.01"),             # Required. Price in USD.
-    description="Premium content",       # Optional. Shown in payment terms.
-    resource_resolver=lambda req: ...,   # Optional. Custom resource URL resolver.
-                                         # Defaults to request.url.path.
-)
-```
-
 ## How It Works
 
 The `@require_sangria_payment` decorator handles the x402 negotiation loop:
