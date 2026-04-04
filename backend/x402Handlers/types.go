@@ -3,10 +3,13 @@ package x402Handlers
 import "encoding/json"
 
 // PaymentRequirements specifies the terms for an x402 payment.
+// Note: Amount is sent as both "amount" (v2 facilitator) and "maxAmountRequired"
+// (v1 client response) to maintain compatibility across protocol versions.
 type PaymentRequirements struct {
 	Scheme            string         `json:"scheme"`
 	Network           string         `json:"network"`
 	MaxAmountRequired string         `json:"maxAmountRequired"`
+	Amount            string         `json:"amount"`
 	Asset             string         `json:"asset"`
 	PayTo             string         `json:"payTo"`
 	MaxTimeoutSeconds int            `json:"maxTimeoutSeconds"`
@@ -32,8 +35,8 @@ type ResourceInfo struct {
 // VerifyRequest is the payload sent to the facilitator /verify endpoint.
 type VerifyRequest struct {
 	X402Version  int                 `json:"x402Version"`
-	Payload      json.RawMessage     `json:"payload"`
-	Requirements PaymentRequirements `json:"requirements"`
+	Payload      json.RawMessage     `json:"paymentPayload"`
+	Requirements PaymentRequirements `json:"paymentRequirements"`
 }
 
 // VerifyResponse is the response from the facilitator /verify endpoint.
@@ -47,8 +50,8 @@ type VerifyResponse struct {
 // SettleRequest is the payload sent to the facilitator /settle endpoint.
 type SettleRequest struct {
 	X402Version  int                 `json:"x402Version"`
-	Payload      json.RawMessage     `json:"payload"`
-	Requirements PaymentRequirements `json:"requirements"`
+	Payload      json.RawMessage     `json:"paymentPayload"`
+	Requirements PaymentRequirements `json:"paymentRequirements"`
 }
 
 // SettleResponse is the response from the facilitator /settle endpoint.
