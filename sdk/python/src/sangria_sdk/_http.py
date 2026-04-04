@@ -28,7 +28,10 @@ class SangriaHTTPClient:
         payload: dict[str, Any],
     ) -> dict[str, Any]:
         response = await self._client.post(endpoint, json=payload)
-        response.raise_for_status()
+        # only raise on 5xx — 4xx responses carry business-level error payloads
+        # that the client needs to inspect (e.g. error_reason, error_message)
+        if response.status_code >= 500:
+            response.raise_for_status()
         return response.json()
 
     async def close(self) -> None:

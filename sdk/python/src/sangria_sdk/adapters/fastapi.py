@@ -42,7 +42,7 @@ def require_sangria_payment(
                 payment_header=request.headers.get("PAYMENT-SIGNATURE"),
                 options=FixedPriceOptions(
                     price=amount,
-                    resource=request.url.path,
+                    resource=str(request.url),
                     description=description,
                 ),
             )
