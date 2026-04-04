@@ -1,15 +1,9 @@
 import { source } from "@/lib/source";
-import { DocsLayout } from "fumadocs-ui/layouts/docs";
 import type { ReactNode } from "react";
+import DocsLayoutClient from "./docs-layout-client";
 
 export default function Layout({ children }: { children: ReactNode }) {
   return (
-    <DocsLayout
-      tree={source.getPageTree()}
-      nav={{ enabled: false }}
-      sidebar={{ defaultOpenLevel: 1 }}
-    >
-      {children}
-    </DocsLayout>
+    <DocsLayoutClient tree={source.getPageTree()}>{children}</DocsLayoutClient>
   );
 }
