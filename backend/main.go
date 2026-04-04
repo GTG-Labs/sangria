@@ -12,7 +12,6 @@ import (
 	"sangrianet/backend/config"
 	"sangrianet/backend/merchantHandlers"
 	"sangrianet/backend/utils"
-	"sangrianet/backend/x402Handlers"
 )
 
 func main() {
@@ -67,19 +66,6 @@ func setupRoutes(app *fiber.App, pool *pgxpool.Pool) {
 	// Payment endpoints (API key auth)
 	app.Post("/payments/generate-payment", apiKeyMiddleware, merchantHandlers.GeneratePayment(pool))
 	app.Post("/payments/settle-payment", apiKeyMiddleware, merchantHandlers.SettlePayment(pool))
-
-	// Versioned route aliases for SDK clients
-	app.Post("/v1/generate-payment", apiKeyMiddleware, merchantHandlers.GeneratePayment(pool))
-	app.Post("/v1/settle-payment", apiKeyMiddleware, merchantHandlers.SettlePayment(pool))
-
-	// Facilitator endpoints (API key auth)
-	facilitatorGroup := app.Group("/facilitator", apiKeyMiddleware)
-
-	// POST /facilitator/verify — verify a payment authorization
-	facilitatorGroup.Post("/verify", x402Handlers.VerifyPayment(pool))
-
-	// POST /facilitator/settle — settle a verified payment
-	facilitatorGroup.Post("/settle", x402Handlers.SettlePayment(pool))
 
 	// === ADMIN ENDPOINTS === (WorkOS JWT auth)
 	// These are for admins to MANAGE the system (create API keys, manage wallets, etc.)

@@ -13,9 +13,6 @@ import (
 	"net/http"
 	"os"
 	"time"
-
-	"github.com/gofiber/fiber/v3"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 var httpClient = &http.Client{Timeout: 30 * time.Second}
@@ -129,44 +126,3 @@ func Settle(ctx context.Context, payload json.RawMessage, requirements PaymentRe
 	return &result, nil
 }
 
-// VerifyPayment handles POST /facilitator/verify
-func VerifyPayment(pool *pgxpool.Pool) fiber.Handler {
-	return func(c fiber.Ctx) error {
-		type VerifyPaymentRequest struct {
-			PaymentHeader string                 `json:"payment_header"`
-			Requirements  map[string]interface{} `json:"requirements"`
-		}
-
-		var req VerifyPaymentRequest
-		if err := c.Bind().JSON(&req); err != nil {
-			return c.Status(400).JSON(fiber.Map{"error": "Invalid request body"})
-		}
-
-		// Payment verification logic not yet implemented
-		return c.Status(fiber.StatusNotImplemented).JSON(fiber.Map{
-			"error": "Payment verification functionality not yet implemented",
-			"code":  "NOT_IMPLEMENTED",
-		})
-	}
-}
-
-// SettlePayment handles POST /facilitator/settle
-func SettlePayment(pool *pgxpool.Pool) fiber.Handler {
-	return func(c fiber.Ctx) error {
-		type SettlePaymentRequest struct {
-			PaymentHeader string                 `json:"payment_header"`
-			Requirements  map[string]interface{} `json:"requirements"`
-		}
-
-		var req SettlePaymentRequest
-		if err := c.Bind().JSON(&req); err != nil {
-			return c.Status(400).JSON(fiber.Map{"error": "Invalid request body"})
-		}
-
-		// Payment settlement logic not yet implemented
-		return c.Status(fiber.StatusNotImplemented).JSON(fiber.Map{
-			"error": "Payment settlement functionality not yet implemented",
-			"code":  "NOT_IMPLEMENTED",
-		})
-	}
-}
