@@ -68,6 +68,8 @@ class ChallengeConfig:
             "x402Version": self.x402_version,
             "accepts": self.accepts,
         }
+        if self.payment_id is not None:
+            payload["payment_id"] = self.payment_id
         if self.description is not None:
             payload["description"] = self.description
         if self.resource is not None:

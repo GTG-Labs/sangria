@@ -121,7 +121,7 @@ export class SangriaNet {
 
   private setCachedPaymentId(resourceUrl: string, paymentId: string): void {
     // Lazy cleanup when cache grows too large
-    if (this.paymentCache.size > CACHE_MAX_SIZE) {
+    if (this.paymentCache.size >= CACHE_MAX_SIZE) {
       const now = Date.now();
       for (const [key, val] of this.paymentCache) {
         if (now > val.expiresAt) this.paymentCache.delete(key);

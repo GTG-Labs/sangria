@@ -78,6 +78,8 @@ def require_sangria_payment(
                     payment_payload=payment_signature,
                     resource=resource,
                 )
+            except (SettlementFailedError, APIError) as exc:
+                return build_error_response(exc)
             except SangriaSDKError:
                 # Cache miss (server restart, TTL expiry) — re-generate challenge
                 try:
@@ -91,8 +93,6 @@ def require_sangria_payment(
                 except APIError as exc:
                     return build_error_response(exc)
                 return build_402_response(challenge.to_dict())
-            except (SettlementFailedError, APIError) as exc:
-                return build_error_response(exc)
             request.state.sangria_verification = verification
             return await func(*args, **kwargs)
 
