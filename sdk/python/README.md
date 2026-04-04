@@ -31,6 +31,21 @@ async def premium(request: Request):
     return {"data": "premium content"}
 ```
 
+## Bypass Payments
+
+Skip payment for certain requests:
+
+```python
+@app.get("/premium")
+@require_sangria_payment(
+    client,
+    amount=Decimal("0.01"),
+    bypass_if=lambda req: req.headers.get("x-internal") == "true",
+)
+async def premium(request: Request):
+    return {"data": "premium content"}
+```
+
 ## How It Works
 
 The `@require_sangria_payment` decorator handles the x402 negotiation loop:
