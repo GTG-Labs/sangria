@@ -67,6 +67,10 @@ func setupRoutes(app *fiber.App, pool *pgxpool.Pool) {
 	app.Post("/payments/generate-payment", apiKeyMiddleware, merchantHandlers.GeneratePayment(pool))
 	app.Post("/payments/settle-payment", apiKeyMiddleware, merchantHandlers.SettlePayment(pool))
 
+	// Versioned route aliases for SDK clients
+	app.Post("/v1/generate-payment", apiKeyMiddleware, merchantHandlers.GeneratePayment(pool))
+	app.Post("/v1/settle-payment", apiKeyMiddleware, merchantHandlers.SettlePayment(pool))
+
 	// === ADMIN ENDPOINTS === (WorkOS JWT auth)
 	// These are for admins to MANAGE the system (create API keys, manage wallets, etc.)
 	// Uses WorkOS JWT authentication (admin must be logged in via WorkOS).
