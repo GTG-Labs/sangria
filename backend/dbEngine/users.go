@@ -20,13 +20,12 @@ func UpsertUser(ctx context.Context, pool *pgxpool.Pool, owner, workosID string)
 	return u, err
 }
 
-// GetUserByWorkosID retrieves a user by their WorkOS ID
+// GetUserByWorkosID returns a user by their WorkOS ID.
 func GetUserByWorkosID(ctx context.Context, pool *pgxpool.Pool, workosID string) (User, error) {
 	var u User
 	err := pool.QueryRow(ctx,
 		`SELECT workos_id, owner, created_at, updated_at
-		 FROM users
-		 WHERE workos_id = $1`,
+		 FROM users WHERE workos_id = $1`,
 		workosID,
 	).Scan(&u.WorkosID, &u.Owner, &u.CreatedAt, &u.UpdatedAt)
 	return u, err

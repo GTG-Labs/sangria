@@ -1,25 +1,22 @@
-package handlers
+package auth
 
 import (
 	"crypto/rand"
-	"crypto/subtle"
 	"encoding/hex"
 	"fmt"
 	"strings"
-
-	"golang.org/x/crypto/bcrypt"
 )
 
 const (
 	// API key format: sg_live_8charKeyID_32randomchars or sg_test_8charKeyID_32randomchars
-	KeyPrefixLive = "sg_live_"
-	KeyPrefixTest = "sg_test_"
-	KeyIDLength = 8
+	KeyPrefixLive   = "sg_live_"
+	KeyPrefixTest   = "sg_test_"
+	KeyIDLength     = 8
 	KeyRandomLength = 32
 )
 
-// GenerateAPIKey generates a new API key with embedded key_id like GitHub
-// Returns the full key, key_id, and display identifier
+// GenerateAPIKey generates a new API key with embedded key_id like GitHub.
+// Returns the full key, key_id, and display identifier.
 func GenerateAPIKey(isLive bool) (string, string, error) {
 	// Generate 8-char key ID for database lookup (4 bytes -> 8 hex chars)
 	keyIDBytes := make([]byte, KeyIDLength/2)
@@ -51,23 +48,7 @@ func GenerateAPIKey(isLive bool) (string, string, error) {
 	return fullKey, keyID, nil
 }
 
-// HashAPIKey hashes an API key using bcrypt for secure storage
-func HashAPIKey(key string) (string, error) {
-	// Use bcrypt with cost 12 for good security/performance balance
-	hash, err := bcrypt.GenerateFromPassword([]byte(key), 12)
-	if err != nil {
-		return "", fmt.Errorf("failed to hash API key: %w", err)
-	}
-	return string(hash), nil
-}
-
-// VerifyAPIKey verifies an API key against its stored hash
-func VerifyAPIKey(key, hash string) bool {
-	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(key))
-	return err == nil
-}
-
-// ValidateAPIKeyFormat validates that an API key follows the expected format
+// ValidateAPIKeyFormat validates that an API key follows the expected format.
 func ValidateAPIKeyFormat(key string) error {
 	if key == "" {
 		return fmt.Errorf("API key cannot be empty")
@@ -120,12 +101,42 @@ func ValidateAPIKeyFormat(key string) error {
 	return nil
 }
 
-// IsLiveKey returns true if the API key is a live/production key
+// ExtractKeyID extracts the key_id from a full API key for database lookup.
+func ExtractKeyID(fullKey string) (string, error) {
+	if err := ValidateAPIKeyFormat(fullKey); err != nil {
+		return "", fmt.Errorf("invalid API key format: %w", err)
+	}
+
+	var keyID string
+	if strings.HasPrefix(fullKey, KeyPrefixLive) {
+		parts := strings.Split(strings.TrimPrefix(fullKey, KeyPrefixLive), "_")
+		if len(parts) != 2 {
+			return "", fmt.Errorf("invalid live key format")
+		}
+		keyID = parts[0]
+	} else if strings.HasPrefix(fullKey, KeyPrefixTest) {
+		parts := strings.Split(strings.TrimPrefix(fullKey, KeyPrefixTest), "_")
+		if len(parts) != 2 {
+			return "", fmt.Errorf("invalid test key format")
+		}
+		keyID = parts[0]
+	} else {
+		return "", fmt.Errorf("unsupported key prefix")
+	}
+
+	if len(keyID) != KeyIDLength {
+		return "", fmt.Errorf("invalid key ID length: expected %d, got %d", KeyIDLength, len(keyID))
+	}
+
+	return keyID, nil
+}
+
+// IsLiveKey returns true if the API key is a live/production key.
 func IsLiveKey(key string) bool {
 	return strings.HasPrefix(key, KeyPrefixLive)
 }
 
-// GetKeyPrefix extracts the display prefix from a full API key
+// GetKeyPrefix extracts the display prefix from a full API key.
 func GetKeyPrefix(key string) string {
 	if err := ValidateAPIKeyFormat(key); err != nil {
 		return ""
@@ -148,42 +159,4 @@ func GetKeyPrefix(key string) string {
 	}
 
 	return prefix + randomPart + "..."
-}
-
-// ExtractKeyID extracts the key_id from a full API key for database lookup
-func ExtractKeyID(fullKey string) (string, error) {
-	if err := ValidateAPIKeyFormat(fullKey); err != nil {
-		return "", fmt.Errorf("invalid API key format: %w", err)
-	}
-
-	var keyID string
-	if strings.HasPrefix(fullKey, KeyPrefixLive) {
-		// Format: sg_live_keyID_randomPart
-		parts := strings.Split(strings.TrimPrefix(fullKey, KeyPrefixLive), "_")
-		if len(parts) != 2 {
-			return "", fmt.Errorf("invalid live key format")
-		}
-		keyID = parts[0]
-	} else if strings.HasPrefix(fullKey, KeyPrefixTest) {
-		// Format: sg_test_keyID_randomPart
-		parts := strings.Split(strings.TrimPrefix(fullKey, KeyPrefixTest), "_")
-		if len(parts) != 2 {
-			return "", fmt.Errorf("invalid test key format")
-		}
-		keyID = parts[0]
-	} else {
-		return "", fmt.Errorf("unsupported key prefix")
-	}
-
-	if len(keyID) != KeyIDLength {
-		return "", fmt.Errorf("invalid key ID length: expected %d, got %d", KeyIDLength, len(keyID))
-	}
-
-	return keyID, nil
-}
-
-// SecureCompare performs constant-time comparison of API key hashes
-// to prevent timing attacks
-func SecureCompare(a, b string) bool {
-	return subtle.ConstantTimeCompare([]byte(a), []byte(b)) == 1
 }
