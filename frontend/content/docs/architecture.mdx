@@ -165,7 +165,7 @@ sangria-net/
 Merchant-facing SDKs in TypeScript and Python. Both share the same backend-call pattern: on a missing `PAYMENT-SIGNATURE` header, they call `POST /v1/generate-payment` on the Sangria backend and return a `402`; on a valid header, they call `POST /v1/settle-payment` and pass the request through on success.
 
 - **TypeScript SDK** — framework adapters for Express, Fastify, and Hono. Reads `PAYMENT-SIGNATURE` from incoming headers, calls the backend with `Authorization: Bearer <apiKey>`.
-- **Python SDK** — a `@require_sangria_payment` FastAPI decorator. Returns `402` with a base64-encoded `PAYMENT-REQUIRED` header; on settlement success, attaches `SettlementResult` to `request.state.sangria_verification`.
+- **Python SDK** — a `@require_sangria_payment` FastAPI decorator. Returns `402` with a base64-encoded `PAYMENT-REQUIRED` header; on settlement success, attaches `PaymentProceeded` to `request.state.sangria_payment`.
 - Supports both `exact` (fixed price) and `upto` (variable price) schemes
 - Future: SDKs in additional languages
 

@@ -36,8 +36,8 @@ func GeneratePayment(pool *pgxpool.Pool) fiber.Handler {
 		}
 		amountMicro := int64(math.Round(req.Amount * 1e6))
 
-		// Hardcoded: USDC on Base Sepolia (change to "base" for mainnet).
-		const network = "base-sepolia"
+		// Hardcoded: USDC on Base (change to "base" for mainnet).
+		const network = "base"
 
 		netConfig, ok := x402Handlers.NetworkConfigs[network]
 		if !ok {
@@ -56,13 +56,12 @@ func GeneratePayment(pool *pgxpool.Pool) fiber.Handler {
 				{
 					Scheme:            "exact",
 					Network:           netConfig.CAIP2,
-					MaxAmountRequired: strconv.FormatInt(amountMicro, 10),
 					Amount:            strconv.FormatInt(amountMicro, 10),
 					Asset:             netConfig.USDCAddress,
 					PayTo:             wallet.Address,
 					MaxTimeoutSeconds: maxTimeoutSeconds,
 					Extra: map[string]any{
-						"name":                "USDC",
+						"name":                "USD Coin",
 						"version":             "2",
 						"assetTransferMethod": "eip3009",
 					},
@@ -81,6 +80,7 @@ func GeneratePayment(pool *pgxpool.Pool) fiber.Handler {
 type payloadEnvelope struct {
 	Payload struct {
 		Authorization struct {
+			From  string      `json:"from"`
 			To    string      `json:"to"`
 			Value json.Number `json:"value"`
 		} `json:"authorization"`
@@ -145,13 +145,12 @@ func SettlePayment(pool *pgxpool.Pool) fiber.Handler {
 		canonicalRequirements := x402Handlers.PaymentRequirements{
 			Scheme:            "exact",
 			Network:           netConfig.CAIP2,
-			MaxAmountRequired: valueStr,
 			Amount:            valueStr,
 			Asset:             netConfig.USDCAddress,
 			PayTo:             wallet.Address,
 			MaxTimeoutSeconds: maxTimeoutSeconds,
 			Extra: map[string]any{
-				"name":                "USDC",
+				"name":                "USD Coin",
 				"version":             "2",
 				"assetTransferMethod": "eip3009",
 			},
@@ -159,10 +158,22 @@ func SettlePayment(pool *pgxpool.Pool) fiber.Handler {
 
 		payload := json.RawMessage(payloadBytes)
 
-		// Call facilitator /verify.
+		log.Println("")
+		log.Println("════════════════════════════════════════")
+		log.Println("  SETTLE PAYMENT FLOW")
+		log.Println("════════════════════════════════════════")
+		log.Printf("  payer:   %s", envelope.Payload.Authorization.From)
+		log.Printf("  to:      %s", toAddress)
+		log.Printf("  amount:  %s (micro USDC)", valueStr)
+		log.Printf("  network: %s", netConfig.CAIP2)
+		log.Println("────────────────────────────────────────")
+
+		// Step 1: Verify
+		log.Println("  [1/2] Calling facilitator /verify ...")
 		verifyResp, err := x402Handlers.Verify(c.Context(), payload, canonicalRequirements)
 		if err != nil {
-			log.Printf("facilitator verify error: %v", err)
+			log.Printf("  [1/2] VERIFY FAILED (error): %v", err)
+			log.Println("════════════════════════════════════════")
 			return c.Status(502).JSON(fiber.Map{
 				"success":       false,
 				"error_reason":  "verify_failed",
@@ -170,17 +181,22 @@ func SettlePayment(pool *pgxpool.Pool) fiber.Handler {
 			})
 		}
 		if !verifyResp.IsValid {
+			log.Printf("  [1/2] VERIFY FAILED (invalid): reason=%s message=%s", verifyResp.InvalidReason, verifyResp.InvalidMessage)
+			log.Println("════════════════════════════════════════")
 			return c.Status(400).JSON(fiber.Map{
 				"success":       false,
 				"error_reason":  verifyResp.InvalidReason,
 				"error_message": verifyResp.InvalidMessage,
 			})
 		}
+		log.Printf("  [1/2] VERIFY SUCCEEDED — payer: %s", verifyResp.Payer)
 
-		// Call facilitator /settle.
+		// Step 2: Settle
+		log.Println("  [2/2] Calling facilitator /settle ...")
 		settleResp, err := x402Handlers.Settle(c.Context(), payload, canonicalRequirements)
 		if err != nil {
-			log.Printf("facilitator settle error: %v", err)
+			log.Printf("  [2/2] SETTLE FAILED (error): %v", err)
+			log.Println("════════════════════════════════════════")
 			return c.Status(502).JSON(fiber.Map{
 				"success":       false,
 				"error_reason":  "settle_failed",
@@ -188,12 +204,16 @@ func SettlePayment(pool *pgxpool.Pool) fiber.Handler {
 			})
 		}
 		if !settleResp.Success {
+			log.Printf("  [2/2] SETTLE FAILED (rejected): reason=%s message=%s", settleResp.ErrorReason, settleResp.ErrorMessage)
+			log.Println("════════════════════════════════════════")
 			return c.Status(400).JSON(fiber.Map{
 				"success":       false,
 				"error_reason":  settleResp.ErrorReason,
 				"error_message": settleResp.ErrorMessage,
 			})
 		}
+		log.Printf("  [2/2] SETTLE SUCCEEDED — tx: %s", settleResp.Transaction)
+		log.Println("════════════════════════════════════════")
 
 		// Write double-entry ledger using the tx hash as idempotency key.
 		merchantAcct, err := dbengine.GetMerchantUSDCLiabilityAccount(c.Context(), pool, merchant.ID)

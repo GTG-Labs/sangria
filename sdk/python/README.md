@@ -13,10 +13,9 @@ pip install sangria-merchant-sdk
 ### FastAPI
 
 ```python
-from decimal import Decimal
 from fastapi import FastAPI, Request
 from sangria_sdk import SangriaMerchantClient
-from sangria_sdk.fastapi import require_sangria_payment
+from sangria_sdk.adapters.fastapi import require_sangria_payment
 
 app = FastAPI()
 client = SangriaMerchantClient(
@@ -25,9 +24,9 @@ client = SangriaMerchantClient(
 )
 
 @app.get("/premium")
-@require_sangria_payment(client, amount=Decimal("0.01"), description="Premium content")
+@require_sangria_payment(client, amount=0.01, description="Premium content")
 async def premium(request: Request):
-    # request.state.sangria_verification.transaction == "0x..."
+    # request.state.sangria_payment.transaction == "0x..."
     return {"data": "premium content"}
 ```
 
@@ -39,7 +38,7 @@ Skip payment for certain requests. This is useful if you want to let API key use
 @app.get("/premium")
 @require_sangria_payment(
     client,
-    amount=Decimal("0.01"),
+    amount=0.01,
     bypass_if=lambda req: req.headers.get("x-api-key") is not None,
 )
 async def premium(request: Request):
@@ -51,7 +50,7 @@ async def premium(request: Request):
 The `@require_sangria_payment` decorator handles the x402 negotiation loop:
 
 1. **First request** (no `PAYMENT-SIGNATURE` header): calls Sangria's `/v1/generate-payment` endpoint, returns `402 Payment Required` with payment terms and a base64-encoded `PAYMENT-REQUIRED` response header.
-2. **Retry** (with `PAYMENT-SIGNATURE` header): forwards the signed payload to Sangria's `/v1/settle-payment` endpoint. On success, stores the result in `request.state.sangria_verification` and calls your handler.
+2. **Retry** (with `PAYMENT-SIGNATURE` header): forwards the signed payload to Sangria's `/v1/settle-payment` endpoint. On success, stores the result in `request.state.sangria_payment` and calls your handler.
 
 ## API Contract
 
@@ -69,7 +68,7 @@ Response (402):
   "accepts": [{
     "scheme": "exact",
     "network": "eip155:84532",
-    "maxAmountRequired": "10000",
+    "amount": "10000",
     "asset": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
     "payTo": "0xWalletAddress",
     "maxTimeoutSeconds": 60

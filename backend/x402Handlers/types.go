@@ -3,14 +3,12 @@ package x402Handlers
 import "encoding/json"
 
 // PaymentRequirements specifies the terms for an x402 payment.
-// Note: Amount is sent as both "amount" (v2 facilitator) and "maxAmountRequired"
-// (v1 client response) to maintain compatibility across protocol versions.
+// Matches the x402 v2 spec: https://github.com/coinbase/x402/blob/main/go/types/v2.go
 type PaymentRequirements struct {
 	Scheme            string         `json:"scheme"`
 	Network           string         `json:"network"`
-	MaxAmountRequired string         `json:"maxAmountRequired"`
-	Amount            string         `json:"amount"`
 	Asset             string         `json:"asset"`
+	Amount            string         `json:"amount"`
 	PayTo             string         `json:"payTo"`
 	MaxTimeoutSeconds int            `json:"maxTimeoutSeconds"`
 	Extra             map[string]any `json:"extra,omitempty"`

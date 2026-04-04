@@ -83,7 +83,7 @@ async def variable(request: Request):
                     {
                         "scheme": "exact",
                         "network": NETWORK,
-                        "maxAmountRequired": str(int(actual_cost * 10 ** asset_config.decimals)),
+                        "amount": str(int(actual_cost * 10 ** asset_config.decimals)),
                         "resource": resource,
                         "description": f"Variable-priced endpoint (cost: ${actual_cost})",
                         "mimeType": "application/json",
@@ -204,7 +204,7 @@ async def run_automation(request: Request):
                     {
                         "scheme": "exact",
                         "network": NETWORK,
-                        "maxAmountRequired": str(cached["price_atomic"]),
+                        "amount": str(cached["price_atomic"]),
                         "resource": resource,
                         "description": f"TinyFish automation ({cached['price_usd']:.4f} USD)",
                         "mimeType": "application/json",
