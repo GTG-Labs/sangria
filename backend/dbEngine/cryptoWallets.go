@@ -74,13 +74,3 @@ func GetWalletByAddress(ctx context.Context, pool *pgxpool.Pool, address string)
 	return w, err
 }
 
-// GetCryptoWalletByID returns a crypto wallet by its UUID.
-func GetCryptoWalletByID(ctx context.Context, pool *pgxpool.Pool, id string) (CryptoWallet, error) {
-	var w CryptoWallet
-	err := pool.QueryRow(ctx,
-		`SELECT id, address, network, account_id, last_used_at, created_at
-		 FROM crypto_wallets WHERE id = $1`,
-		id,
-	).Scan(&w.ID, &w.Address, &w.Network, &w.AccountID, &w.LastUsedAt, &w.CreatedAt)
-	return w, err
-}

@@ -18,21 +18,17 @@ declare module "fastify" {
   }
 }
 
-/** Register this plugin before using fixedPrice() */
-export const sangrianetPlugin = fp(
-  async (fastify: FastifyInstance) => {
-    fastify.decorateRequest("sangrianet", undefined);
-  },
-  { name: "sangrianet" }
-);
-
+// ── Entry point: add as preHandler to gate a route behind payment ──
+//
+//   fastify.get("/premium", { preHandler: fixedPrice(sangrianet, { price: 0.01 }) }, handler)
+//
+//   Note: register sangrianetPlugin before using fixedPrice().
+//
 export function fixedPrice(
   sangrianet: SangriaNet,
   options: FixedPriceOptions,
   config?: FastifyConfig
 ): preHandlerAsyncHookHandler {
-  sangrianet.validateFixedPriceOptions(options);
-
   return async (request: FastifyRequest, reply: FastifyReply) => {
     if (config?.bypassPaymentIf?.(request)) {
       request.sangrianet = { paid: false, amount: 0 };
@@ -50,9 +46,20 @@ export function fixedPrice(
     );
 
     if (result.action === "respond") {
+      if (result.headers) {
+        reply.headers(result.headers);
+      }
       return reply.status(result.status).send(result.body);
     }
 
     request.sangrianet = result.data;
   };
 }
+
+/** Register this plugin before using fixedPrice() */
+export const sangrianetPlugin = fp(
+  async (fastify: FastifyInstance) => {
+    fastify.decorateRequest("sangrianet", undefined);
+  },
+  { name: "sangrianet" }
+);

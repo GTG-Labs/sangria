@@ -3,17 +3,14 @@ import type {
   FixedPriceOptions,
   PaymentContext,
   PaymentResult,
-  PaymentCacheEntry,
+  X402ChallengePayload,
 } from "./types.js";
 
 const DEFAULT_BASE_URL = "http://localhost:8080";
-const CACHE_TTL_MS = 60_000; // 60 seconds, matches backend maxTimeoutSeconds
-const CACHE_MAX_SIZE = 1000;
 
 export class SangriaNet {
   private apiKey: string;
   private baseUrl: string;
-  private paymentCache: Map<string, PaymentCacheEntry> = new Map();
 
   constructor(config: SangriaNetConfig) {
     if (!config.apiKey) {
@@ -24,60 +21,71 @@ export class SangriaNet {
     this.baseUrl = (config.baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, "");
   }
 
-  validateFixedPriceOptions(options: FixedPriceOptions): void {
+  private validateFixedPriceOptions(options: FixedPriceOptions): void {
     if (!Number.isFinite(options.price) || options.price <= 0) {
-      throw new Error("SangriaNet: price must be a finite number greater than 0");
+      throw new Error(
+        "SangriaNet: price must be a finite number greater than 0",
+      );
     }
   }
 
   async handleFixedPrice(
     ctx: PaymentContext,
-    options: FixedPriceOptions
+    options: FixedPriceOptions,
   ): Promise<PaymentResult> {
     this.validateFixedPriceOptions(options);
 
     if (!ctx.paymentHeader) {
-      try {
-        const terms = (await this.post("/v1/generate-payment", {
-          amount: options.price,
-          resource: ctx.resourceUrl,
-          description: options.description,
-        })) as {
-          payment_id?: string;
-          [key: string]: unknown;
-        };
-
-        // Cache payment_id for the settle call
-        if (terms.payment_id) {
-          this.setCachedPaymentId(ctx.resourceUrl, terms.payment_id);
-        }
-
-        return { action: "respond", status: 402, body: terms };
-      } catch {
-        return {
-          action: "respond",
-          status: 500,
-          body: { error: "Payment service unavailable" },
-        };
-      }
+      return this.generatePayment(ctx, options);
+    } else {
+      return this.settlePayment(ctx.paymentHeader, options);
     }
+  }
 
-    // Settle: look up cached payment_id and forward the payment signature
-    const paymentId = this.getCachedPaymentId(ctx.resourceUrl);
-    if (!paymentId) {
+  // if we dont have a payment header, it means that we need to hit the generate-payment endpoint on our backend,
+  // and send the client a 402 response with details on how to pay us
+  private async generatePayment(
+    ctx: PaymentContext,
+    options: FixedPriceOptions,
+  ): Promise<PaymentResult> {
+    try {
+      const x402_responsePayload = await this.postToSangriaBackend("/v1/generate-payment", {
+        amount: options.price,
+        resource: ctx.resourceUrl,
+        description: options.description,
+      }) as X402ChallengePayload;
+
+      // you gotta encode the payload before sending it back (part of the spec)
+      const encoded = btoa(JSON.stringify(x402_responsePayload));
+
       return {
         action: "respond",
         status: 402,
-        body: { error: "Payment session expired, please retry" },
+        body: x402_responsePayload,
+        headers: { "PAYMENT-REQUIRED": encoded },
+      };
+    } catch {
+      //TODO: instead of doing this, raise an error so the merchant handles it.
+      return {
+        action: "respond",
+        status: 500,
+        body: { error: "Payment service unavailable" },
       };
     }
+  }
 
+  // there was a payment header so we try to settle the payment
+  private async settlePayment(
+    paymentHeader: string,
+    options: FixedPriceOptions,
+  ): Promise<PaymentResult> {
     try {
-      const result = (await this.post("/v1/settle-payment", {
-        payment_payload: ctx.paymentHeader,
+      const result = (await this.postToSangriaBackend("/v1/settle-payment", {
+        payment_payload: paymentHeader,
       })) as {
         success: boolean;
         transaction?: string;
+        error_reason?: string;
         error_message?: string;
       };
 
@@ -85,11 +93,12 @@ export class SangriaNet {
         return {
           action: "respond",
           status: 402,
-          body: { error: result.error_message ?? "Payment failed" },
+          body: {
+            error: result.error_message ?? "Payment failed",
+            error_reason: result.error_reason,
+          },
         };
       }
-
-      this.paymentCache.delete(ctx.resourceUrl);
 
       return {
         action: "proceed",
@@ -108,31 +117,7 @@ export class SangriaNet {
     }
   }
 
-  private getCachedPaymentId(resourceUrl: string): string | undefined {
-    const entry = this.paymentCache.get(resourceUrl);
-    if (!entry) return undefined;
-    if (Date.now() > entry.expiresAt) {
-      this.paymentCache.delete(resourceUrl);
-      return undefined;
-    }
-    return entry.paymentId;
-  }
-
-  private setCachedPaymentId(resourceUrl: string, paymentId: string): void {
-    // Lazy cleanup when cache grows too large
-    if (this.paymentCache.size >= CACHE_MAX_SIZE) {
-      const now = Date.now();
-      for (const [key, val] of this.paymentCache) {
-        if (now > val.expiresAt) this.paymentCache.delete(key);
-      }
-    }
-    this.paymentCache.set(resourceUrl, {
-      paymentId,
-      expiresAt: Date.now() + CACHE_TTL_MS,
-    });
-  }
-
-  private async post(path: string, body: Record<string, unknown>) {
+  private async postToSangriaBackend(path: string, body: Record<string, unknown>) {
     const res = await fetch(`${this.baseUrl}${path}`, {
       method: "POST",
       headers: {

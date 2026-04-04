@@ -15,19 +15,15 @@ export interface HonoConfig {
   bypassPaymentIf?: (c: SangriaNetContext) => boolean;
 }
 
-export function getSangriaNet(
-  c: SangriaNetContext
-): SangriaRequestData | undefined {
-  return c.get("sangrianet");
-}
-
+// ── Entry point: add as middleware to gate a route behind payment ──
+//
+//   app.get("/premium", fixedPrice(sangrianet, { price: 0.01 }), handler)
+//
 export function fixedPrice(
   sangrianet: SangriaNet,
   options: FixedPriceOptions,
   config?: HonoConfig
 ): MiddlewareHandler<SangriaNetEnv> {
-  sangrianet.validateFixedPriceOptions(options);
-
   return async (c, next) => {
     if (config?.bypassPaymentIf?.(c)) {
       c.set("sangrianet", { paid: false, amount: 0 });
@@ -44,6 +40,11 @@ export function fixedPrice(
     );
 
     if (result.action === "respond") {
+      if (result.headers) {
+        for (const [key, value] of Object.entries(result.headers)) {
+          c.header(key, value);
+        }
+      }
       return c.json(
         result.body as Record<string, unknown>,
         result.status as ContentfulStatusCode
@@ -53,4 +54,10 @@ export function fixedPrice(
     c.set("sangrianet", result.data);
     return next();
   };
+}
+
+export function getSangriaNet(
+  c: SangriaNetContext
+): SangriaRequestData | undefined {
+  return c.get("sangrianet");
 }

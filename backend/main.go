@@ -64,8 +64,8 @@ func setupRoutes(app *fiber.App, pool *pgxpool.Pool) {
 	app.Get("/merchant/balance", apiKeyMiddleware, merchantHandlers.GetMerchantBalance(pool))
 
 	// Payment endpoints (API key auth)
-	app.Post("/payments/generate-payment", apiKeyMiddleware, merchantHandlers.GeneratePayment(pool))
-	app.Post("/payments/settle-payment", apiKeyMiddleware, merchantHandlers.SettlePayment(pool))
+	app.Post("/v1/generate-payment", apiKeyMiddleware, merchantHandlers.GeneratePayment(pool))
+	app.Post("/v1/settle-payment", apiKeyMiddleware, merchantHandlers.SettlePayment(pool))
 
 	// === ADMIN ENDPOINTS === (WorkOS JWT auth)
 	// These are for admins to MANAGE the system (create API keys, manage wallets, etc.)

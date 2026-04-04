@@ -14,13 +14,15 @@ declare global {
   }
 }
 
+// ── Entry point: add as middleware to gate a route behind payment ──
+//
+//   app.get("/premium", fixedPrice(sangrianet, { price: 0.01 }), handler)
+//
 export function fixedPrice(
   sangrianet: SangriaNet,
   options: FixedPriceOptions,
   config?: ExpressConfig
 ) {
-  sangrianet.validateFixedPriceOptions(options);
-
   return async (req: Request, res: Response, next: NextFunction) => {
     if (config?.bypassPaymentIf?.(req)) {
       req.sangrianet = { paid: false, amount: 0 };
@@ -38,6 +40,11 @@ export function fixedPrice(
     );
 
     if (result.action === "respond") {
+      if (result.headers) {
+        for (const [key, value] of Object.entries(result.headers)) {
+          res.setHeader(key, value);
+        }
+      }
       return res.status(result.status).json(result.body);
     }
 

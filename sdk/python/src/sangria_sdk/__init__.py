@@ -1,17 +1,15 @@
 from .client import SangriaMerchantClient
 from .models import (
-    ChallengeConfig,
-    GeneratePaymentRequest,
-    MerchantContext,
-    SettlePaymentRequest,
-    SettlementResult,
+    FixedPriceOptions,
+    PaymentProceeded,
+    PaymentResponse,
+    PaymentResult,
 )
 
 __all__ = [
-    "ChallengeConfig",
-    "GeneratePaymentRequest",
-    "MerchantContext",
+    "FixedPriceOptions",
+    "PaymentProceeded",
+    "PaymentResponse",
+    "PaymentResult",
     "SangriaMerchantClient",
-    "SettlePaymentRequest",
-    "SettlementResult",
 ]
