@@ -36,6 +36,13 @@ X402ChallengePayload = dict[str, Any]
 
 
 @dataclass(slots=True)
+class GeneratePaymentResponse:
+    status_code: int
+    body: X402ChallengePayload
+    headers: dict[str, str]
+
+
+@dataclass(slots=True)
 class SettlePaymentRequest:
     payment_payload: str
 

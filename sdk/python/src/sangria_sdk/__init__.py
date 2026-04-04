@@ -8,6 +8,7 @@ from .errors import (
 from .models import (
     X402ChallengePayload,
     GeneratePaymentRequest,
+    GeneratePaymentResponse,
     SettlePaymentRequest,
     SettlementResult,
 )
@@ -15,6 +16,7 @@ from .models import (
 __all__ = [
     "APIError",
     "GeneratePaymentRequest",
+    "GeneratePaymentResponse",
     "PaymentRequiredError",
     "SangriaMerchantClient",
     "SangriaSDKError",

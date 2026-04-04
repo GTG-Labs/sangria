@@ -1,13 +1,17 @@
 from __future__ import annotations
 
+import base64
+import json
+from typing import Any
+
 from ._http import SangriaHTTPClient
 from .errors import SettlementFailedError
 from .models import (
     GeneratePaymentRequest,
+    GeneratePaymentResponse,
     SettlePaymentRequest,
     SettlementResult,
 )
-from typing import Any
 
 
 class SangriaMerchantClient:
@@ -27,8 +31,14 @@ class SangriaMerchantClient:
         self.generate_endpoint = generate_endpoint
         self.settle_endpoint = settle_endpoint
 
-    async def generate_payment(self, req: GeneratePaymentRequest) -> dict[str, Any]:
-        return await self._http.post_json(self.generate_endpoint, req.to_dict())
+    async def generate_payment(self, req: GeneratePaymentRequest) -> GeneratePaymentResponse:
+        challenge = await self._http.post_json(self.generate_endpoint, req.to_dict())
+        encoded = base64.b64encode(json.dumps(challenge).encode()).decode()
+        return GeneratePaymentResponse(
+            status_code=402,
+            body=challenge,
+            headers={"PAYMENT-REQUIRED": encoded},
+        )
 
     async def settle_payment(self, payment_payload: str) -> SettlementResult:
         req = SettlePaymentRequest(payment_payload=payment_payload)

@@ -42,7 +42,13 @@ export class SangriaNet {
           resource: ctx.resourceUrl,
           description: options.description,
         }) as X402ChallengePayload;
-        return { action: "respond", status: 402, body: challenge };
+        const encoded = btoa(JSON.stringify(challenge));
+        return {
+          action: "respond",
+          status: 402,
+          body: challenge,
+          headers: { "PAYMENT-REQUIRED": encoded },
+        };
       } catch {
         return {
           action: "respond",

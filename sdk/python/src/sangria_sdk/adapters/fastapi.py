@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
-import base64
-import json
 from decimal import Decimal
 from functools import wraps
 from typing import Any
@@ -10,33 +8,16 @@ from typing import Any
 from fastapi import HTTPException, Request
 from fastapi.responses import JSONResponse
 
-from .client import SangriaMerchantClient
-from .errors import APIError, SettlementFailedError
-from .models import GeneratePaymentRequest
+from ..client import SangriaMerchantClient
+from ..errors import APIError, SettlementFailedError
+from ..models import GeneratePaymentRequest
 
 
-def build_402_response(challenge: dict[str, Any]) -> JSONResponse:
-    encoded = base64.b64encode(json.dumps(challenge).encode()).decode()
-    return JSONResponse(
-        status_code=402,
-        content=challenge,
-        headers={"PAYMENT-REQUIRED": encoded},
-    )
-
-
-def build_error_response(exc: Exception) -> JSONResponse:
-    if isinstance(exc, SettlementFailedError):
-        return JSONResponse(
-            status_code=403,
-            content={"detail": exc.reason or "Payment verification failed"},
-        )
-    if isinstance(exc, APIError):
-        status_code = 502 if exc.status_code is None else exc.status_code
-        payload = exc.payload or {"error": str(exc)}
-        return JSONResponse(status_code=status_code, content=payload)
-    return JSONResponse(status_code=500, content={"detail": "Unexpected Sangria SDK error"})
-
-
+# ── Entry point: decorate a FastAPI route to require payment ──
+#
+#   @require_sangria_payment(client, amount=Decimal("0.01"))
+#   async def premium(request: Request): ...
+#
 def require_sangria_payment(
     merchant_client: SangriaMerchantClient,
     amount: Decimal,
@@ -65,7 +46,7 @@ def require_sangria_payment(
 
             if not payment_signature:
                 try:
-                    challenge = await merchant_client.generate_payment(
+                    response = await merchant_client.generate_payment(
                         GeneratePaymentRequest(
                             amount=normalized_amount,
                             resource=resource,
@@ -74,20 +55,40 @@ def require_sangria_payment(
                     )
                 except APIError as exc:
                     return build_error_response(exc)
-                return build_402_response(challenge)
-
-            try:
-                verification = await merchant_client.settle_payment(
-                    payment_payload=payment_signature,
+                return JSONResponse(
+                    status_code=response.status_code,
+                    content=response.body,
+                    headers=response.headers,
                 )
-            except (SettlementFailedError, APIError) as exc:
-                return build_error_response(exc)
-            request.state.sangria_verification = verification
-            return await func(*args, **kwargs)
+            else:
+                try:
+                    verification = await merchant_client.settle_payment(
+                        payment_payload=payment_signature,
+                    )
+                except (SettlementFailedError, APIError) as exc:
+                    return build_error_response(exc)
+                request.state.sangria_verification = verification
+                return await func(*args, **kwargs)
 
         return wrapper
 
     return decorator
+
+
+# ── Helpers ──
+
+
+def build_error_response(exc: Exception) -> JSONResponse:
+    if isinstance(exc, SettlementFailedError):
+        return JSONResponse(
+            status_code=403,
+            content={"detail": exc.reason or "Payment verification failed"},
+        )
+    if isinstance(exc, APIError):
+        status_code = 502 if exc.status_code is None else exc.status_code
+        payload = exc.payload or {"error": str(exc)}
+        return JSONResponse(status_code=status_code, content=payload)
+    return JSONResponse(status_code=500, content={"detail": "Unexpected Sangria SDK error"})
 
 
 def map_sangria_error(exc: Exception) -> HTTPException:
