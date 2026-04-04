@@ -1,0 +1,19 @@
+{
+  "name": "merchant-fastify",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx --watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@sangrianet/core": "file:../../sdk/sdk-typescript",
+    "fastify": "^5.0.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.21.0",
+    "typescript": "^5.7.0"
+  }
+}
