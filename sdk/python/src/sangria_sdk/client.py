@@ -5,12 +5,11 @@ import json
 from typing import Any
 
 from ._http import SangriaHTTPClient
-from .errors import SettlementFailedError
 from .models import (
-    GeneratePaymentRequest,
-    GeneratePaymentResponse,
-    SettlePaymentRequest,
-    SettlementResult,
+    FixedPriceOptions,
+    PaymentProceeded,
+    PaymentResponse,
+    PaymentResult,
 )
 
 
@@ -31,25 +30,58 @@ class SangriaMerchantClient:
         self.generate_endpoint = generate_endpoint
         self.settle_endpoint = settle_endpoint
 
-    async def generate_payment(self, req: GeneratePaymentRequest) -> GeneratePaymentResponse:
-        challenge = await self._http.post_json(self.generate_endpoint, req.to_dict())
-        encoded = base64.b64encode(json.dumps(challenge).encode()).decode()
-        return GeneratePaymentResponse(
-            status_code=402,
-            body=challenge,
-            headers={"PAYMENT-REQUIRED": encoded},
-        )
-
-    async def settle_payment(self, payment_payload: str) -> SettlementResult:
-        req = SettlePaymentRequest(payment_payload=payment_payload)
-        data = await self._http.post_json(self.settle_endpoint, req.to_dict())
-        result = SettlementResult.from_dict(data)
-        if not result.success:
-            raise SettlementFailedError(
-                message=result.error_message or "Settlement verification failed",
-                reason=result.error_reason,
-            )
-        return result
+    async def handle_fixed_price(
+        self,
+        payment_header: str | None,
+        options: FixedPriceOptions,
+    ) -> PaymentResult:
+        if not payment_header:
+            try:
+                challenge = await self._http.post_json(
+                    self.generate_endpoint,
+                    options.to_generate_dict(),
+                )
+                encoded = base64.b64encode(json.dumps(challenge).encode()).decode()
+                return PaymentResponse(
+                    action="respond",
+                    status_code=402,
+                    body=challenge,
+                    headers={"PAYMENT-REQUIRED": encoded},
+                )
+            except Exception:
+                return PaymentResponse(
+                    action="respond",
+                    status_code=500,
+                    body={"error": "Payment service unavailable"},
+                )
+        else:
+            try:
+                data = await self._http.post_json(
+                    self.settle_endpoint,
+                    {"payment_payload": payment_header},
+                )
+                success = data.get("success", False)
+                if not success:
+                    return PaymentResponse(
+                        action="respond",
+                        status_code=402,
+                        body={
+                            "error": data.get("error_message", "Payment failed"),
+                            "error_reason": data.get("error_reason"),
+                        },
+                    )
+                return PaymentProceeded(
+                    action="proceed",
+                    paid=True,
+                    amount=options.price,
+                    transaction=data.get("transaction"),
+                )
+            except Exception:
+                return PaymentResponse(
+                    action="respond",
+                    status_code=500,
+                    body={"error": "Payment settlement failed"},
+                )
 
     async def aclose(self) -> None:
         await self._http.close()

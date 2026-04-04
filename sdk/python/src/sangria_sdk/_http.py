@@ -4,8 +4,6 @@ from typing import Any
 
 import httpx
 
-from .errors import APIError
-
 
 class SangriaHTTPClient:
     def __init__(
@@ -29,31 +27,9 @@ class SangriaHTTPClient:
         endpoint: str,
         payload: dict[str, Any],
     ) -> dict[str, Any]:
-        try:
-            response = await self._client.post(endpoint, json=payload)
-        except httpx.RequestError as exc:
-            raise APIError(
-                message=f"Sangria transport error: {exc}",
-                status_code=None,
-                payload={"error": str(exc)},
-            ) from exc
-
-        if response.status_code >= 400:
-            body: dict[str, Any]
-            try:
-                body = response.json()
-            except ValueError:
-                body = {"error": response.text}
-            raise APIError(
-                message=f"Sangria backend error ({response.status_code})",
-                status_code=response.status_code,
-                payload=body,
-            )
-
-        try:
-            return response.json()
-        except ValueError as exc:
-            raise APIError("Sangria backend returned non-JSON response") from exc
+        response = await self._client.post(endpoint, json=payload)
+        response.raise_for_status()
+        return response.json()
 
     async def close(self) -> None:
         await self._client.aclose()

@@ -1,30 +1,22 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from decimal import Decimal
 from typing import Any
 
 
-def _coerce_decimal(value: Decimal | int | float | str) -> Decimal:
-    if isinstance(value, Decimal):
-        return value
-    return Decimal(str(value))
-
-
 @dataclass(slots=True)
-class GeneratePaymentRequest:
-    amount: Decimal
+class FixedPriceOptions:
+    price: float
     resource: str
     description: str | None = None
 
     def __post_init__(self) -> None:
-        self.amount = _coerce_decimal(self.amount)
-        if self.amount <= 0 or self.amount > 9_000_000_000_000:
-            raise ValueError("amount must be positive and within a valid range")
+        if not isinstance(self.price, (int, float)) or self.price <= 0:
+            raise ValueError("price must be a number greater than 0")
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_generate_dict(self) -> dict[str, Any]:
         payload: dict[str, Any] = {
-            "amount": float(self.amount),
+            "amount": self.price,
             "resource": self.resource,
         }
         if self.description:
@@ -32,51 +24,22 @@ class GeneratePaymentRequest:
         return payload
 
 
-X402ChallengePayload = dict[str, Any]
-
-
 @dataclass(slots=True)
-class GeneratePaymentResponse:
+class PaymentResponse:
+    """A respond-to-client result: return this as an HTTP response."""
+    action: str  # "respond"
     status_code: int
-    body: X402ChallengePayload
-    headers: dict[str, str]
+    body: dict[str, Any]
+    headers: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(slots=True)
-class SettlePaymentRequest:
-    payment_payload: str
-
-    def to_dict(self) -> dict[str, Any]:
-        return {"payment_payload": self.payment_payload}
-
-
-@dataclass(slots=True)
-class SettlementResult:
-    success: bool
+class PaymentProceeded:
+    """A proceed result: payment succeeded, run the handler."""
+    action: str  # "proceed"
+    paid: bool
+    amount: float
     transaction: str | None = None
-    network: str | None = None
-    payer: str | None = None
-    error_reason: str | None = None
-    error_message: str | None = None
-    raw: dict[str, Any] = field(default_factory=dict)
 
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "SettlementResult":
-        raw_success = data.get("success", False)
-        if isinstance(raw_success, bool):
-            success = raw_success
-        elif isinstance(raw_success, str):
-            success = raw_success.strip().lower() in {"true", "1", "yes"}
-        elif isinstance(raw_success, (int, float)):
-            success = raw_success != 0
-        else:
-            success = False
-        return cls(
-            success=success,
-            transaction=data.get("transaction"),
-            network=data.get("network"),
-            payer=data.get("payer"),
-            error_reason=data.get("error_reason"),
-            error_message=data.get("error_message"),
-            raw=dict(data),
-        )
+
+PaymentResult = PaymentResponse | PaymentProceeded
