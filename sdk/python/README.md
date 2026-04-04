@@ -1,98 +1,118 @@
-# Sangria Merchant Python SDK
+# sangria-merchant-sdk
 
-Merchant-facing SDK that integrates FastAPI endpoints with Sangria backend pre-flight and settlement checks.
+Python SDK for accepting x402 payments. Supports FastAPI.
 
-## Install (local workspace)
+## Install
 
 ```bash
-cd sdk/python
-pip install -e .
+pip install sangria-merchant-sdk
 ```
 
-## Quick usage
+## Quick Start
+
+### FastAPI
 
 ```python
+from decimal import Decimal
 from fastapi import FastAPI, Request
 from sangria_sdk import SangriaMerchantClient
 from sangria_sdk.fastapi import require_sangria_payment
 
 app = FastAPI()
 client = SangriaMerchantClient(
-    base_url="http://localhost:3000",
-    api_key="your-sangria-api-key",
+    base_url="https://api.sangria.net",
+    api_key="sg_live_...",
 )
 
 @app.get("/premium")
-@require_sangria_payment(client, amount=0.0001)
-async def premium_data(request: Request):
-    return {
-        "ok": True,
-        "verification": getattr(request.state, "sangria_verification", None),
-    }
+@require_sangria_payment(client, amount=Decimal("0.01"), description="Premium content")
+async def premium(request: Request):
+    # request.state.sangria_verification.transaction == "0x..."
+    return {"data": "premium content"}
 ```
 
-## Endpoint contract assumptions
+## Manual Usage
 
-The SDK currently targets these backend endpoints:
+If you need more control over the payment flow, use the client directly:
 
-- `POST /v1/generate-payment`
-- `POST /v1/settle-payment`
+```python
+from sangria_sdk import SangriaMerchantClient, GeneratePaymentRequest
 
-### `POST /v1/generate-payment` request
+client = SangriaMerchantClient(
+    base_url="https://api.sangria.net",
+    api_key="sg_live_...",
+)
 
+# Step 1: Generate payment terms
+challenge = await client.generate_payment(
+    GeneratePaymentRequest(amount=Decimal("0.01"), resource="/premium")
+)
+# challenge.accepts contains x402 v2 payment requirements
+
+# Step 2: Settle (after client signs and retries with payment-signature header)
+result = await client.settle_payment(payment_payload="<base64 signed payload>")
+# result.transaction == "0x..."
+# result.payer == "0x..."
+```
+
+## Decorator Options
+
+```python
+@require_sangria_payment(
+    merchant_client,
+    amount=Decimal("0.01"),             # Required. Price in USD.
+    description="Premium content",       # Optional. Shown in payment terms.
+    resource_resolver=lambda req: ...,   # Optional. Custom resource URL resolver.
+                                         # Defaults to request.url.path.
+)
+```
+
+## How It Works
+
+The `@require_sangria_payment` decorator handles the x402 negotiation loop:
+
+1. **First request** (no `PAYMENT-SIGNATURE` header): calls Sangria's `/v1/generate-payment` endpoint, returns `402 Payment Required` with payment terms and a base64-encoded `PAYMENT-REQUIRED` response header.
+2. **Retry** (with `PAYMENT-SIGNATURE` header): forwards the signed payload to Sangria's `/v1/settle-payment` endpoint. On success, stores the result in `request.state.sangria_verification` and calls your handler.
+
+## API Contract
+
+### `POST /v1/generate-payment`
+
+Request:
 ```json
-{
-  "amount": 0.01,
-  "resource": "/premium",
-  "scheme": "exact",
-  "description": "Premium access"
-}
+{ "amount": 0.01, "resource": "/premium", "description": "Premium content" }
 ```
 
-### `POST /v1/generate-payment` response
-
+Response (402):
 ```json
 {
   "x402Version": 2,
-  "description": "Premium access",
-  "resource": "/premium",
-  "accepts": [
-    {
-      "scheme": "exact",
-      "network": "eip155:84532",
-      "amount": "10000",
-      "asset": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
-      "payTo": "0xabc...",
-      "maxTimeoutSeconds": 300,
-      "extra": {
-        "name": "USDC",
-        "version": "1",
-        "assetTransferMethod": "eip3009"
-      }
-    }
-  ]
+  "accepts": [{
+    "scheme": "exact",
+    "network": "eip155:84532",
+    "maxAmountRequired": "10000",
+    "asset": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+    "payTo": "0xWalletAddress",
+    "maxTimeoutSeconds": 60
+  }],
+  "resource": { "url": "/premium", "description": "Premium content" }
 }
 ```
 
-### `POST /v1/settle-payment` request
+### `POST /v1/settle-payment`
 
+Request:
 ```json
-{
-  "paymentHeader": "<eip712-signed-payload>",
-  "resource": "/premium",
-  "amount": 0.01,
-  "scheme": "exact"
-}
+{ "payment_payload": "<base64 EIP-712 signed authorization>" }
 ```
 
-### `POST /v1/settle-payment` response
-
+Response:
 ```json
-{
-  "success": true,
-  "transaction": "0xdef...",
-  "error": null
-}
+{ "success": true, "transaction": "0x...", "network": "base-sepolia", "payer": "0x..." }
 ```
 
-`settle_payment` is terminal from the SDK perspective: verification is done on Sangria backend.
+## Requirements
+
+- Python >= 3.10
+- FastAPI >= 0.135.1
+- httpx >= 0.28.1
