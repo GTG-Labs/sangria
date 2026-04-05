@@ -19,15 +19,15 @@ var (
 )
 
 // GetClient returns the singleton CDP client. Thread-safe via sync.Once.
-// Requires CDP_API_KEY_ID, CDP_API_KEY_SECRET, and CDP_WALLET_SECRET env vars.
+// Requires CDP_API_KEY, CDP_SECRET_KEY, and CDP_WALLET_SECRET env vars.
 func GetClient() (*openapi.ClientWithResponses, error) {
 	once.Do(func() {
-		apiKeyID := os.Getenv("CDP_API_KEY_ID")
-		apiKeySecret := os.Getenv("CDP_API_KEY_SECRET")
+		apiKeyID := os.Getenv("CDP_API_KEY")
+		apiKeySecret := os.Getenv("CDP_API_SECRET")
 		walletSecret := os.Getenv("CDP_WALLET_SECRET")
 
 		if apiKeyID == "" || apiKeySecret == "" || walletSecret == "" {
-			initErr = fmt.Errorf("CDP_API_KEY_ID, CDP_API_KEY_SECRET, and CDP_WALLET_SECRET environment variables are required")
+			initErr = fmt.Errorf("CDP_API_KEY, CDP_API_SECRET, and CDP_WALLET_SECRET environment variables are required")
 			return
 		}
 

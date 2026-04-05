@@ -43,9 +43,9 @@ func addCDPAuth(req *http.Request, facilitatorURL, path string) error {
 	}
 
 	apiKeyID := os.Getenv("CDP_API_KEY")
-	apiKeySecret := os.Getenv("CDP_SECRET_KEY")
+	apiKeySecret := os.Getenv("CDP_API_SECRET")
 	if apiKeyID == "" || apiKeySecret == "" {
-		return fmt.Errorf("CDP_API_KEY and CDP_SECRET_KEY are required for Coinbase facilitator")
+		return fmt.Errorf("CDP_API_KEY and CDP_API_SECRET are required for Coinbase facilitator")
 	}
 
 	token, err := cdpauth.GenerateJWT(cdpauth.JwtOptions{
