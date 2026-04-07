@@ -67,22 +67,10 @@ func setupRoutes(app *fiber.App, pool *pgxpool.Pool) {
 	app.Post("/v1/generate-payment", apiKeyMiddleware, merchantHandlers.GeneratePayment(pool))
 	app.Post("/v1/settle-payment", apiKeyMiddleware, merchantHandlers.SettlePayment(pool))
 
-	// === ADMIN ENDPOINTS === (WorkOS JWT auth)
-	// These are for admins to MANAGE the system (create API keys, manage wallets, etc.)
-	// Uses WorkOS JWT authentication (admin must be logged in via WorkOS).
-	//
-	// IMPORTANT: /merchants (plural) is for CREATING merchant API keys, not for
-	// merchants using their keys. Merchants using keys should call /merchant/* above.
-	//
-	// TODO: Add admin role authorization. Currently any authenticated user can
-	// call these endpoints. Decide on an admin mechanism (e.g., is_admin flag on
-	// users, WorkOS roles/permissions, or internal secret) and add middleware to
-	// restrict access.
-	//
-	// Example flow:
-	// 1. Admin logs in via WorkOS → gets JWT token
-	// 2. Admin calls POST /merchants with JWT → creates API key for a merchant
-	// 3. Returns the API key (shown only once for security)
-	app.Post("/merchants", auth.WorkosAuthMiddleware, adminHandlers.CreateMerchantAPIKey(pool))
-	app.Post("/wallets/pool", auth.WorkosAuthMiddleware, adminHandlers.CreateWalletPool(pool))
+	// === ADMIN ENDPOINTS === (WorkOS JWT + admin API key + admin role)
+	// Double-gated: requires a valid WorkOS JWT, the X-Admin-Key header
+	// matching ADMIN_API_KEY env var, AND role = "admin" in the database.
+	adminMiddleware := auth.RequireAdmin(pool)
+	app.Post("/merchants", auth.WorkosAuthMiddleware, adminMiddleware, adminHandlers.CreateMerchantAPIKey(pool))
+	app.Post("/wallets/pool", auth.WorkosAuthMiddleware, adminMiddleware, adminHandlers.CreateWalletPool(pool))
 }
