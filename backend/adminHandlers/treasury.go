@@ -64,6 +64,8 @@ func FundTreasury(pool *pgxpool.Pool) fiber.Handler {
 			return c.Status(500).JSON(fiber.Map{"error": "failed to record funding"})
 		}
 
+		log.Printf("treasury funded: $%.2f (%d microunits) key=%s note=%q", req.Amount, amountMicro, idempotencyKey, req.Note)
+
 		return c.Status(201).JSON(fiber.Map{
 			"success":        true,
 			"amount":         req.Amount,

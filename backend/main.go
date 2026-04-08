@@ -25,7 +25,7 @@ func main() {
 	if err := config.LoadPlatformFees(); err != nil {
 		log.Fatalf("Failed to load platform fees: %v", err)
 	}
-	log.Printf("Platform fee: %.2f%% (min %d microunits)", config.PlatformFee.Percent, config.PlatformFee.MinMicrounits)
+	log.Printf("Platform fee: %d basis points (min %d microunits)", config.PlatformFee.RateBasisPoints, config.PlatformFee.MinMicrounits)
 
 	ctx := context.Background()
 

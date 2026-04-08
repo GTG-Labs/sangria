@@ -32,8 +32,8 @@ The server starts on `http://localhost:8080`.
 | `CDP_WALLET_SECRET` | Yes | Encryption key for CDP wallet keys |
 | `ADMIN_API_KEY` | Yes | Shared secret for admin endpoints (generate with `openssl rand -hex 32`) |
 | `X402_FACILITATOR_URL` | Yes | Facilitator URL (testnet: `https://x402.org/facilitator`) |
-| `PLATFORM_FEE_PERCENT` | No | Fee percentage per payment (default: `0.5`) |
-| `PLATFORM_FEE_MIN_MICROUNITS` | No | Minimum fee in microunits (default: `1000` = $0.001) |
+| `PLATFORM_FEE_PERCENT` | No | Fee percentage per payment (default: `0`, recommended: `0.5`) |
+| `PLATFORM_FEE_MIN_MICROUNITS` | No | Minimum fee in microunits (default: `0`, recommended: `1000` = $0.001) |
 
 ## API reference
 
@@ -66,6 +66,7 @@ The server starts on `http://localhost:8080`.
 | Method | Path | Auth | Description |
 |---|---|---|---|
 | POST | `/wallets/pool` | Admin | Create a CDP wallet in the pool |
+| POST | `/admin/treasury/fund` | Admin | Record a USD treasury deposit (bookkeeping only) |
 
 ### API key format
 

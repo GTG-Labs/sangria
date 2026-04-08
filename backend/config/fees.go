@@ -11,13 +11,17 @@ var PlatformFee PlatformFeeConfig
 
 // PlatformFeeConfig defines the platform fee parameters.
 type PlatformFeeConfig struct {
-	Percent       float64 // e.g., 0.5 means 0.5%
-	MinMicrounits int64   // minimum fee in microunits (1000 = $0.001)
+	// RateBasisPoints is the fee rate in basis points (1 bp = 0.01%).
+	// e.g., 50 = 0.5%, 100 = 1%, 290 = 2.9%
+	RateBasisPoints int64
+	MinMicrounits   int64 // minimum fee in microunits (1000 = $0.001)
 }
 
 // CalculateFee returns the platform fee for a given payment amount in microunits.
+// Uses pure integer arithmetic to avoid float rounding.
 func (c PlatformFeeConfig) CalculateFee(amountMicrounits int64) int64 {
-	fee := int64(float64(amountMicrounits) * c.Percent / 100.0)
+	// fee = amount * rateBP / 10000
+	fee := amountMicrounits * c.RateBasisPoints / 10000
 	// Apply minimum fee only when the payment is large enough to cover it.
 	// For micropayments smaller than the minimum, just use the percentage fee
 	// so the merchant still receives something.
@@ -28,6 +32,8 @@ func (c PlatformFeeConfig) CalculateFee(amountMicrounits int64) int64 {
 }
 
 // LoadPlatformFees reads fee configuration from environment variables.
+// PLATFORM_FEE_PERCENT is a human-readable percentage (e.g., "0.5" = 0.5%)
+// that gets converted to basis points internally (0.5% = 50 bp).
 func LoadPlatformFees() error {
 	percentStr := os.Getenv("PLATFORM_FEE_PERCENT")
 	if percentStr == "" {
@@ -40,6 +46,8 @@ func LoadPlatformFees() error {
 	if percent < 0 || percent > 100 {
 		return fmt.Errorf("PLATFORM_FEE_PERCENT must be between 0 and 100, got %f", percent)
 	}
+	// Convert percent to basis points: 0.5% → 50bp, 2.9% → 290bp
+	rateBP := int64(percent * 100)
 
 	minStr := os.Getenv("PLATFORM_FEE_MIN_MICROUNITS")
 	if minStr == "" {
@@ -54,8 +62,8 @@ func LoadPlatformFees() error {
 	}
 
 	PlatformFee = PlatformFeeConfig{
-		Percent:       percent,
-		MinMicrounits: minMicro,
+		RateBasisPoints: rateBP,
+		MinMicrounits:   minMicro,
 	}
 
 	return nil

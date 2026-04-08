@@ -5,7 +5,7 @@ Test implementations for the [x402 payment protocol](https://www.x402.org/) inte
 ## How it works
 
 ```
-Buyer (e2e_test/client.py)           Merchant Server (:4004)              Sangria Backend (:8080)
+Buyer (e2e_test/client.py)           Merchant Server (:<port>)             Sangria Backend (:8080)
        |                                     |                                    |
        |  GET /premium                       |                                    |
        |------------------------------------>|                                    |

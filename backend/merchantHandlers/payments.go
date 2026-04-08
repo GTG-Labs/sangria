@@ -159,6 +159,36 @@ func SettlePayment(pool *pgxpool.Pool) fiber.Handler {
 
 		payload := json.RawMessage(payloadBytes)
 
+		// Pre-validate all ledger prerequisites before calling the external facilitator.
+		// This ensures we fail fast on missing accounts rather than after an on-chain settlement.
+		merchantAcct, err := dbengine.GetMerchantUSDLiabilityAccount(c.Context(), pool, merchant.ID)
+		if err != nil {
+			log.Printf("get merchant liability account: %v", err)
+			return c.Status(500).JSON(fiber.Map{"error": "failed to look up merchant account"})
+		}
+
+		convClearingUSDC, err := dbengine.GetSystemAccount(c.Context(), pool, dbengine.SystemAccountConversionClearing, dbengine.USDC)
+		if err != nil {
+			log.Printf("get conversion clearing (USDC): %v", err)
+			return c.Status(500).JSON(fiber.Map{"error": "system account not found"})
+		}
+
+		convClearingUSD, err := dbengine.GetSystemAccount(c.Context(), pool, dbengine.SystemAccountConversionClearing, dbengine.USD)
+		if err != nil {
+			log.Printf("get conversion clearing (USD): %v", err)
+			return c.Status(500).JSON(fiber.Map{"error": "system account not found"})
+		}
+
+		revenueAcct, err := dbengine.GetSystemAccount(c.Context(), pool, dbengine.SystemAccountPlatformFeeRevenue, dbengine.USD)
+		if err != nil {
+			log.Printf("get platform fee revenue account: %v", err)
+			return c.Status(500).JSON(fiber.Map{"error": "system account not found"})
+		}
+
+		// Calculate platform fee.
+		fee := config.PlatformFee.CalculateFee(amount)
+		merchantAmount := amount - fee
+
 		log.Println("")
 		log.Println("════════════════════════════════════════")
 		log.Println("  SETTLE PAYMENT FLOW")
@@ -166,6 +196,7 @@ func SettlePayment(pool *pgxpool.Pool) fiber.Handler {
 		log.Printf("  payer:   %s", envelope.Payload.Authorization.From)
 		log.Printf("  to:      %s", toAddress)
 		log.Printf("  amount:  %s (micro USDC)", valueStr)
+		log.Printf("  fee:     %d (micro USD)", fee)
 		log.Printf("  network: %s", netConfig.CAIP2)
 		log.Println("────────────────────────────────────────")
 
@@ -217,36 +248,8 @@ func SettlePayment(pool *pgxpool.Pool) fiber.Handler {
 		log.Println("════════════════════════════════════════")
 
 		// Write cross-currency double-entry ledger using the tx hash as idempotency key.
-		// Entry flow: USDC received → conversion clearing bridge → USD owed to merchant + platform fee.
-		merchantAcct, err := dbengine.GetMerchantUSDLiabilityAccount(c.Context(), pool, merchant.ID)
-		if err != nil {
-			log.Printf("get merchant liability account: %v", err)
-			return c.Status(500).JSON(fiber.Map{"error": "failed to look up merchant account"})
-		}
-
-		convClearingUSDC, err := dbengine.GetSystemAccount(c.Context(), pool, dbengine.SystemAccountConversionClearing, dbengine.USDC)
-		if err != nil {
-			log.Printf("get conversion clearing (USDC): %v", err)
-			return c.Status(500).JSON(fiber.Map{"error": "system account not found"})
-		}
-
-		convClearingUSD, err := dbengine.GetSystemAccount(c.Context(), pool, dbengine.SystemAccountConversionClearing, dbengine.USD)
-		if err != nil {
-			log.Printf("get conversion clearing (USD): %v", err)
-			return c.Status(500).JSON(fiber.Map{"error": "system account not found"})
-		}
-
-		revenueAcct, err := dbengine.GetSystemAccount(c.Context(), pool, dbengine.SystemAccountPlatformFeeRevenue, dbengine.USD)
-		if err != nil {
-			log.Printf("get platform fee revenue account: %v", err)
-			return c.Status(500).JSON(fiber.Map{"error": "system account not found"})
-		}
-
-		// Calculate platform fee.
-		fee := config.PlatformFee.CalculateFee(amount)
-		merchantAmount := amount - fee
-
-		// Build ledger lines — each currency independently nets to zero.
+		// All account lookups and fee calculation were done above (before facilitator calls)
+		// so a missing account never results in an orphaned on-chain settlement.
 		lines := []dbengine.LedgerLine{
 			// USDC side: hot wallet receives, conversion clearing absorbs.
 			{Currency: dbengine.USDC, Amount: amount, Direction: dbengine.Debit, AccountID: wallet.AccountID},
