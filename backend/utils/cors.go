@@ -6,7 +6,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v2"
 )
 
 // GetAllowedOrigins parses the ALLOWED_ORIGINS environment variable
@@ -38,7 +38,7 @@ func IsOriginAllowed(origin string, allowedOrigins []string) bool {
 func SetupCORSMiddleware(app *fiber.App) {
 	allowedOrigins := GetAllowedOrigins()
 
-	app.Use(func(c fiber.Ctx) error {
+	app.Use(func(c *fiber.Ctx) error {
 		origin := c.Get("Origin")
 
 		if IsOriginAllowed(origin, allowedOrigins) {

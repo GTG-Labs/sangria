@@ -9,7 +9,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -178,7 +178,7 @@ func TestSettlePayment(t *testing.T) {
 
 	// Setup Fiber app with mock auth middleware
 	app := fiber.New()
-	app.Use("/v1/settle-payment", func(c fiber.Ctx) error {
+	app.Use("/v1/settle-payment", func(c *fiber.Ctx) error {
 		// Mock merchant for testing
 		mockMerchant := &dbengine.Merchant{
 			ID:     "test-merchant-id",

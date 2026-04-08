@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	dbengine "sangria/backend/dbEngine"
@@ -13,7 +13,7 @@ import (
 // GetMerchantBalance handles GET /merchant/balance.
 // Returns the authenticated merchant's virtual USD balance.
 func GetMerchantBalance(pool *pgxpool.Pool) fiber.Handler {
-	return func(c fiber.Ctx) error {
+	return func(c *fiber.Ctx) error {
 		merchant := c.Locals("merchant_api_key").(*dbengine.Merchant)
 
 		balance, err := dbengine.GetMerchantBalance(c.Context(), pool, merchant.ID)

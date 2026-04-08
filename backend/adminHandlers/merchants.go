@@ -4,7 +4,7 @@ import (
 	"errors"
 	"log"
 
-	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"sangria/backend/auth"
@@ -14,7 +14,7 @@ import (
 // CreateMerchantAPIKey handles POST /merchants.
 // Creates a merchant API key and USDC LIABILITY account for a user (admin-only, WorkOS JWT auth).
 func CreateMerchantAPIKey(pool *pgxpool.Pool) fiber.Handler {
-	return func(c fiber.Ctx) error {
+	return func(c *fiber.Ctx) error {
 		// Get authenticated user from middleware context
 		user := c.Locals("workos_user").(auth.WorkOSUser)
 
@@ -22,7 +22,7 @@ func CreateMerchantAPIKey(pool *pgxpool.Pool) fiber.Handler {
 			Name   string `json:"name"`
 			IsLive bool   `json:"is_live"`
 		}
-		if err := c.Bind().JSON(&req); err != nil {
+		if err := c.BodyParser(&req); err != nil {
 			return c.Status(400).JSON(fiber.Map{"error": "invalid request body"})
 		}
 

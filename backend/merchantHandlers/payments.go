@@ -8,7 +8,7 @@ import (
 	"math"
 	"strconv"
 
-	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"sangria/backend/config"
@@ -21,13 +21,13 @@ const maxTimeoutSeconds = 60
 // GeneratePayment handles POST /v1/generate-payment.
 // Stateless: looks up the wallet for the network and returns x402 payment terms.
 func GeneratePayment(pool *pgxpool.Pool) fiber.Handler {
-	return func(c fiber.Ctx) error {
+	return func(c *fiber.Ctx) error {
 		var req struct {
 			Amount      float64 `json:"amount"`
 			Description string  `json:"description"`
 			Resource    string  `json:"resource"`
 		}
-		if err := c.Bind().JSON(&req); err != nil {
+		if err := c.BodyParser(&req); err != nil {
 			return c.Status(400).JSON(fiber.Map{"error": "invalid request body"})
 		}
 
@@ -92,13 +92,13 @@ type payloadEnvelope struct {
 // Extracts the recipient wallet and amount from the signed payload,
 // verifies and settles via the facilitator, then writes the ledger.
 func SettlePayment(pool *pgxpool.Pool) fiber.Handler {
-	return func(c fiber.Ctx) error {
+	return func(c *fiber.Ctx) error {
 		merchant := c.Locals("merchant_api_key").(*dbengine.Merchant)
 
 		var req struct {
 			PaymentPayload string `json:"payment_payload"`
 		}
-		if err := c.Bind().JSON(&req); err != nil {
+		if err := c.BodyParser(&req); err != nil {
 			return c.Status(400).JSON(fiber.Map{"error": "invalid request body"})
 		}
 

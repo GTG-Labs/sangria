@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/workos/workos-go/v4/pkg/usermanagement"
 
@@ -22,7 +22,7 @@ type WorkOSUser struct {
 }
 
 // WorkosAuthMiddleware validates WorkOS JWT session tokens and extracts user info.
-func WorkosAuthMiddleware(c fiber.Ctx) error {
+func WorkosAuthMiddleware(c *fiber.Ctx) error {
 	// Get Authorization header containing JWT token
 	authHeader := c.Get("Authorization")
 	if authHeader == "" {
@@ -64,7 +64,7 @@ func WorkosAuthMiddleware(c fiber.Ctx) error {
 
 // APIKeyAuthMiddleware validates API keys for merchant authentication.
 func APIKeyAuthMiddleware(pool *pgxpool.Pool) fiber.Handler {
-	return func(c fiber.Ctx) error {
+	return func(c *fiber.Ctx) error {
 		// Get API key from Authorization header or X-API-Key header
 		var apiKey string
 

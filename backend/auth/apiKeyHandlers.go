@@ -3,13 +3,13 @@ package auth
 import (
 	"log"
 
-	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // ListAPIKeys handles GET /api-keys
 func ListAPIKeys(pool *pgxpool.Pool) fiber.Handler {
-	return func(c fiber.Ctx) error {
+	return func(c *fiber.Ctx) error {
 		user := c.Locals("workos_user").(WorkOSUser)
 
 		apiKeys, err := GetAPIKeysByUserID(c.Context(), pool, user.ID)
@@ -29,7 +29,7 @@ func ListAPIKeys(pool *pgxpool.Pool) fiber.Handler {
 
 // DeleteAPIKey handles DELETE /api-keys/:id
 func DeleteAPIKey(pool *pgxpool.Pool) fiber.Handler {
-	return func(c fiber.Ctx) error {
+	return func(c *fiber.Ctx) error {
 		user := c.Locals("workos_user").(WorkOSUser)
 		keyID := c.Params("id")
 

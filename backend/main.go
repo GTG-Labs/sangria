@@ -4,7 +4,7 @@ import (
 	"context"
 	"log"
 
-	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"sangria/backend/adminHandlers"
@@ -49,12 +49,12 @@ func main() {
 
 func setupRoutes(app *fiber.App, pool *pgxpool.Pool) {
 	// Root endpoint
-	app.Get("/", func(c fiber.Ctx) error {
+	app.Get("/", func(c *fiber.Ctx) error {
 		return c.SendString("Hello, Sangria!")
 	})
 
 	// Health check endpoint
-	app.Get("/health", func(c fiber.Ctx) error {
+	app.Get("/health", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{
 			"status":  "ok",
 			"service": "sangria-backend",

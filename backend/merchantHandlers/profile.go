@@ -3,7 +3,7 @@ package merchantHandlers
 import (
 	"log"
 
-	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v2"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	dbengine "sangria/backend/dbEngine"
@@ -12,7 +12,7 @@ import (
 // GetMerchantProfile handles GET /merchants/profile.
 // Returns the authenticated merchant's profile using their API key.
 func GetMerchantProfile(pool *pgxpool.Pool) fiber.Handler {
-	return func(c fiber.Ctx) error {
+	return func(c *fiber.Ctx) error {
 		merchantKey := c.Locals("merchant_api_key").(*dbengine.Merchant)
 
 		// Get user information
