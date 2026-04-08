@@ -87,4 +87,5 @@ func setupRoutes(app *fiber.App, pool *pgxpool.Pool) {
 	// matching ADMIN_API_KEY env var, AND role = "admin" in the database.
 	adminMiddleware := auth.RequireAdmin(pool)
 	app.Post("/wallets/pool", auth.WorkosAuthMiddleware, adminMiddleware, adminHandlers.CreateWalletPool(pool))
+	app.Post("/admin/treasury/fund", auth.WorkosAuthMiddleware, adminMiddleware, adminHandlers.FundTreasury(pool))
 }

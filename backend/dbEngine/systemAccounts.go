@@ -15,6 +15,8 @@ const (
 	SystemAccountPlatformFeeRevenue = "Platform Fee Revenue"
 	SystemAccountConversionFees     = "Conversion Fees"
 	SystemAccountGasFees            = "Gas Fees"
+	SystemAccountUSDMerchantPool    = "USD Merchant Pool"
+	SystemAccountOwnerEquity        = "Owner Equity"
 )
 
 // ensureSystemAccount creates a system-level account if it doesn't exist.
@@ -83,6 +85,12 @@ func EnsureSystemAccounts(ctx context.Context, pool *pgxpool.Pool) error {
 
 		// Gas fees — on-chain transaction costs (for when we become our own facilitator).
 		{SystemAccountGasFees, AccountTypeExpense, USD},
+
+		// USD merchant pool — pre-funded pool for merchant payouts.
+		{SystemAccountUSDMerchantPool, AccountTypeAsset, USD},
+
+		// Owner equity — tracks capital deposited by Sangria into the treasury.
+		{SystemAccountOwnerEquity, AccountTypeEquity, USD},
 	}
 
 	for _, a := range accounts {
