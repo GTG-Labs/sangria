@@ -12,6 +12,8 @@ interface ProfilePopoverProps {
   profilePictureUrl: string | null;
 }
 
+const POPOVER_WIDTH = 256;
+
 export default function ProfilePopover({
   firstName,
   lastName,
@@ -53,7 +55,8 @@ export default function ProfilePopover({
             const rect = buttonRef.current.getBoundingClientRect();
             setPopoverStyle({
               position: "fixed",
-              left: Math.min(rect.left, window.innerWidth - 256 - 12),
+              width: POPOVER_WIDTH,
+              left: Math.min(rect.left, window.innerWidth - POPOVER_WIDTH - 12),
               bottom: window.innerHeight - rect.top + 8,
             });
           }
@@ -85,7 +88,7 @@ export default function ProfilePopover({
       {open && (
         <div
           style={popoverStyle}
-          className="z-50 w-64 rounded-xl border border-zinc-200 bg-white p-3 shadow-lg"
+          className="z-50 rounded-xl border border-zinc-200 bg-white p-3 shadow-lg"
         >
           <div className="mb-3 flex items-center gap-3 px-1">
             {profilePictureUrl ? (
