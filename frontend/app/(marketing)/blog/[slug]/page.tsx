@@ -45,7 +45,7 @@ export default async function BlogPostPage({
         </Link>
 
         <header className="mb-10">
-          <div className="flex items-center gap-3 text-sm text-zinc-500 dark:text-zinc-400 mb-4">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-zinc-500 dark:text-zinc-400 mb-4">
             <span className="inline-flex items-center gap-1.5">
               <User className="w-4 h-4" />
               {post.author}

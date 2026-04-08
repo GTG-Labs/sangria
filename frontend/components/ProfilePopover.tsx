@@ -31,7 +31,8 @@ export default function ProfilePopover({
     }
     if (open) {
       document.addEventListener("mousedown", handleClickOutside);
-      return () => document.removeEventListener("mousedown", handleClickOutside);
+      return () =>
+        document.removeEventListener("mousedown", handleClickOutside);
     }
   }, [open]);
 
@@ -52,7 +53,7 @@ export default function ProfilePopover({
             const rect = buttonRef.current.getBoundingClientRect();
             setPopoverStyle({
               position: "fixed",
-              left: rect.left,
+              left: Math.min(rect.left, window.innerWidth - 256 - 12),
               bottom: window.innerHeight - rect.top + 8,
             });
           }
@@ -82,7 +83,10 @@ export default function ProfilePopover({
       </button>
 
       {open && (
-        <div style={popoverStyle} className="z-50 w-64 rounded-xl border border-zinc-200 bg-white p-3 shadow-lg">
+        <div
+          style={popoverStyle}
+          className="z-50 w-64 rounded-xl border border-zinc-200 bg-white p-3 shadow-lg"
+        >
           <div className="mb-3 flex items-center gap-3 px-1">
             {profilePictureUrl ? (
               <Image

@@ -42,7 +42,7 @@ export default function BlogPage() {
                 href={`/blog/${post.slug}`}
                 className="card p-6 card-hover block"
               >
-                <div className="flex items-center gap-3 text-xs text-zinc-500 dark:text-zinc-400 mb-3">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-500 dark:text-zinc-400 mb-3">
                   <span className="inline-flex items-center gap-1">
                     <User className="w-3.5 h-3.5" />
                     {post.author}

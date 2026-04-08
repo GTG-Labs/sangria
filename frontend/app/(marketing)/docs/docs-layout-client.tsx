@@ -29,7 +29,7 @@ export default function DocsLayoutClient({
   return (
     <DocsLayout
       tree={tree}
-      nav={{ enabled: false }}
+      nav={{ title: null }}
       themeSwitch={{ enabled: false }}
       sidebar={{
         defaultOpenLevel: 1,

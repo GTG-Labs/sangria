@@ -45,9 +45,13 @@ export default function APIKeysContent() {
         setApiKeys(Array.isArray(keys) ? keys : []);
         setError(null); // Clear any previous errors
       } else {
-        const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
+        const errorData = await response
+          .json()
+          .catch(() => ({ error: "Unknown error" }));
         console.error("API Keys fetch failed:", response.status, errorData);
-        setError(errorData.error || `Failed to load API keys (${response.status})`);
+        setError(
+          errorData.error || `Failed to load API keys (${response.status})`,
+        );
         setApiKeys([]);
       }
     } catch (err) {
@@ -105,7 +109,11 @@ export default function APIKeysContent() {
   };
 
   const revokeAPIKey = async (keyId: string) => {
-    if (!confirm("Are you sure you want to revoke this API key? This action cannot be undone.")) {
+    if (
+      !confirm(
+        "Are you sure you want to revoke this API key? This action cannot be undone.",
+      )
+    ) {
       return;
     }
 
@@ -153,9 +161,9 @@ export default function APIKeysContent() {
 
   return (
     <div className="mx-auto max-w-6xl">
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
-          <h1 className="text-4xl font-semibold tracking-tight text-gray-900">
+          <h1 className="text-2xl sm:text-4xl font-semibold tracking-tight text-gray-900">
             API Keys
           </h1>
           <p className="mt-2 text-gray-500">
@@ -164,7 +172,7 @@ export default function APIKeysContent() {
         </div>
         <button
           onClick={() => setShowCreateForm(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-sangria-500 text-white rounded-lg hover:bg-sangria-600 transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-sangria-500 text-white rounded-lg hover:bg-sangria-600 transition-colors self-start sm:self-auto"
         >
           <Plus className="w-4 h-4" />
           Create API Key
@@ -182,8 +190,16 @@ export default function APIKeysContent() {
         <div className="mb-6 p-6 bg-amber-50 border border-amber-200 rounded-lg">
           <div className="flex items-start gap-3">
             <div className="flex-shrink-0 mt-1">
-              <svg className="w-5 h-5 text-amber-600" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              <svg
+                className="w-5 h-5 text-amber-600"
+                fill="currentColor"
+                viewBox="0 0 20 20"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                  clipRule="evenodd"
+                />
               </svg>
             </div>
             <div className="flex-1">
@@ -191,7 +207,11 @@ export default function APIKeysContent() {
                 API Key Created - Save It Now!
               </h3>
               <p className="text-amber-700 mb-4">
-                <strong>This is the only time you&apos;ll see your API key.</strong> Copy it now and store it securely. For security reasons, we cannot show it again.
+                <strong>
+                  This is the only time you&apos;ll see your API key.
+                </strong>{" "}
+                Copy it now and store it securely. For security reasons, we
+                cannot show it again.
               </p>
               <div className="flex items-center gap-2 p-4 bg-white border border-amber-200 rounded-md font-mono text-sm break-all">
                 <span className="flex-1 select-all">{newKeyResult}</span>
@@ -235,7 +255,10 @@ export default function APIKeysContent() {
           </h3>
           <div className="space-y-4">
             <div>
-              <label htmlFor="keyName" className="block text-sm font-medium text-gray-700 mb-2">
+              <label
+                htmlFor="keyName"
+                className="block text-sm font-medium text-gray-700 mb-2"
+              >
                 Key Name
               </label>
               <input

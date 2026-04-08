@@ -16,19 +16,24 @@ export default function Home() {
                 <span className="text-sangria-500">for your API.</span>
               </h1>
 
-              <p className="text-base md:text-lg text-zinc-600 dark:text-zinc-400 max-w-md mb-10 leading-relaxed">
+              <p className="text-base md:text-lg text-zinc-600 dark:text-zinc-400 mb-10 leading-relaxed">
                 sangriaNet is a drop-in SDK that integrates with your backend
-                and allows you to monetize your endpoints so agents can
-                call and pay for them.
+                and allows you to monetize your endpoints so agents can call and
+                pay for them.
               </p>
 
-              <div className="flex flex-col sm:flex-row items-start gap-4">
-                <ArcadeButton href="/docs" glow>
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-start gap-4">
+                <ArcadeButton
+                  href="/docs"
+                  glow
+                  className="[&>span]:w-full sm:[&>span]:w-auto"
+                >
                   Get Started →
                 </ArcadeButton>
                 <ArcadeButton
                   href="https://github.com/GTG-Labs/sangria-net"
                   variant="secondary"
+                  className="[&>span]:w-full sm:[&>span]:w-auto"
                 >
                   View on GitHub →
                 </ArcadeButton>
@@ -36,20 +41,19 @@ export default function Home() {
             </div>
 
             {/* Right: illustration */}
-            <div className="hidden md:flex items-center justify-center">
+            <div className="flex items-center justify-center">
               <Image
                 src="/computey2.png"
                 alt="Pixel art computer holding a sangria"
                 width={500}
                 height={500}
-                className="w-full max-w-md"
+                className="w-full max-w-[220px] sm:max-w-xs md:max-w-md"
                 priority
               />
             </div>
           </div>
         </div>
       </section>
-
     </div>
   );
 }
