@@ -124,8 +124,8 @@ func RequireAdmin(pool *pgxpool.Pool) fiber.Handler {
 		user := c.Locals("workos_user").(WorkOSUser)
 		dbUser, err := dbengine.GetUserByWorkosID(c.Context(), pool, user.ID)
 		if err != nil {
-			log.Printf("admin role check failed for user %s: %v", user.ID, err)
-			return c.Status(403).JSON(fiber.Map{"error": "Forbidden"})
+			log.Printf("admin role check: database lookup failed for user %s: %v", user.ID, err)
+			return c.Status(500).JSON(fiber.Map{"error": "Internal server error"})
 		}
 		if dbUser.Role != "admin" {
 			return c.Status(403).JSON(fiber.Map{"error": "Forbidden"})
