@@ -5,7 +5,7 @@ export default function Footer() {
   return (
     <footer className="border-t border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-zinc-950 font-sans">
       <div className="max-w-7xl mx-auto px-6 py-8 flex flex-col gap-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-4">
           <Link href="/" className="flex items-center gap-2">
             <Image
               src="/sangrialogo.png"

@@ -28,33 +28,33 @@
 
 @theme {
   /* Fumadocs overrides — light mode */
-  --color-fd-background: #F3F4F1;
+  --color-fd-background: #f3f4f1;
   --color-fd-foreground: #111111;
-  --color-fd-muted: #EAEBE7;
+  --color-fd-muted: #eaebe7;
   --color-fd-muted-foreground: #555555;
-  --color-fd-popover: #FAFAF8;
+  --color-fd-popover: #fafaf8;
   --color-fd-popover-foreground: #111111;
-  --color-fd-card: #FAFAF8;
+  --color-fd-card: #fafaf8;
   --color-fd-card-foreground: #111111;
-  --color-fd-border: #DDDDD8;
+  --color-fd-border: #ddddd8;
   --color-fd-primary: #a51c30;
   --color-fd-primary-foreground: #ffffff;
-  --color-fd-secondary: #EAEBE7;
+  --color-fd-secondary: #eaebe7;
   --color-fd-secondary-foreground: #111111;
   --color-fd-accent: hsla(60, 5%, 80%, 50%);
   --color-fd-accent-foreground: #111111;
-  --color-fd-ring: #C8C8C3;
+  --color-fd-ring: #c8c8c3;
 }
 
 :root {
   --fd-banner-height: 4rem;
-  --bg-primary: #F3F4F1;
-  --bg-secondary: #FAFAF8;
-  --bg-tertiary: #EAEBE7;
+  --bg-primary: #f3f4f1;
+  --bg-secondary: #fafaf8;
+  --bg-tertiary: #eaebe7;
   --text-primary: #111111;
   --text-secondary: #333333;
   --text-tertiary: #555555;
-  --border-color: #DDDDD8;
+  --border-color: #ddddd8;
   --surface-bg: rgba(243, 244, 241, 0.8);
 }
 
@@ -91,6 +91,10 @@
   padding-top: 1rem;
 }
 
+#nd-sidebar-mobile {
+  top: 4rem;
+}
+
 .dark #nd-sidebar {
   --color-fd-muted: #141416;
   --color-fd-secondary: #1a1a1e;
@@ -103,7 +107,12 @@ body {
   font-family: var(--font-sans);
 }
 
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   font-family: var(--font-sans);
 }
 
@@ -208,4 +217,3 @@ h1, h2, h3, h4, h5, h6 {
   transform: translateY(-0.5px);
   transition: transform 50ms ease;
 }
-
