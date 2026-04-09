@@ -32,7 +32,10 @@ class SangriaHTTPClient:
         # that the client needs to inspect (e.g. error_reason, error_message)
         if response.status_code >= 500:
             response.raise_for_status()
-        return response.json()
+        result = response.json()
+        if not isinstance(result, dict):
+            raise TypeError(f"Expected dict response, got {type(result)}")
+        return result
 
     async def close(self) -> None:
         await self._client.aclose()
