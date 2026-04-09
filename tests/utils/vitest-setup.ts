@@ -13,14 +13,17 @@ beforeAll(async () => {
   process.env.NODE_ENV = 'test'
   process.env.TEST_MODE = 'true'
 
-  // No buffer - causing timing issues
-  // Removed server coordination buffer
-
   // Configure global timeouts
   vi.setConfig({ testTimeout: 30000 })
 
-  // Initialize global mocks
-  setupGlobalMocks()
+  // Initialize global mocks - skip for E2E, performance, and cross-SDK tests
+  const testPath = expect.getState().testPath
+  const isE2ETest = testPath?.includes('e2e/')
+  const isPerformanceTest = testPath?.includes('performance/')
+  const isCrossSDKTest = testPath?.includes('cross-sdk/')
+  if (!isE2ETest && !isPerformanceTest && !isCrossSDKTest) {
+    setupGlobalMocks()
+  }
 
   console.log('✅ Test suite initialized')
 })
@@ -54,14 +57,10 @@ function setupGlobalMocks() {
   // Mock fetch globally
   global.fetch = vi.fn()
 
-  // Mock console methods to reduce noise in tests
+  // Mock console methods to reduce noise in tests (but preserve for debugging)
   const originalConsole = { ...console }
-  console.log = vi.fn()
   console.warn = vi.fn()
-  console.error = (...args) => {
-    // Still show errors for debugging
-    originalConsole.error(...args)
-  }
+  // Keep console.log and console.error for debugging
 
   // Mock timers
   vi.useFakeTimers()

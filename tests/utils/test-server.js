@@ -78,8 +78,8 @@ export class MockSangriaServer {
         return res.status(429).json(mockResponses.generatePayment.rate_limited())
       }
 
-      // Random rate limiting (legacy)
-      if (!this.options.rateLimitThreshold && Math.random() < 0.05) {
+      // Random rate limiting (legacy) - only if rateLimitThreshold is not explicitly set to null
+      if (this.options.rateLimitThreshold !== null && !this.options.rateLimitThreshold && Math.random() < 0.05) {
         return res.status(429).json(mockResponses.generatePayment.rate_limited())
       }
 
@@ -170,13 +170,13 @@ export class MockSangriaServer {
    */
   async start() {
     return new Promise((resolve, reject) => {
-      this.server = this.app.listen(this.port, (err) => {
-        if (err) {
-          reject(err)
-        } else {
-          console.log(`Mock Sangria server running on port ${this.port}`)
-          resolve()
-        }
+      this.server = this.app.listen(this.port, () => {
+        console.log(`Mock Sangria server running on port ${this.port}`)
+        resolve()
+      })
+
+      this.server.on('error', (err) => {
+        reject(err)
       })
     })
   }

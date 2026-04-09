@@ -6,24 +6,31 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { MockSangriaServer } from '../utils/test-server.js'
 
-// Use real fetch for E2E tests (global setup mocks it)
-const realFetch = globalThis.fetch || ((await import('node-fetch')).default as any)
-
 let mockServer: MockSangriaServer | null = null
+let realFetch: any
 
 describe('Deterministic X402 Payment Flow', () => {
   beforeAll(async () => {
-    // Use deterministic server (no random behavior)
-    mockServer = new MockSangriaServer(8083, {
-      latency: 0,
-      errorRate: 0,
-      rateLimitThreshold: null // No rate limiting for deterministic tests
-    })
-    await mockServer.start()
+    try {
+      // Setup real fetch for E2E tests
+      realFetch = globalThis.fetch || ((await import('node-fetch')).default as any)
 
-    // Give the server a moment to fully initialize
-    await new Promise(resolve => setTimeout(resolve, 500))
-  })
+      // Use deterministic server (no random behavior)
+      mockServer = new MockSangriaServer(8083, {
+        latency: 0,
+        errorRate: 0,
+        rateLimitThreshold: null // No rate limiting for deterministic tests
+      })
+
+      await mockServer.start()
+
+      // Give the server a moment to fully initialize
+      await new Promise(resolve => setTimeout(resolve, 100))
+    } catch (error) {
+      console.error('Failed to start mock server:', error)
+      throw error
+    }
+  }, 30000)
 
   afterAll(async () => {
     if (mockServer) {

@@ -120,7 +120,7 @@ sequenceDiagram
 
 ## Testing
 
-Comprehensive testing suite covering both TypeScript and Python SDKs with 143 tests across security, financial, and end-to-end validation.
+**Production-grade testing infrastructure with 146 comprehensive tests** covering TypeScript + Python SDKs, cryptographic security, financial precision, E2E flows, performance benchmarks, and cross-SDK interoperability.
 
 ### **Quick Commands**
 
@@ -131,7 +131,7 @@ cd tests
 # Install dependencies
 pnpm install
 
-# Run all tests (143 tests, TypeScript + Python)
+# Run all tests (146 tests + benchmarks, TypeScript + Python + E2E + Performance + Cross-SDK)
 pnpm test:all
 
 # Core development tests (TypeScript + Security + Financial)
@@ -144,6 +144,9 @@ pnpm test:unit:py       # Python SDK tests (50 tests)
 pnpm test:security      # Security tests (33 tests)
 pnpm test:financial     # Financial tests (21 tests)
 pnpm test:e2e          # End-to-end tests (7 tests)
+pnpm test:performance   # Performance benchmarks (2 tests)
+pnpm test:cross-sdk     # Cross-SDK interoperability (5 tests)
+pnpm benchmark          # Performance benchmarking
 ```
 
 ### **What's Tested**
@@ -152,25 +155,27 @@ pnpm test:e2e          # End-to-end tests (7 tests)
 - ✅ **Python SDK**: Client, models, HTTP handling, FastAPI adapter (50 tests)
 - ✅ **Security**: EIP-712 signatures, penetration testing, vulnerability assessment (33 tests)
 - ✅ **Financial**: USDC precision, payment lifecycle, compliance validation (21 tests)
-- ✅ **End-to-End**: Complete X402 flows, cross-SDK integration (7 tests)
-- ✅ **Concurrency**: Race conditions, double-spending prevention, load testing
+- ✅ **End-to-End**: Complete X402 payment flows, deterministic server testing (7 tests)
+- ✅ **Performance**: Timing validation, concurrency benchmarks, load testing (2 tests)
+- ✅ **Cross-SDK**: TypeScript/Python interoperability and API compatibility (5 tests)
+- ✅ **Concurrency**: Race conditions, double-spending prevention, concurrent operations
 - ✅ **Database**: Payment persistence, audit trails, state management
+- ✅ **Penetration Testing**: Attack scenarios, security vulnerability assessment
 
 ### **Test Structure**
 
 ```
 tests/
 ├── unit/           # Unit tests for core functionality
-│   ├── typescript/ # TypeScript SDK unit tests
-│   ├── python/     # Python SDK unit tests
-│   ├── crypto/     # Cryptographic validation
-│   ├── database/   # Database persistence
-│   ├── security/   # Security penetration tests
-│   ├── lifecycle/  # Payment lifecycle tests
-│   └── concurrency/# Race condition testing
-├── security/       # Security-focused test suites
-├── financial/      # Financial precision & compliance
-├── e2e/           # End-to-end integration tests
+│   ├── typescript/ # TypeScript SDK unit tests (28 tests)
+│   ├── python/     # Python SDK unit tests (50 tests)
+│   └── security/   # Security penetration tests
+├── security/       # Cryptographic security tests (33 tests)
+├── financial/      # Financial precision & compliance (21 tests)
+├── e2e/           # End-to-end integration tests (7 tests)
+├── performance/    # Performance & timing benchmarks (2 tests)
+├── cross-sdk/      # Cross-SDK interoperability (5 tests)
+├── utils/         # Test infrastructure & mock servers
 └── fixtures/      # Test data and mock responses
 ```
 

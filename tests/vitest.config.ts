@@ -9,7 +9,7 @@ export default defineConfig({
     globals: true,
     // Increase timeouts for financial tests that need precision
     testTimeout: 10000,
-    hookTimeout: 15000,
+    hookTimeout: 30000,
     // Coverage configuration
     coverage: {
       provider: 'v8',

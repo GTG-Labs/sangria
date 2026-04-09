@@ -4,7 +4,7 @@
 
 **Production-grade financial software testing infrastructure with real cryptographic validation, comprehensive security coverage, and financial compliance.**
 
-> ✅ **Current State**: Enterprise-ready testing with 87 comprehensive tests covering cryptography, financial precision, concurrency, and security penetration scenarios
+> ✅ **Current State**: Enterprise-ready testing with 146 comprehensive tests covering cryptography, financial precision, concurrency, security penetration, E2E flows, performance benchmarks, and cross-SDK interoperability
 > ✅ **Achievement**: Replaced inadequate test infrastructure with production-grade components suitable for financial applications
 
 **Key Features:**
@@ -14,35 +14,58 @@
 - ✅ **Security penetration testing** covering attack scenarios and vulnerabilities
 - ✅ **Concurrent payment processing** with race condition testing
 - ✅ **Financial compliance** with complete audit trails and metrics
+- ✅ **End-to-end payment flows** with deterministic test servers
+- ✅ **Performance benchmarking** with timing and concurrency validation
+- ✅ **Cross-SDK interoperability** between TypeScript and Python SDKs
 
 ## Quick Start
 
-**Core Production Tests** (fastest feedback):
+**Core Production Tests** (fastest development feedback):
 ```bash
-pnpm test                    # All core tests (87 tests, ~1 minute)
+pnpm test                    # Core tests (132 tests, ~2 seconds)
 ```
 
 **Individual Test Categories**:
 ```bash
+pnpm test:unit               # TypeScript + Python unit tests (78 tests)
 pnpm test:unit:ts            # TypeScript SDK unit tests (28 tests)
+pnpm test:unit:py            # Python SDK unit tests (50 tests)
 pnpm test:security           # Security & cryptographic tests (33 tests)
 pnpm test:financial          # Financial precision & lifecycle tests (21 tests)
-pnpm test:unit               # All unit tests including new infrastructure
+```
+
+**Integration & Advanced Tests**:
+```bash
+pnpm test:e2e                # End-to-end payment flow tests (7 tests)
+pnpm test:performance        # Performance & timing tests (2 tests)
+pnpm test:cross-sdk          # TypeScript/Python interoperability (5 tests)
+pnpm benchmark               # Performance benchmarks + TS SDK benchmarks
 ```
 
 **Comprehensive Test Suite**:
 ```bash
-pnpm test:all                # All tests including E2E (full validation)
+pnpm test:all                # ALL 146 tests + benchmarks (~8 seconds)
 ```
 
 **Individual Test Files**:
 ```bash
-# Run specific test categories
-vitest run unit/crypto/signature-validation.test.ts
-vitest run unit/database/payment-persistence.test.ts
+# Core unit tests
+vitest run unit/typescript/core.test.ts
+vitest run unit/python/test_client.py
+
+# Security tests
+vitest run security/eip712-crypto.test.ts
+vitest run security/payment-validation.test.ts
 vitest run unit/security/penetration-tests.test.ts
-vitest run unit/lifecycle/payment-audit-trail.test.ts
-vitest run unit/concurrency/race-condition-tests.test.ts
+
+# Financial tests
+vitest run financial/precision-validation.test.ts
+vitest run financial/payment-lifecycle.test.ts
+
+# Integration tests
+vitest run e2e/x402-payment-flow.test.ts
+vitest run performance/sdk-benchmarks.test.ts
+vitest run cross-sdk/typescript-python-interop.test.ts
 ```
 
 ---
@@ -67,27 +90,39 @@ Production Financial Testing Hierarchy
 │   ├── Fixed-point arithmetic (no floating point errors)
 │   ├── Audit trail compliance
 │   └── Payment lifecycle management
-├── Concurrency & Race Conditions (Essential)
-│   ├── High-load payment processing
+├── SDK Integration & Interoperability (Essential)
+│   ├── TypeScript SDK core functionality
+│   ├── Python SDK core functionality
+│   ├── Cross-SDK compatibility validation
+│   └── API integration patterns
+├── End-to-End Payment Flows (Essential)
+│   ├── Complete X402 payment workflow
+│   ├── Deterministic payment processing
+│   ├── Multi-framework adapter testing
+│   └── Real server integration
+├── Performance & Concurrency (Essential)
+│   ├── Payment processing benchmarks
+│   ├── High-load concurrent operations
 │   ├── Double-spending prevention
-│   ├── Database consistency under load
-│   └── Settlement race condition handling
-└── SDK Integration (Supporting)
-    ├── TypeScript SDK core functionality
-    ├── API integration patterns
-    └── Error handling scenarios
+│   └── Race condition handling
+└── Penetration Testing (Supporting)
+    ├── Attack scenario simulation
+    ├── Database injection protection
+    └── Resource exhaustion testing
 ```
 
 ### **Test Infrastructure Components**
 
 | Component | Purpose | Technology | Tests |
 |-----------|---------|------------|-------|
-| **CryptoValidator** | Real EIP-712 operations | ethers.js + Decimal.js | 15 tests |
-| **PaymentDatabase** | Production SQLite persistence | better-sqlite3 | 15 tests |
-| **SecurityPenetration** | Attack scenario testing | Vitest + real operations | 14 tests |
-| **LifecycleAudit** | Payment compliance & audit | Database + state management | 15 tests |
-| **ConcurrencyTesting** | Race conditions & load | Promise-based concurrency | 9 tests |
-| **SDKCore** | TypeScript SDK validation | Vitest + mocks | 28 tests |
+| **TypeScript SDK Core** | SDK functionality & integration | Vitest + mocks | 28 tests |
+| **Python SDK Core** | SDK functionality & FastAPI adapter | Pytest + async testing | 50 tests |
+| **Cryptographic Security** | Real EIP-712 operations | ethers.js + Decimal.js | 33 tests |
+| **Financial Validation** | USDC precision & lifecycle | Decimal.js + state machines | 21 tests |
+| **E2E Payment Flows** | Complete payment workflows | MockSangriaServer + real APIs | 7 tests |
+| **Performance Benchmarks** | Timing & concurrency validation | Performance measurement | 2 tests |
+| **Cross-SDK Interoperability** | TypeScript/Python compatibility | API compatibility testing | 5 tests |
+| **Security Penetration** | Attack scenario simulation | Real cryptographic operations | Embedded in crypto tests |
 
 ---
 
@@ -584,27 +619,70 @@ vitest run --coverage
 
 ### **Testing Infrastructure Metrics**
 
-- **87 comprehensive tests** covering all critical financial software requirements
+- **146 comprehensive tests** covering all critical financial software requirements
+- **Dual-SDK coverage** with TypeScript (28 tests) + Python (50 tests) + security (33) + financial (21) + integration (14)
 - **Sub-second execution** for individual test categories (fast development feedback)
 - **100% deterministic** behavior (no random test failures)
 - **Real operations** throughout (no fake validation or mock cryptography)
-- **Enterprise patterns** (audit trails, compliance, security)
+- **Enterprise patterns** (audit trails, compliance, security, performance benchmarking)
 
 ### **Developer Experience**
 
 ```bash
 # Daily development workflow
-pnpm test                    # Quick validation (1 minute)
+pnpm test                    # Core tests (132 tests, 2 seconds)
 
 # Feature development
-vitest unit/crypto/ --watch  # Live feedback during development
+vitest unit/typescript/ --watch     # TypeScript SDK development
+vitest unit/python/ --watch         # Python SDK development (pytest)
+
+# Integration testing
+pnpm test:e2e                       # End-to-end payment flows
+pnpm test:performance               # Performance & timing validation
+pnpm test:cross-sdk                 # Cross-SDK compatibility
 
 # Pre-commit validation
-pnpm test:security           # Security validation
-pnpm test:financial          # Financial precision check
+pnpm test:security                  # Cryptographic security validation
+pnpm test:financial                 # Financial precision validation
 
-# Release preparation
-pnpm test:all               # Complete test suite
+# Complete validation
+pnpm test:all                       # All 146 tests + benchmarks (8 seconds)
 ```
+
+---
+
+## CI/CD Test Execution Strategy
+
+### **Local Git Hooks**
+```bash
+# Pre-commit (fast feedback)
+git commit → pnpm precommit → pnpm lint && pnpm test:core
+                            → 132 core tests, ~2 seconds
+
+# Pre-push (comprehensive validation)
+git push → pnpm prepush → pnpm test:all && pnpm coverage:check
+                       → 146 tests + benchmarks + coverage, ~10 seconds
+```
+
+### **GitHub Actions Pipeline**
+
+| **Stage** | **Tests** | **Duration** | **Trigger** |
+|-----------|-----------|--------------|-------------|
+| **Lint & Type Check** | TypeScript & Python linting | ~1-2 min | Push/PR |
+| **TypeScript Tests** | Core + Security + Financial (82 tests) | ~2-3 min | After lint |
+| **Python Tests** | Unit + FastAPI adapter (50 tests) | ~2-3 min | After lint |
+| **Integration Tests** | E2E + Performance + Cross-SDK + Benchmarks (14 tests) | ~3-4 min | After unit tests |
+| **Security Audit** | Dependency & vulnerability scanning | ~1-2 min | After unit tests |
+| **Coverage Report** | Combined TypeScript + Python coverage | ~1-2 min | After unit tests |
+
+**Total CI/CD Duration**: ~10-12 minutes for complete validation
+
+### **Test Execution Matrix**
+
+| **Command** | **Tests** | **Duration** | **Use Case** |
+|-------------|-----------|--------------|--------------|
+| `pnpm test` | 132 core tests | 2 seconds | Daily development |
+| `pnpm test:all` | 146 tests + benchmarks | 8 seconds | Pre-push validation |
+| **CI Pipeline** | 146 tests + audits + coverage | 10-12 minutes | Production deployment |
 
 This testing infrastructure provides **production-ready validation** for financial software, ensuring cryptographic security, financial precision, and regulatory compliance throughout the development lifecycle.

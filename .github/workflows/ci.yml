@@ -139,9 +139,9 @@ jobs:
           flags: python
           name: python-coverage
 
-  # Run E2E tests
-  test-e2e:
-    name: E2E Tests
+  # Run E2E and integration tests
+  test-integration:
+    name: Integration Tests (E2E, Performance, Cross-SDK, Benchmarks)
     runs-on: ubuntu-latest
     needs: [test-typescript, test-python]
     steps:
@@ -165,7 +165,19 @@ jobs:
 
       - name: Run E2E tests
         working-directory: tests
-        run: pnpm test:e2e || echo "E2E tests failed but continuing - these are integration tests"
+        run: pnpm test:e2e
+
+      - name: Run performance tests
+        working-directory: tests
+        run: pnpm test:performance
+
+      - name: Run cross-SDK interoperability tests
+        working-directory: tests
+        run: pnpm test:cross-sdk
+
+      - name: Run performance benchmarks
+        working-directory: tests
+        run: pnpm benchmark
 
   # Security audit
   security:
@@ -252,7 +264,7 @@ jobs:
   ci-status:
     name: CI Status
     runs-on: ubuntu-latest
-    needs: [lint, test-typescript, test-python, test-e2e, security, coverage]
+    needs: [lint, test-typescript, test-python, test-integration, security, coverage]
     if: always()
     steps:
       - name: Check CI results
@@ -260,14 +272,14 @@ jobs:
           echo "Lint: ${{ needs.lint.result }}"
           echo "TypeScript Tests: ${{ needs.test-typescript.result }}"
           echo "Python Tests: ${{ needs.test-python.result }}"
-          echo "E2E Tests: ${{ needs.test-e2e.result }}"
+          echo "Integration Tests: ${{ needs.test-integration.result }}"
           echo "Security: ${{ needs.security.result }}"
           echo "Coverage: ${{ needs.coverage.result }}"
 
           if [[ "${{ needs.lint.result }}" != "success" ]] || \
              [[ "${{ needs.test-typescript.result }}" != "success" ]] || \
              [[ "${{ needs.test-python.result }}" != "success" ]] || \
-             [[ "${{ needs.test-e2e.result }}" != "success" ]] || \
+             [[ "${{ needs.test-integration.result }}" != "success" ]] || \
              [[ "${{ needs.security.result }}" != "success" ]] || \
              [[ "${{ needs.coverage.result }}" != "success" ]]; then
             echo "❌ CI FAILED"
