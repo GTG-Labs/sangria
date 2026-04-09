@@ -120,50 +120,72 @@ sequenceDiagram
 
 ## Testing
 
-Sangria.NET includes comprehensive SDK-focused testing with no Docker dependencies. All tests use MockSangriaServer for fast, reliable execution.
+Comprehensive testing suite covering both TypeScript and Python SDKs with 143 tests across security, financial, and end-to-end validation.
 
 ### **Quick Commands**
 
 ```bash
-# First cd into tests directory
+# Navigate to tests directory
 cd tests
 
-# Daily development (30 seconds)
-pnpm test:unit
+# Install dependencies
+pnpm install
 
-# Integration tests (1-2 min)
-pnpm test:integration
-
-# End-to-end tests (2-3 min)
-pnpm test:e2e
-
-# All tests (3-5 min)
+# Run all tests (143 tests, TypeScript + Python)
 pnpm test:all
+
+# Core development tests (TypeScript + Security + Financial)
+pnpm test
+
+# By category
+pnpm test:unit          # All unit tests (TypeScript + Python)
+pnpm test:unit:ts       # TypeScript SDK tests (28 tests)
+pnpm test:unit:py       # Python SDK tests (50 tests)
+pnpm test:security      # Security tests (33 tests)
+pnpm test:financial     # Financial tests (21 tests)
+pnpm test:e2e          # End-to-end tests (7 tests)
 ```
 
 ### **What's Tested**
 
-- ✅ **Complete x402 payment flows** with realistic scenarios
-- ✅ **Framework adapters** (Express, Fastify, Hono, FastAPI, Django, Flask)
-- ✅ **SDK functionality** across TypeScript and Python
-- ✅ **Error handling** (insufficient funds, invalid signatures, expired payments)
-- ✅ **Cross-platform compatibility** (Node 18-22, Python 3.9-3.12)
-- ✅ **Security validation** (API keys, payment headers, rate limiting)
+- ✅ **TypeScript SDK**: Core client, payment handling, error management (28 tests)
+- ✅ **Python SDK**: Client, models, HTTP handling, FastAPI adapter (50 tests)
+- ✅ **Security**: EIP-712 signatures, penetration testing, vulnerability assessment (33 tests)
+- ✅ **Financial**: USDC precision, payment lifecycle, compliance validation (21 tests)
+- ✅ **End-to-End**: Complete X402 flows, cross-SDK integration (7 tests)
+- ✅ **Concurrency**: Race conditions, double-spending prevention, load testing
+- ✅ **Database**: Payment persistence, audit trails, state management
+
+### **Test Structure**
+
+```
+tests/
+├── unit/           # Unit tests for core functionality
+│   ├── typescript/ # TypeScript SDK unit tests
+│   ├── python/     # Python SDK unit tests
+│   ├── crypto/     # Cryptographic validation
+│   ├── database/   # Database persistence
+│   ├── security/   # Security penetration tests
+│   ├── lifecycle/  # Payment lifecycle tests
+│   └── concurrency/# Race condition testing
+├── security/       # Security-focused test suites
+├── financial/      # Financial precision & compliance
+├── e2e/           # End-to-end integration tests
+└── fixtures/      # Test data and mock responses
+```
 
 ### **CI/CD Integration**
 
-- **Pull Requests**: Unit + Integration tests with coverage validation
-- **Main Branch**: Full test suite including E2E and security tests
-- **Matrix Testing**: Multiple OS, Node.js, and Python versions
-- **Coverage Thresholds**: Unit 95%, Integration 90%, Overall 92%
-
-All tests use MockSangriaServer - no Docker required!
+- **Pull Requests**: Unit + Security + Financial tests with 90%+ coverage
+- **Main Branch**: Full test suite including E2E and security audits
+- **Multi-language**: TypeScript and Python SDK validation
+- **Security**: Dependency vulnerability scanning and penetration testing
 
 ---
 
 ## Documentation
 
-- [Comprehensive Testing Guide](tests/TESTING.md) — complete testing infrastructure and workflow
+- [Comprehensive Testing Guide](tests/README.md) — complete testing infrastructure and workflow
 - [TypeScript SDK](sdk/sdk-typescript/README.md) — full API, all framework adapters, bypass config
 - [Python SDK](sdk/python/README.md) — FastAPI adapter, API contract
 - [Playground](playground/README.md) — run example merchants and test payments locally
