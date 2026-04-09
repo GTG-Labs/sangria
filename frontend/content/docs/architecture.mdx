@@ -177,7 +177,6 @@ A **Go / Fiber v3** API server on port `8080` with two authentication models: **
 
 - **API Key Management** — create, list, and revoke keys (max 10 per user), backed by PostgreSQL
 - **Payment Routes** — `/v1/generate-payment` returns an x402 v2 challenge; `/v1/settle-payment` verifies and settles (currently stubbed)
-- **Merchant Profile** — `/merchant/profile` returns user + key metadata for API-key-authenticated requests
 - **Facilitator Endpoints** — `/facilitator/verify` and `/facilitator/settle` are defined but return 501 (planned)
 - **Internal Ledger** — double-entry credit accounting via `dbEngine.InsertTransaction`
 
@@ -194,7 +193,6 @@ A **Go / Fiber v3** API server on port `8080` with two authentication models: **
 | `GET` | `/api-keys` | WorkOS JWT | List API keys |
 | `POST` | `/api-keys` | WorkOS JWT | Create API key |
 | `DELETE` | `/api-keys/:id` | WorkOS JWT | Revoke API key |
-| `GET` | `/merchant/profile` | API Key | User + key metadata |
 | `POST` | `/facilitator/verify` | API Key | **501 Not Implemented** |
 | `POST` | `/facilitator/settle` | API Key | **501 Not Implemented** |
 

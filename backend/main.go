@@ -43,7 +43,7 @@ func setupRoutes(app *fiber.App, pool *pgxpool.Pool) {
 
 	// User endpoints (WorkOS JWT auth)
 	app.Post("/users", auth.WorkosAuthMiddleware, auth.CreateUser(pool))
-	app.Get("/transactions", auth.WorkosAuthMiddleware, auth.ListUserTransactions(pool))
+	app.Get("/transactions", auth.WorkosAuthMiddleware, merchantHandlers.GetUserTransactions(pool))
 
 	// API Key management (WorkOS JWT auth)
 	apiKeysGroup := app.Group("/api-keys", auth.WorkosAuthMiddleware)
@@ -53,16 +53,7 @@ func setupRoutes(app *fiber.App, pool *pgxpool.Pool) {
 	// === MERCHANT ENDPOINTS ===
 	// These are for merchants who already HAVE API keys and want to use them.
 	// Uses API key authentication (sg_live_xxx or sg_test_xxx).
-	//
-	// IMPORTANT: We use /merchant/* (singular) to avoid conflicts with the admin
-	// /merchants (plural) endpoint below that CREATES merchant API keys.
-	//
-	// Example flow:
-	// 1. Admin creates API key via POST /merchants
-	// 2. Merchant uses that API key to call GET /merchant/profile
 	apiKeyMiddleware := auth.APIKeyAuthMiddleware(pool)
-	app.Get("/merchant/profile", apiKeyMiddleware, merchantHandlers.GetMerchantProfile(pool))
-	app.Get("/merchant/balance", apiKeyMiddleware, merchantHandlers.GetMerchantBalance(pool))
 
 	// Payment endpoints (API key auth)
 	app.Post("/v1/generate-payment", apiKeyMiddleware, merchantHandlers.GeneratePayment(pool))
