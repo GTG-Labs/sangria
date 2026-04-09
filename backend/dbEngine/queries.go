@@ -2,6 +2,8 @@ package dbengine
 
 import (
 	"context"
+	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -80,7 +82,7 @@ func GetUserTransactions(ctx context.Context, pool *pgxpool.Pool, userID string)
 			t.created_at,
 			le.amount,
 			le.currency,
-			COALESCE(cw.network, '') as network
+			COALESCE(cw.network::text, '') as network
 		FROM transactions t
 		JOIN ledger_entries le ON le.transaction_id = t.id
 		JOIN accounts a ON a.id = le.account_id
@@ -122,4 +124,109 @@ func GetUserTransactions(ctx context.Context, pool *pgxpool.Pool, userID string)
 	}
 
 	return transactions, rows.Err()
+}
+
+// GetUserTransactionsPaginated returns paginated transactions for a user with total count.
+// Uses created_at as cursor for stable, performant pagination.
+// Also returns total count of all transactions (requires additional COUNT query).
+func GetUserTransactionsPaginated(
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	userID string,
+	limit int,
+	cursor *time.Time,
+) ([]UserTransaction, *time.Time, int, error) {
+	// Build WHERE clause with cursor condition
+	baseWhere := `
+		WHERE a.user_id = $1
+		  AND a.type = 'LIABILITY'
+		  AND le.direction = 'CREDIT'
+	`
+	args := []interface{}{userID}
+
+	cursorWhere := ""
+	if cursor != nil {
+		cursorWhere = ` AND t.created_at < $2`
+		args = append(args, *cursor)
+	}
+
+	// Fetch limit+1 to determine if more results exist
+	limitParam := len(args) + 1
+	dataQuery := fmt.Sprintf(`
+		SELECT
+			t.id,
+			t.idempotency_key,
+			t.created_at,
+			le.amount,
+			le.currency,
+			COALESCE(cw.network::text, '') as network
+		FROM transactions t
+		JOIN ledger_entries le ON le.transaction_id = t.id
+		JOIN accounts a ON a.id = le.account_id
+		LEFT JOIN crypto_wallets cw ON cw.account_id = a.id
+		%s%s
+		ORDER BY t.created_at DESC
+		LIMIT $%d
+	`, baseWhere, cursorWhere, limitParam)
+
+	// Get total count (separate query)
+	countQuery := fmt.Sprintf(`
+		SELECT COUNT(DISTINCT t.id)
+		FROM transactions t
+		JOIN ledger_entries le ON le.transaction_id = t.id
+		JOIN accounts a ON a.id = le.account_id
+		%s
+	`, baseWhere)
+
+	var total int
+	err := pool.QueryRow(ctx, countQuery, userID).Scan(&total)
+	if err != nil {
+		return nil, nil, 0, fmt.Errorf("count query failed: %w", err)
+	}
+
+	// Fetch data with limit+1
+	dataArgs := append(args, limit+1)
+	rows, err := pool.Query(ctx, dataQuery, dataArgs...)
+	if err != nil {
+		return nil, nil, 0, err
+	}
+	defer rows.Close()
+
+	var transactions []UserTransaction
+	for rows.Next() {
+		var tx UserTransaction
+		err := rows.Scan(
+			&tx.ID,
+			&tx.IdempotencyKey,
+			&tx.CreatedAt,
+			&tx.Amount,
+			&tx.Currency,
+			&tx.Network,
+		)
+		if err != nil {
+			return nil, nil, 0, err
+		}
+		tx.Type = "payment_received"
+		transactions = append(transactions, tx)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, nil, 0, err
+	}
+
+	// Handle empty results
+	if len(transactions) == 0 {
+		return []UserTransaction{}, nil, total, nil
+	}
+
+	// Determine next cursor
+	var nextCursor *time.Time
+	if len(transactions) > limit {
+		// More results exist, trim to limit and set cursor
+		transactions = transactions[:limit]
+		lastTimestamp := transactions[len(transactions)-1].CreatedAt
+		nextCursor = &lastTimestamp
+	}
+
+	return transactions, nextCursor, total, nil
 }

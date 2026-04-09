@@ -72,7 +72,10 @@ export const transactions = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (table) => [unique("uq_idempotency_key").on(table.idempotencyKey)],
+  (table) => [
+    unique("uq_idempotency_key").on(table.idempotencyKey),
+    index("idx_transactions_created_at").on(table.createdAt.desc()),
+  ],
 );
 
 // ---------------------------------------------------------------------------

@@ -13,33 +13,74 @@ interface Transaction {
   type: string;
 }
 
+interface PaginatedResponse {
+  data: Transaction[];
+  pagination: {
+    next_cursor: string | null;
+    has_more: boolean;
+    count: number;
+    limit: number;
+    total: number;
+  };
+}
+
 export default function TransactionsContent() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [total, setTotal] = useState<number | null>(null);
 
-  const fetchTransactions = async () => {
-    setLoading(true);
+  const fetchTransactions = async (cursor?: string) => {
+    const isInitialLoad = !cursor;
+    isInitialLoad ? setLoading(true) : setLoadingMore(true);
+
     try {
-      const response = await fetch("/api/backend/transactions");
+      const url = cursor
+        ? `/api/backend/transactions?limit=20&cursor=${encodeURIComponent(cursor)}`
+        : `/api/backend/transactions?limit=20`;
+
+      const response = await fetch(url);
 
       if (response.ok) {
         const data = await response.json();
-        setTransactions(Array.isArray(data) ? data : []);
+
+        // Handle both old format (array) and new format (paginated)
+        if (Array.isArray(data)) {
+          // Legacy format - no pagination
+          setTransactions(data);
+          setHasMore(false);
+          setTotal(data.length);
+        } else {
+          // New paginated format
+          const paginatedData = data as PaginatedResponse;
+          setTransactions((prev) =>
+            cursor ? [...prev, ...paginatedData.data] : paginatedData.data
+          );
+          setNextCursor(paginatedData.pagination.next_cursor);
+          setHasMore(paginatedData.pagination.has_more);
+          setTotal(paginatedData.pagination.total);
+        }
         setError(null);
       } else {
         const errorData = await response
           .json()
           .catch(() => ({ error: "Unknown error" }));
         setError(errorData.error || "Failed to load transactions");
-        setTransactions([]);
+        if (isInitialLoad) {
+          setTransactions([]);
+        }
       }
     } catch (err) {
       console.error("Failed to load transactions:", err);
       setError("Failed to load transactions");
-      setTransactions([]);
+      if (isInitialLoad) {
+        setTransactions([]);
+      }
     } finally {
-      setLoading(false);
+      isInitialLoad ? setLoading(false) : setLoadingMore(false);
     }
   };
 
@@ -207,10 +248,31 @@ export default function TransactionsContent() {
         )}
       </div>
 
+      {hasMore && (
+        <div className="mt-6 flex justify-center">
+          <button
+            onClick={() => fetchTransactions(nextCursor!)}
+            disabled={loadingMore}
+            className="px-6 py-2 bg-sangria-600 text-white rounded-lg hover:bg-sangria-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {loadingMore ? (
+              <span className="flex items-center gap-2">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                Loading...
+              </span>
+            ) : (
+              "Load More"
+            )}
+          </button>
+        </div>
+      )}
+
       {transactions.length > 0 && (
         <div className="mt-4 text-sm text-gray-500 text-center">
-          Showing {transactions.length} transaction
+          Showing {transactions.length}
+          {total !== null && ` of ${total}`} transaction
           {transactions.length !== 1 ? "s" : ""}
+          {hasMore && " • Load more to see older transactions"}
         </div>
       )}
     </div>
