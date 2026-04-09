@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import base64
 import json
-from typing import Any
 
 from ._http import SangriaHTTPClient
 from .models import (
@@ -40,8 +39,11 @@ class SangriaMerchantClient:
         else:
             return await self._settle_payment(payment_header, options)
 
-    # if we dont have a payment header, it means that we need to hit the generate-payment endpoint on our backend,
-    # and send the client a 402 response with details on how to pay us
+    # if we dont have a payment header,
+    # it means that we need to hit the
+    # generate-payment endpoint on our backend,
+    # and send the client a 402 response
+    # with details on how to pay us
     async def _generate_payment(
         self,
         options: FixedPriceOptions,
@@ -52,10 +54,10 @@ class SangriaMerchantClient:
                 options.to_generate_dict(),
             )
 
-            # you gotta encode the payload before sending it back (part of the spec)
-            encoded = base64.b64encode(
-                json.dumps(x402_response_payload).encode()
-            ).decode()
+            # you gotta encode the payload before
+            # sending it back (part of the spec)
+            payload_json = json.dumps(x402_response_payload).encode()
+            encoded = base64.b64encode(payload_json).decode()
 
             return PaymentResponse(
                 status_code=402,

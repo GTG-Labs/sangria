@@ -25,10 +25,16 @@ def require_sangria_payment(
     # Validate amount immediately when decorator is applied
     import math
 
-    if not isinstance(amount, (int, float)) or not math.isfinite(amount) or amount <= 0:
+    if (
+        not isinstance(amount, (int, float))
+        or not math.isfinite(amount)
+        or amount <= 0
+    ):
         raise ValueError("price must be a finite number greater than 0")
 
-    def decorator(func: Callable[..., Awaitable[Any]]) -> Callable[..., Awaitable[Any]]:
+    def decorator(
+        func: Callable[..., Awaitable[Any]]
+    ) -> Callable[..., Awaitable[Any]]:
         @wraps(func)
         async def wrapper(*args: Any, **kwargs: Any) -> Any:
             request: Request | None = kwargs.get("request")
