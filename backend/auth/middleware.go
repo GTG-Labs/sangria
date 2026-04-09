@@ -10,7 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/workos/workos-go/v4/pkg/usermanagement"
 
-	dbengine "sangrianet/backend/dbEngine"
+	dbengine "sangria/backend/dbEngine"
 )
 
 // WorkOSUser contains user information from a validated session.

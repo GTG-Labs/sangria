@@ -1,12 +1,12 @@
 import express from "express";
-import { SangriaNet } from "../src/index.js";
+import { Sangria } from "../src/index.js";
 import { fixedPrice } from "../src/adapters/express.js";
 
 const app = express();
 app.use(express.json());
 
-// ── Initialize SangriaNet ──
-const sangrianet = new SangriaNet({
+// ── Initialize Sangria ──
+const sangria = new Sangria({
   apiKey: process.env.SANGRIA_SECRET_KEY ?? "sk_test_abc123",
   baseUrl: process.env.SANGRIA_URL ?? "http://localhost:8080",
 });
@@ -19,7 +19,7 @@ app.get("/", (_req, res) => {
 // ── Fixed-price endpoint ──
 app.get(
   "/premium",
-  fixedPrice(sangrianet, { price: 0.01, description: "Access premium content" }),
+  fixedPrice(sangria, { price: 0.01, description: "Access premium content" }),
   (_req, res) => {
     res.json({ message: "You accessed the premium endpoint!" });
   }

@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import type { SangriaRequestData, FixedPriceOptions } from "../types.js";
-import { SangriaNet } from "../core.js";
+import { Sangria } from "../core.js";
 
 export interface ExpressConfig {
   bypassPaymentIf?: (req: Request) => boolean;
@@ -9,27 +9,27 @@ export interface ExpressConfig {
 declare global {
   namespace Express {
     interface Request {
-      sangrianet?: SangriaRequestData;
+      sangria?: SangriaRequestData;
     }
   }
 }
 
 // ── Entry point: add as middleware to gate a route behind payment ──
 //
-//   app.get("/premium", fixedPrice(sangrianet, { price: 0.01 }), handler)
+//   app.get("/premium", fixedPrice(sangria, { price: 0.01 }), handler)
 //
 export function fixedPrice(
-  sangrianet: SangriaNet,
+  sangria: Sangria,
   options: FixedPriceOptions,
   config?: ExpressConfig
 ) {
   return async (req: Request, res: Response, next: NextFunction) => {
     if (config?.bypassPaymentIf?.(req)) {
-      req.sangrianet = { paid: false, amount: 0 };
+      req.sangria = { paid: false, amount: 0 };
       return next();
     }
 
-    const result = await sangrianet.handleFixedPrice(
+    const result = await sangria.handleFixedPrice(
       {
         paymentHeader: Array.isArray(req.headers["payment-signature"])
           ? req.headers["payment-signature"][0]
@@ -48,7 +48,7 @@ export function fixedPrice(
       return res.status(result.status).json(result.body);
     }
 
-    req.sangrianet = result.data;
+    req.sangria = result.data;
     return next();
   };
 }

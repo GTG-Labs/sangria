@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	dbengine "sangrianet/backend/dbEngine"
+	dbengine "sangria/backend/dbEngine"
 )
 
 // FundTreasury handles POST /admin/treasury/fund.

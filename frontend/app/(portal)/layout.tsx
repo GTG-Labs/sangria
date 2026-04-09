@@ -31,9 +31,7 @@ export default async function PortalLayout({
                 height={34}
                 className="h-[34px] w-[34px] rounded-lg"
               />
-              <p className="text-sm font-bold text-gray-900">
-                SangriaNet
-              </p>
+              <p className="text-sm font-bold text-gray-900">Sangria</p>
             </Link>
 
             <PortalSidebarNav />

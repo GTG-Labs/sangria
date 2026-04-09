@@ -6,7 +6,7 @@ import type {
 } from "fastify";
 import fp from "fastify-plugin";
 import type { SangriaRequestData, FixedPriceOptions } from "../types.js";
-import { SangriaNet } from "../core.js";
+import { Sangria } from "../core.js";
 
 export interface FastifyConfig {
   bypassPaymentIf?: (request: FastifyRequest) => boolean;
@@ -14,28 +14,28 @@ export interface FastifyConfig {
 
 declare module "fastify" {
   interface FastifyRequest {
-    sangrianet?: SangriaRequestData;
+    sangria?: SangriaRequestData;
   }
 }
 
 // ── Entry point: add as preHandler to gate a route behind payment ──
 //
-//   fastify.get("/premium", { preHandler: fixedPrice(sangrianet, { price: 0.01 }) }, handler)
+//   fastify.get("/premium", { preHandler: fixedPrice(sangria, { price: 0.01 }) }, handler)
 //
-//   Note: register sangrianetPlugin before using fixedPrice().
+//   Note: register sangriaPlugin before using fixedPrice().
 //
 export function fixedPrice(
-  sangrianet: SangriaNet,
+  sangria: Sangria,
   options: FixedPriceOptions,
   config?: FastifyConfig
 ): preHandlerAsyncHookHandler {
   return async (request: FastifyRequest, reply: FastifyReply) => {
     if (config?.bypassPaymentIf?.(request)) {
-      request.sangrianet = { paid: false, amount: 0 };
+      request.sangria = { paid: false, amount: 0 };
       return;
     }
 
-    const result = await sangrianet.handleFixedPrice(
+    const result = await sangria.handleFixedPrice(
       {
         paymentHeader: Array.isArray(request.headers["payment-signature"])
           ? request.headers["payment-signature"][0]
@@ -52,14 +52,14 @@ export function fixedPrice(
       return reply.status(result.status).send(result.body);
     }
 
-    request.sangrianet = result.data;
+    request.sangria = result.data;
   };
 }
 
 /** Register this plugin before using fixedPrice() */
-export const sangrianetPlugin = fp(
+export const sangriaPlugin = fp(
   async (fastify: FastifyInstance) => {
-    fastify.decorateRequest("sangrianet", undefined);
+    fastify.decorateRequest("sangria", undefined);
   },
-  { name: "sangrianet" }
+  { name: "sangria" }
 );

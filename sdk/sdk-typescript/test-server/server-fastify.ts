@@ -1,17 +1,17 @@
 import Fastify from "fastify";
-import { SangriaNet } from "../src/index.js";
-import { sangrianetPlugin, fixedPrice } from "../src/adapters/fastify.js";
+import { Sangria } from "../src/index.js";
+import { sangriaPlugin, fixedPrice } from "../src/adapters/fastify.js";
 
 const fastify = Fastify({ logger: false });
 
-// ── Initialize SangriaNet ──
-const sangrianet = new SangriaNet({
+// ── Initialize Sangria ──
+const sangria = new Sangria({
   apiKey: process.env.SANGRIA_SECRET_KEY ?? "sk_test_abc123",
   baseUrl: process.env.SANGRIA_URL ?? "http://localhost:8080",
 });
 
-// ── Register SangriaNet plugin ──
-fastify.register(sangrianetPlugin);
+// ── Register Sangria plugin ──
+fastify.register(sangriaPlugin);
 
 // ── Free endpoint ──
 fastify.get("/", async () => {
@@ -21,7 +21,12 @@ fastify.get("/", async () => {
 // ── Fixed-price endpoint ──
 fastify.get(
   "/premium",
-  { preHandler: fixedPrice(sangrianet, { price: 0.01, description: "Access premium content" }) },
+  {
+    preHandler: fixedPrice(sangria, {
+      price: 0.01,
+      description: "Access premium content",
+    }),
+  },
   async () => {
     return { message: "You accessed the premium endpoint!" };
   }
