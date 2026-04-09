@@ -2,11 +2,15 @@ package dbengine
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+// ErrInsufficientBalance is returned when a merchant doesn't have enough balance for a withdrawal.
+var ErrInsufficientBalance = errors.New("insufficient balance")
 
 // withdrawalColumns is the shared SELECT column list for scanning into a Withdrawal.
 const withdrawalColumns = `id, merchant_id, amount, fee, net_amount, status,
@@ -78,7 +82,7 @@ func CreateWithdrawal(
 	}
 
 	if balance < amount {
-		return Withdrawal{}, fmt.Errorf("insufficient balance: have %d, need %d", balance, amount)
+		return Withdrawal{}, fmt.Errorf("%w: have %d, need %d", ErrInsufficientBalance, balance, amount)
 	}
 
 	// Look up the withdrawal clearing system account.
