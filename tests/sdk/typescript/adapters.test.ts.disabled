@@ -1,0 +1,364 @@
+/**
+ * TypeScript SDK Adapters Unit Tests
+ * Tests for Express, Fastify, and Hono framework adapters
+ */
+
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import type { Request, Response, NextFunction } from 'express'
+
+// Mock the SangriaNet core before importing adapters
+const mockHandleFixedPrice = vi.fn()
+vi.mock('../../../../sdk/sdk-typescript/src/core.js', () => ({
+  SangriaNet: class MockSangriaNet {
+    handleFixedPrice = mockHandleFixedPrice
+  }
+}))
+
+describe('SDK Adapters', () => {
+  describe('Express Adapter', () => {
+    let mockSangriaNet: any
+    let mockReq: Partial<Request>
+    let mockRes: Partial<Response>
+    let mockNext: NextFunction
+    let fixedPrice: any
+
+    beforeEach(async () => {
+      // Reset mocks
+      vi.resetAllMocks()
+
+      // Import the adapter after mocking
+      const { fixedPrice: fp } = await import('../../../sdk/sdk-typescript/src/adapters/express.js')
+      const { SangriaNet } = await import('../../../sdk/sdk-typescript/src/core.js')
+
+      fixedPrice = fp
+
+      // Setup mocks
+      mockSangriaNet = new SangriaNet({ apiKey: 'test' })
+
+      mockReq = {
+        headers: {},
+        protocol: 'https',
+        get: vi.fn().mockReturnValue('example.com'),
+        originalUrl: '/api/premium'
+      }
+
+      mockRes = {
+        setHeader: vi.fn(),
+        status: vi.fn().mockReturnThis(),
+        json: vi.fn()
+      }
+
+      mockNext = vi.fn()
+    })
+
+    afterEach(() => {
+      vi.resetAllMocks()
+    })
+
+    it('should create middleware function', () => {
+      const middleware = fixedPrice(mockSangriaNet, { price: 0.01 })
+      expect(typeof middleware).toBe('function')
+    })
+
+    it('should extract payment header from request', async () => {
+      mockReq.headers!['payment-signature'] = 'test-signature'
+
+      mockHandleFixedPrice.mockResolvedValueOnce({
+        action: 'proceed',
+        data: { paid: true, amount: 0.01, transaction: 'tx-123' }
+      })
+
+      const middleware = fixedPrice(mockSangriaNet, { price: 0.01 })
+      await middleware(mockReq as Request, mockRes as Response, mockNext)
+
+      expect(mockHandleFixedPrice).toHaveBeenCalledWith(
+        {
+          paymentHeader: 'test-signature',
+          resourceUrl: 'https://example.com/api/premium'
+        },
+        { price: 0.01 }
+      )
+    })
+
+    it('should handle array payment header', async () => {
+      mockReq.headers!['payment-signature'] = ['header1', 'header2']
+
+      mockHandleFixedPrice.mockResolvedValueOnce({
+        action: 'proceed',
+        data: { paid: true, amount: 0.01 }
+      })
+
+      const middleware = fixedPrice(mockSangriaNet, { price: 0.01 })
+      await middleware(mockReq as Request, mockRes as Response, mockNext)
+
+      expect(mockHandleFixedPrice).toHaveBeenCalledWith(
+        expect.objectContaining({
+          paymentHeader: 'header1' // Should take first header
+        }),
+        expect.any(Object)
+      )
+    })
+
+    it('should proceed when payment is successful', async () => {
+      const paymentData = { paid: true, amount: 0.01, transaction: 'tx-123' }
+
+      mockHandleFixedPrice.mockResolvedValueOnce({
+        action: 'proceed',
+        data: paymentData
+      })
+
+      const middleware = fixedPrice(mockSangriaNet, { price: 0.01 })
+      await middleware(mockReq as Request, mockRes as Response, mockNext)
+
+      expect(mockReq.sangrianet).toEqual(paymentData)
+      expect(mockNext).toHaveBeenCalled()
+      expect(mockRes.status).not.toHaveBeenCalled()
+    })
+
+    it('should respond with 402 when payment is required', async () => {
+      const paymentResponse = {
+        action: 'respond',
+        status: 402,
+        body: { error: 'Payment required' },
+        headers: { 'PAYMENT-REQUIRED': 'encoded-challenge' }
+      }
+
+      mockHandleFixedPrice.mockResolvedValueOnce(paymentResponse)
+
+      const middleware = fixedPrice(mockSangriaNet, { price: 0.01 })
+      await middleware(mockReq as Request, mockRes as Response, mockNext)
+
+      expect(mockRes.setHeader).toHaveBeenCalledWith('PAYMENT-REQUIRED', 'encoded-challenge')
+      expect(mockRes.status).toHaveBeenCalledWith(402)
+      expect(mockRes.json).toHaveBeenCalledWith({ error: 'Payment required' })
+      expect(mockNext).not.toHaveBeenCalled()
+    })
+
+    it('should handle server errors', async () => {
+      mockHandleFixedPrice.mockResolvedValueOnce({
+        action: 'respond',
+        status: 500,
+        body: { error: 'Internal server error' }
+      })
+
+      const middleware = fixedPrice(mockSangriaNet, { price: 0.01 })
+      await middleware(mockReq as Request, mockRes as Response, mockNext)
+
+      expect(mockRes.status).toHaveBeenCalledWith(500)
+      expect(mockRes.json).toHaveBeenCalledWith({ error: 'Internal server error' })
+      expect(mockNext).not.toHaveBeenCalled()
+    })
+
+    it('should bypass payment when bypass condition is met', async () => {
+      const middleware = fixedPrice(
+        mockSangriaNet,
+        { price: 0.01 },
+        { bypassPaymentIf: (req) => req.headers.authorization === 'Bearer admin-token' }
+      )
+
+      mockReq.headers!.authorization = 'Bearer admin-token'
+
+      await middleware(mockReq as Request, mockRes as Response, mockNext)
+
+      expect(mockHandleFixedPrice).not.toHaveBeenCalled()
+      expect(mockReq.sangrianet).toEqual({ paid: false, amount: 0 })
+      expect(mockNext).toHaveBeenCalled()
+    })
+
+    it('should not bypass payment when bypass condition is not met', async () => {
+      const middleware = fixedPrice(
+        mockSangriaNet,
+        { price: 0.01 },
+        { bypassPaymentIf: (req) => req.headers.authorization === 'Bearer admin-token' }
+      )
+
+      mockReq.headers!.authorization = 'Bearer user-token'
+
+      mockHandleFixedPrice.mockResolvedValueOnce({
+        action: 'proceed',
+        data: { paid: true, amount: 0.01 }
+      })
+
+      await middleware(mockReq as Request, mockRes as Response, mockNext)
+
+      expect(mockHandleFixedPrice).toHaveBeenCalled()
+    })
+
+    it('should construct correct resource URL', async () => {
+      mockReq.protocol = 'http'
+      mockReq.get = vi.fn().mockReturnValue('localhost:3000')
+      mockReq.originalUrl = '/api/data?param=value'
+
+      mockHandleFixedPrice.mockResolvedValueOnce({
+        action: 'proceed',
+        data: { paid: true, amount: 0.01 }
+      })
+
+      const middleware = fixedPrice(mockSangriaNet, { price: 0.01 })
+      await middleware(mockReq as Request, mockRes as Response, mockNext)
+
+      expect(mockHandleFixedPrice).toHaveBeenCalledWith(
+        {
+          paymentHeader: undefined,
+          resourceUrl: 'http://localhost:3000/api/data?param=value'
+        },
+        { price: 0.01 }
+      )
+    })
+
+    it('should handle missing headers gracefully', async () => {
+      mockReq.get = vi.fn().mockReturnValue(undefined)
+
+      mockHandleFixedPrice.mockResolvedValueOnce({
+        action: 'proceed',
+        data: { paid: true, amount: 0.01 }
+      })
+
+      const middleware = fixedPrice(mockSangriaNet, { price: 0.01 })
+      await middleware(mockReq as Request, mockRes as Response, mockNext)
+
+      expect(mockHandleFixedPrice).toHaveBeenCalledWith(
+        {
+          paymentHeader: undefined,
+          resourceUrl: 'https://undefined/api/premium'
+        },
+        { price: 0.01 }
+      )
+    })
+
+    it('should pass through all options to core SDK', async () => {
+      const options = {
+        price: 0.05,
+        description: 'Premium content access'
+      }
+
+      mockHandleFixedPrice.mockResolvedValueOnce({
+        action: 'proceed',
+        data: { paid: true, amount: 0.05 }
+      })
+
+      const middleware = fixedPrice(mockSangriaNet, options)
+      await middleware(mockReq as Request, mockRes as Response, mockNext)
+
+      expect(mockHandleFixedPrice).toHaveBeenCalledWith(
+        expect.any(Object),
+        options
+      )
+    })
+
+    it('should set multiple headers when provided', async () => {
+      const paymentResponse = {
+        action: 'respond',
+        status: 402,
+        body: { error: 'Payment required' },
+        headers: {
+          'PAYMENT-REQUIRED': 'encoded-challenge',
+          'X-Payment-Network': 'base-sepolia',
+          'Cache-Control': 'no-cache'
+        }
+      }
+
+      mockHandleFixedPrice.mockResolvedValueOnce(paymentResponse)
+
+      const middleware = fixedPrice(mockSangriaNet, { price: 0.01 })
+      await middleware(mockReq as Request, mockRes as Response, mockNext)
+
+      expect(mockRes.setHeader).toHaveBeenCalledTimes(3)
+      expect(mockRes.setHeader).toHaveBeenCalledWith('PAYMENT-REQUIRED', 'encoded-challenge')
+      expect(mockRes.setHeader).toHaveBeenCalledWith('X-Payment-Network', 'base-sepolia')
+      expect(mockRes.setHeader).toHaveBeenCalledWith('Cache-Control', 'no-cache')
+    })
+
+    it('should handle async errors in payment processing', async () => {
+      mockHandleFixedPrice.mockRejectedValueOnce(new Error('Network error'))
+
+      const middleware = fixedPrice(mockSangriaNet, { price: 0.01 })
+
+      // The middleware should handle the error gracefully
+      await expect(
+        middleware(mockReq as Request, mockRes as Response, mockNext)
+      ).rejects.toThrow('Network error')
+    })
+  })
+
+  describe('Framework Integration Patterns', () => {
+    it('should support middleware chaining patterns', async () => {
+      const { fixedPrice } = await import('../../../sdk/sdk-typescript/src/adapters/express.js')
+
+      const mockSangriaNet = {
+        handleFixedPrice: vi.fn().mockResolvedValue({
+          action: 'proceed',
+          data: { paid: true, amount: 0.01 }
+        })
+      }
+
+      const middleware1 = fixedPrice(mockSangriaNet, { price: 0.01 })
+      const middleware2 = fixedPrice(mockSangriaNet, { price: 0.02 })
+
+      expect(typeof middleware1).toBe('function')
+      expect(typeof middleware2).toBe('function')
+      expect(middleware1).not.toBe(middleware2) // Different instances
+    })
+
+    it('should support configuration variations', async () => {
+      const { fixedPrice } = await import('../../../sdk/sdk-typescript/src/adapters/express.js')
+
+      const mockSangriaNet = {
+        handleFixedPrice: vi.fn().mockResolvedValue({
+          action: 'proceed',
+          data: { paid: true, amount: 0.01 }
+        })
+      }
+
+      // Without config
+      const middleware1 = fixedPrice(mockSangriaNet, { price: 0.01 })
+
+      // With config
+      const middleware2 = fixedPrice(
+        mockSangriaNet,
+        { price: 0.01 },
+        { bypassPaymentIf: () => false }
+      )
+
+      expect(typeof middleware1).toBe('function')
+      expect(typeof middleware2).toBe('function')
+    })
+  })
+
+  describe('Type Safety and TypeScript Integration', () => {
+    it('should extend Express Request interface correctly', async () => {
+      const { fixedPrice } = await import('../../../sdk/sdk-typescript/src/adapters/express.js')
+
+      const mockSangriaNet = {
+        handleFixedPrice: vi.fn().mockResolvedValue({
+          action: 'proceed',
+          data: { paid: true, amount: 0.01, transaction: 'tx-123' }
+        })
+      }
+
+      const mockReq = {
+        headers: {},
+        protocol: 'https',
+        get: vi.fn().mockReturnValue('example.com'),
+        originalUrl: '/api/test'
+      } as Partial<Request>
+
+      const mockRes = {
+        setHeader: vi.fn(),
+        status: vi.fn().mockReturnThis(),
+        json: vi.fn()
+      } as Partial<Response>
+
+      const mockNext = vi.fn()
+
+      const middleware = fixedPrice(mockSangriaNet, { price: 0.01 })
+      await middleware(mockReq as Request, mockRes as Response, mockNext)
+
+      // TypeScript should recognize sangrianet property
+      expect(mockReq.sangrianet).toBeDefined()
+      expect(mockReq.sangrianet?.paid).toBe(true)
+      expect(mockReq.sangrianet?.amount).toBe(0.01)
+      expect(mockReq.sangrianet?.transaction).toBe('tx-123')
+    })
+  })
+})
