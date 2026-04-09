@@ -147,7 +147,7 @@ jobs:
           cd ../sdk/python
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
-          cd ../tests
+          cd ../../tests
 
       - name: Run TypeScript unit tests with coverage
         working-directory: sdk/sdk-typescript
@@ -231,7 +231,7 @@ jobs:
         run: |
           pnpm install
           cd ../sdk/sdk-typescript && pnpm install && cd ../../tests
-          cd ../sdk/python && pip install -e ".[dev]" && cd ../tests
+          cd ../sdk/python && pip install -e ".[dev]" && cd ../../tests
 
       # No Docker services needed - tests use MockSangriaServer
 
@@ -299,7 +299,7 @@ jobs:
         run: |
           pnpm install
           cd ../sdk/sdk-typescript && pnpm install && cd ../../tests
-          cd ../sdk/python && pip install -e ".[dev]" && cd ../tests
+          cd ../sdk/python && pip install -e ".[dev]" && cd ../../tests
 
       - name: Build backend
         working-directory: backend
@@ -359,16 +359,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
-
       - name: Setup pnpm
         uses: pnpm/action-setup@v3
         with:
           version: 9
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
 
       - name: Setup Python
         uses: actions/setup-python@v4
@@ -437,7 +437,7 @@ jobs:
         run: |
           pnpm install
           cd ../sdk/sdk-typescript && pnpm install && cd ../../tests
-          cd ../sdk/python && pip install -e ".[dev]" && cd ../tests
+          cd ../sdk/python && pip install -e ".[dev]" && cd ../../tests
 
       - name: Start test services
         run: echo "No Docker needed - using MockSangriaServer"
