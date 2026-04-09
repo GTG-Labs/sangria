@@ -114,3 +114,14 @@ type CryptoWallet struct {
 	CreatedAt  time.Time `json:"created_at"`
 }
 
+// UserTransaction represents a transaction with enriched data for API responses.
+type UserTransaction struct {
+	ID             string    `json:"id"`
+	IdempotencyKey string    `json:"idempotency_key"`
+	CreatedAt      time.Time `json:"created_at"`
+	Amount         int64     `json:"amount"`
+	Currency       Currency  `json:"currency"`
+	Network        string    `json:"network"`
+	Type           string    `json:"type"`
+}
+

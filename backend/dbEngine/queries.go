@@ -69,3 +69,57 @@ func GetLedgerEntriesByTransaction(ctx context.Context, pool *pgxpool.Pool, txID
 	}
 	return entries, rows.Err()
 }
+
+// GetUserTransactions returns all transactions for a specific user.
+// Only returns transactions where the user received payment (CREDIT to LIABILITY account).
+func GetUserTransactions(ctx context.Context, pool *pgxpool.Pool, userID string) ([]UserTransaction, error) {
+	query := `
+		SELECT
+			t.id,
+			t.idempotency_key,
+			t.created_at,
+			le.amount,
+			le.currency,
+			COALESCE(cw.network, '') as network
+		FROM transactions t
+		JOIN ledger_entries le ON le.transaction_id = t.id
+		JOIN accounts a ON a.id = le.account_id
+		LEFT JOIN crypto_wallets cw ON cw.account_id = a.id
+		WHERE a.user_id = $1
+		  AND a.type = 'LIABILITY'
+		  AND le.direction = 'CREDIT'
+		ORDER BY t.created_at DESC
+		LIMIT 1000
+	`
+
+	rows, err := pool.Query(ctx, query, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var transactions []UserTransaction
+	for rows.Next() {
+		var tx UserTransaction
+		err := rows.Scan(
+			&tx.ID,
+			&tx.IdempotencyKey,
+			&tx.CreatedAt,
+			&tx.Amount,
+			&tx.Currency,
+			&tx.Network,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		tx.Type = "payment_received"
+		transactions = append(transactions, tx)
+	}
+
+	if transactions == nil {
+		transactions = []UserTransaction{}
+	}
+
+	return transactions, rows.Err()
+}
