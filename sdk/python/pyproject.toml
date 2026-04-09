@@ -19,6 +19,7 @@ dev = [
   "mypy>=1.0.0",
   "bandit>=1.7.0",
   "safety>=2.0.0",
+  "fastapi>=0.135.1",
 ]
 
 [build-system]

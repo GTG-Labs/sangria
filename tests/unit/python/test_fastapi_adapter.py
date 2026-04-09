@@ -1,12 +1,14 @@
 """Tests for sangria_sdk.adapters.fastapi module."""
 
 from unittest.mock import AsyncMock, Mock
+import sys
+import os
 
 import pytest
 from fastapi import HTTPException, Request
 from fastapi.responses import JSONResponse
-import sys
-import os
+
+# Add the SDK path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', '..', 'sdk', 'python', 'src'))
 
 from sangria_sdk.adapters.fastapi import require_sangria_payment
