@@ -18,9 +18,14 @@ Merchant Server (separate — see merchant-fastapi/, merchant-express/, etc.)
     → Returns 200 + resource
     ↓
 Sangria Backend (Go)
-    → generate-payment: picks LRU wallet, returns PaymentRequired
-    → settle-payment: calls CDP facilitator verify + settle
-    → Writes double-entry ledger (DEBIT hot wallet, CREDIT merchant)
+    → generate-payment: picks wallet from pool, returns PaymentRequired
+    → settle-payment: extracts payTo + amount from signed payload,
+      calls facilitator verify + settle, writes cross-currency ledger:
+        DEBIT  Hot Wallet (USDC ASSET)
+        CREDIT Conversion Clearing (USDC)
+        DEBIT  Conversion Clearing (USD)
+        CREDIT Merchant Payable (USD LIABILITY) — minus platform fee
+        CREDIT Platform Fee Revenue (USD)
     ↓
 CDP Facilitator (Coinbase)
     → Verifies EIP-712 signature, balance, nonce
@@ -30,21 +35,15 @@ CDP Facilitator (Coinbase)
 
 ## Prerequisites
 
-1. **Sangria backend** running
-2. **A merchant server** running (see `playground/merchant-fastapi/`, `merchant-express/`, `merchant-fastify/`, or `merchant-hono/`)
+1. **Sangria backend** running (`cd backend && go run .`)
+2. **A merchant server** running (see below)
 3. **CDP credentials** in `playground/.env`:
    ```
    CDP_API_KEY=<your key ID>
    CDP_SECRET_KEY=<your key secret>
    CDP_WALLET_SECRET=<your wallet secret>
    ```
-4. **Buyer wallet** funded with USDC + ETH on the target network
-
-## Files
-
-| File | Purpose |
-|------|---------|
-| `client.py` | Test buyer client — hits a merchant server endpoint, x402 SDK handles the 402 payment flow automatically |
+4. **Buyer wallet** funded with USDC + ETH on base-sepolia
 
 ## Usage
 
@@ -53,37 +52,50 @@ CDP Facilitator (Coinbase)
 Pick one of the merchant server implementations:
 
 ```bash
-# FastAPI
-cd playground/merchant-fastapi && MERCHANT_API_KEY="sg_test_xxx" uv run uvicorn app:app --port 9000
+# FastAPI (Python)
+cd playground/merchant-fastapi
+SANGRIA_URL=http://localhost:8080 SANGRIA_SECRET_KEY="sg_test_xxx" uv run python src/main.py
 
-# Express
-cd playground/merchant-express && MERCHANT_API_KEY="sg_test_xxx" npm start
+# Express (Node.js)
+cd playground/merchant-express && SANGRIA_SECRET_KEY="sg_test_xxx" bun dev
 
-# Fastify
-cd playground/merchant-fastify && MERCHANT_API_KEY="sg_test_xxx" npm start
+# Fastify (Node.js)
+cd playground/merchant-fastify && SANGRIA_SECRET_KEY="sg_test_xxx" bun dev
 
-# Hono
-cd playground/merchant-hono && MERCHANT_API_KEY="sg_test_xxx" npm start
+# Hono (Node.js)
+cd playground/merchant-hono && SANGRIA_SECRET_KEY="sg_test_xxx" bun dev
 ```
 
 ### 2. Run the test client
 
 ```bash
 cd playground
-uv run python -m e2e_test.client --buyer-address 0x...
+MERCHANT_URL=http://localhost:4004 uv run python -m e2e_test.client --buyer-address 0x...
 ```
 
-Update the `MERCHANT_URL` in `client.py` to point to your merchant server.
+Set `MERCHANT_URL` to wherever your merchant server is running.
 
-### Testnet vs Mainnet
+### Creating a buyer wallet
 
-- **Testnet** (`base-sepolia`): Create buyer wallet with free faucet funds.
-- **Mainnet** (`base`): Fund buyer wallet with real USDC + ETH from Coinbase or another wallet.
+If you don't have a buyer wallet yet:
+
+```python
+import asyncio
+from wallet import TestnetWallet
+
+async def setup():
+    wallet = await TestnetWallet.mint()
+    await wallet.fund_eth()    # gas fees
+    await wallet.fund_usdc()   # payment token
+    print(f"Address: {wallet.address}")
+
+asyncio.run(setup())
+```
 
 ## What Success Looks Like
 
 ```
-=== Step 1: GET https://your-merchant.com/premium ===
+=== Step 1: GET http://localhost:4004/premium ===
 Status: 402
 
 === Step 2: Sign Payment ===
@@ -97,9 +109,15 @@ Final status: 200
   "settlement": {
     "transaction": "0xabc...",
     "payer": "0x...",
-    "network": "eip155:8453"
+    "network": "base-sepolia"
   }
 }
 
 === Payment successful! ===
+```
+
+After settlement, the merchant's USD balance increases (minus platform fee). Check via:
+
+```bash
+curl http://localhost:8080/merchant/balance -H "X-API-Key: sg_test_xxx"
 ```

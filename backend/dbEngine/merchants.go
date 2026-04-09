@@ -20,10 +20,10 @@ func GetMerchantByID(ctx context.Context, pool *pgxpool.Pool, id string) (Mercha
 	return m, err
 }
 
-// EnsureUSDCLiabilityAccount returns the user's USDC LIABILITY account,
+// EnsureUSDLiabilityAccount returns the user's USD LIABILITY account,
 // creating one if it doesn't exist yet. Uses a transaction with a row lock
 // to prevent concurrent requests from creating duplicate accounts.
-func EnsureUSDCLiabilityAccount(ctx context.Context, pool *pgxpool.Pool, userID string) (Account, error) {
+func EnsureUSDLiabilityAccount(ctx context.Context, pool *pgxpool.Pool, userID string) (Account, error) {
 	tx, err := pool.Begin(ctx)
 	if err != nil {
 		return Account{}, fmt.Errorf("begin transaction: %w", err)
@@ -45,7 +45,7 @@ func EnsureUSDCLiabilityAccount(ctx context.Context, pool *pgxpool.Pool, userID 
 	err = tx.QueryRow(ctx,
 		`SELECT id, name, type, currency, user_id, created_at
 		 FROM accounts
-		 WHERE user_id = $1 AND type = 'LIABILITY' AND currency = 'USDC'`,
+		 WHERE user_id = $1 AND type = 'LIABILITY' AND currency = 'USD'`,
 		userID,
 	).Scan(&a.ID, &a.Name, &a.Type, &a.Currency, &a.UserID, &a.CreatedAt)
 
@@ -63,7 +63,7 @@ func EnsureUSDCLiabilityAccount(ctx context.Context, pool *pgxpool.Pool, userID 
 		`INSERT INTO accounts (name, type, currency, user_id)
 		 VALUES ($1, $2, $3, $4)
 		 RETURNING id, name, type, currency, user_id, created_at`,
-		"USDC Liability", AccountTypeLiability, USDC, userID,
+		"USD Liability", AccountTypeLiability, USD, userID,
 	).Scan(&a.ID, &a.Name, &a.Type, &a.Currency, &a.UserID, &a.CreatedAt)
 	if err != nil {
 		return Account{}, fmt.Errorf("create liability account: %w", err)
@@ -76,28 +76,28 @@ func EnsureUSDCLiabilityAccount(ctx context.Context, pool *pgxpool.Pool, userID 
 	return a, nil
 }
 
-// GetMerchantUSDCLiabilityAccount returns the USDC LIABILITY account for a
+// GetMerchantUSDLiabilityAccount returns the USD LIABILITY account for a
 // merchant's user. Used during settle-payment to credit the merchant.
-func GetMerchantUSDCLiabilityAccount(ctx context.Context, pool *pgxpool.Pool, merchantID string) (Account, error) {
+func GetMerchantUSDLiabilityAccount(ctx context.Context, pool *pgxpool.Pool, merchantID string) (Account, error) {
 	var a Account
 	err := pool.QueryRow(ctx,
 		`SELECT a.id, a.name, a.type, a.currency, a.user_id, a.created_at
 		 FROM accounts a
 		 JOIN merchants m ON m.user_id = a.user_id
-		 WHERE m.id = $1 AND a.type = 'LIABILITY' AND a.currency = 'USDC'`,
+		 WHERE m.id = $1 AND a.type = 'LIABILITY' AND a.currency = 'USD'`,
 		merchantID,
 	).Scan(&a.ID, &a.Name, &a.Type, &a.Currency, &a.UserID, &a.CreatedAt)
 	return a, err
 }
 
-// GetMerchantBalance returns the net USDC balance for a merchant by looking
-// up their USDC LIABILITY account and computing the ledger balance.
+// GetMerchantBalance returns the net USD balance for a merchant by looking
+// up their USD LIABILITY account and computing the ledger balance.
 func GetMerchantBalance(ctx context.Context, pool *pgxpool.Pool, merchantID string) (int64, error) {
-	acct, err := GetMerchantUSDCLiabilityAccount(ctx, pool, merchantID)
+	acct, err := GetMerchantUSDLiabilityAccount(ctx, pool, merchantID)
 	if err != nil {
 		return 0, fmt.Errorf("get merchant liability account: %w", err)
 	}
-	return GetAccountBalance(ctx, pool, acct.ID, USDC)
+	return GetAccountBalance(ctx, pool, acct.ID, USD)
 }
 
 // UpdateMerchantLastUsedAt updates the last_used_at timestamp for a merchant.

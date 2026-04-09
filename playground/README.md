@@ -1,150 +1,128 @@
-# sangria-net
+# Sangria Playground
 
-A demo of the [x402 payment protocol](https://www.x402.org/) — HTTP-native micropayments using USDC on Base Sepolia (testnet).
-
-A merchant runs a FastAPI server with a paid endpoint. A buyer client calls that endpoint. The x402 protocol handles payment negotiation automatically: the server responds with a `402 Payment Required`, the client signs a USDC payment, and the server verifies it before returning the real response. No payment UI, no checkout flow — just an HTTP request that costs money.
+Test implementations for the [x402 payment protocol](https://www.x402.org/) integrated with the Sangria backend. Includes merchant servers in multiple frameworks and a test client for end-to-end payment testing.
 
 ## How it works
 
 ```
-Buyer (main.py)                          Merchant Server (:8000)
-       |                                        |
-       |  GET /premium                          |
-       |--------------------------------------->|
-       |                                        |
-       |  402 Payment Required ($0.0001 USDC)   |
-       |<---------------------------------------|
-       |                                        |
-       |  GET /premium + signed USDC payment    |
-       |--------------------------------------->|
-       |                                        |
-       |  200 OK { "paid": true }               |
-       |<---------------------------------------|
+Buyer (e2e_test/client.py)           Merchant Server (:<port>)             Sangria Backend (:8080)
+       |                                     |                                    |
+       |  GET /premium                       |                                    |
+       |------------------------------------>|                                    |
+       |                                     |  POST /v1/generate-payment         |
+       |                                     |----------------------------------->|
+       |                                     |  ← PaymentRequired                 |
+       |                                     |<-----------------------------------|
+       |  402 + PaymentRequired              |                                    |
+       |<------------------------------------|                                    |
+       |                                     |                                    |
+       |  x402 SDK signs EIP-712             |                                    |
+       |                                     |                                    |
+       |  GET /premium + PAYMENT-SIGNATURE   |                                    |
+       |------------------------------------>|                                    |
+       |                                     |  POST /v1/settle-payment            |
+       |                                     |----------------------------------->|
+       |                                     |  ← settlement result               |
+       |                                     |<-----------------------------------|
+       |  200 OK { "paid": true }            |                                    |
+       |<------------------------------------|                                    |
 ```
-
-The x402 client library handles the 402 negotiation transparently. From the developer's perspective, it's just a normal HTTP GET.
 
 ## Project structure
 
 ```
-sangria-net/
-  main.py                  # Buyer client — checks balances, calls the paid endpoint
-  merchant_server/
-    app.py                 # FastAPI app with the @pay-protected endpoint
-    run.py                 # Entry point: python -m merchant_server.run
-  wallet/
-    wallet.py              # TestnetWallet class — create, fund, and check wallets via CDP
+playground/
+├── e2e_test/
+│   ├── client.py              # Test buyer — step-by-step x402 payment flow
+│   └── README.md              # Full e2e test instructions
+├── merchant-fastapi/          # Merchant server using Sangria Python SDK + FastAPI
+├── merchant-express/          # Merchant server using Sangria JS SDK + Express
+├── merchant-fastify/          # Merchant server using Sangria JS SDK + Fastify
+├── merchant-hono/             # Merchant server using Sangria JS SDK + Hono
+├── wallet/
+│   └── wallet.py              # TestnetWallet — create, fund, and check CDP wallets
+├── merchant_server/           # (Legacy) Standalone demo without Sangria backend
+└── main.py                    # (Legacy) Standalone buyer client
 ```
 
-## Prerequisites
+## Quick start
 
-- Python 3.10+
-- [uv](https://docs.astral.sh/uv/) (Python package manager)
-- A [Coinbase Developer Platform](https://portal.cdp.coinbase.com/) account
+### Prerequisites
 
-## Setup
+- Sangria backend running on `localhost:8080` (see `backend/README.md`)
+- A merchant API key (create via `POST /merchants` on the backend)
+- CDP credentials in `playground/.env`:
+  ```
+  CDP_API_KEY=<your key ID>
+  CDP_SECRET_KEY=<your key secret>
+  CDP_WALLET_SECRET=<your wallet secret>
+  ```
+- A buyer wallet funded with testnet USDC + ETH (see below)
+- [uv](https://docs.astral.sh/uv/) for Python, or npm for Node.js servers
 
-1. Clone the repo:
+### 1. Install dependencies
 
 ```bash
-git clone https://github.com/your-username/sangria-net.git
-cd sangria-net
-```
-
-2. Install dependencies:
-
-```bash
+cd playground
 uv sync
 ```
 
-3. Create a `.env` file from the example:
+### 2. Create and fund a buyer wallet (one-time)
 
 ```bash
-cp .env.example .env
-```
-
-4. Fill in your CDP credentials in `.env`:
-
-```
-CDP_API_KEY="your-api-key"
-CDP_SECRET_KEY="your-secret-key"
-CDP_WALLET_SECRET="your-wallet-secret"
-```
-
-You get these from the [CDP Portal](https://portal.cdp.coinbase.com/). The wallet secret is an encryption key you choose — CDP uses it to encrypt your wallet private keys on their servers.
-
-## Running
-
-You need two terminals.
-
-**Terminal 1 — Start the merchant server:**
-
-```bash
-uv run python -m merchant_server.run
-```
-
-This starts a FastAPI server on `http://127.0.0.1:8000` with:
-- `GET /` — health check
-- `GET /premium` — costs $0.0001 USDC per request (protected by x402)
-
-**Terminal 2 — Run the buyer client:**
-
-```bash
-uv run python main.py
-```
-
-This will:
-1. Print initial USDC balances for both the merchant and buyer wallets
-2. Make a single paid request to `GET /premium`
-3. Wait a few seconds for on-chain settlement
-4. Print final balances showing the USDC transfer
-
-## Example output
-
-```
---- Initial Balances ---
-  Merchant (0xF44c...fd39): 10.050000 USDC
-  Buyer    (0x0b7b...e649):  9.950000 USDC
-
-Status: 200 | Body: {'message': 'You accessed the premium endpoint!', 'paid': True}
-
-Waiting for settlement...
-
---- Final Balances ---
-  Merchant (0xF44c...fd39): 10.050100 USDC
-  Buyer    (0x0b7b...e649):  9.949900 USDC
-```
-
-## Wallet management
-
-The project uses pre-created wallets with addresses hardcoded in `main.py` and `merchant_server/app.py`. If you need to create and fund new wallets, you can use the `TestnetWallet` class:
-
-```python
+uv run python -c "
 import asyncio
 from wallet import TestnetWallet
-
 async def setup():
-    wallet = await TestnetWallet.mint()    # creates a new wallet
-    await wallet.fund_eth()                # gas fees (free on testnet)
-    await wallet.fund_usdc()               # payment token (free on testnet)
-    print(wallet.address)                  # save this address
-
+    w = await TestnetWallet.mint()
+    await w.fund_eth()
+    await w.fund_usdc()
+    print(f'Buyer address: {w.address}')
 asyncio.run(setup())
+"
 ```
 
-Then update `MERCHANT_ADDRESS` and `BUYER_ADDRESS` in the code with your new addresses.
+Save the address for step 4.
 
-## Key dependencies
+### 3. Start a merchant server
 
-| Package | What it does |
-|---|---|
-| `cdp-sdk` | Coinbase Developer Platform SDK — wallet creation, funding, balance checks |
-| `x402` | Client-side x402 protocol — signs USDC payments for 402 responses |
-| `fastapi-x402` | Server-side x402 middleware — adds `@pay` decorator to protect endpoints |
-| `uvicorn` | ASGI server to run FastAPI |
+```bash
+# FastAPI example
+cd merchant-fastapi
+SANGRIA_URL=http://localhost:8080 SANGRIA_SECRET_KEY="sg_test_xxx" uv run python src/main.py
+```
+
+Replace `sg_test_xxx` with your actual merchant API key.
+
+### 4. Run the e2e test
+
+```bash
+cd playground
+MERCHANT_URL=http://localhost:4004 uv run python -m e2e_test.client --buyer-address 0x...
+```
+
+See `e2e_test/README.md` for full details and expected output.
+
+## Merchant server implementations
+
+Each merchant server demonstrates integrating the Sangria SDK in a different framework. They all do the same thing:
+- Expose a `GET /premium` endpoint
+- Use the Sangria SDK's `@require_sangria_payment` decorator (or equivalent)
+- The SDK handles the full 402 → generate → settle flow automatically
+
+| Directory | Framework | Language |
+|---|---|---|
+| `merchant-fastapi/` | FastAPI | Python |
+| `merchant-express/` | Express | Node.js |
+| `merchant-fastify/` | Fastify | Node.js |
+| `merchant-hono/` | Hono | Node.js |
+
+## Legacy files
+
+`main.py` and `merchant_server/` are the original standalone demo that talks directly to the x402 facilitator without the Sangria backend. Kept for reference.
 
 ## Important notes
 
-- This runs on **Base Sepolia testnet** — all funds are fake. No real money is involved.
-- CDP manages private keys server-side. The wallet secret in your `.env` encrypts them at rest — don't lose it or you lose access to your wallets.
-- The buyer's private key is exported from CDP only to sign x402 payment headers. This is the one place where the raw key is used locally.
+- Runs on **Base Sepolia testnet** — all funds are fake
+- CDP manages private keys server-side, encrypted with your `CDP_WALLET_SECRET`
+- The buyer's private key is exported from CDP only to sign x402 payment headers

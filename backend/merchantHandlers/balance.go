@@ -10,8 +10,8 @@ import (
 	dbengine "sangrianet/backend/dbEngine"
 )
 
-// GetMerchantBalance handles GET /merchants/balance.
-// Returns the authenticated merchant's virtual USDC balance.
+// GetMerchantBalance handles GET /merchant/balance.
+// Returns the authenticated merchant's virtual USD balance.
 func GetMerchantBalance(pool *pgxpool.Pool) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		merchant := c.Locals("merchant_api_key").(*dbengine.Merchant)
@@ -23,7 +23,7 @@ func GetMerchantBalance(pool *pgxpool.Pool) fiber.Handler {
 		}
 
 		// Convert microunits to display string using integer math (no float rounding).
-		// 1 USDC = 1,000,000 microunits. Preserves full 6-digit precision.
+		// 1 USD = 1,000,000 microunits. Preserves full 6-digit precision.
 		sign := ""
 		abs := balance
 		if balance < 0 {
@@ -32,11 +32,11 @@ func GetMerchantBalance(pool *pgxpool.Pool) fiber.Handler {
 		}
 		whole := abs / 1_000_000
 		frac := abs % 1_000_000
-		displayBalance := fmt.Sprintf("%s%d.%06d USDC", sign, whole, frac)
+		displayBalance := fmt.Sprintf("%s$%d.%06d", sign, whole, frac)
 
 		return c.Status(200).JSON(fiber.Map{
 			"balance":         balance,
-			"currency":        "USDC",
+			"currency":        "USD",
 			"display_balance": displayBalance,
 		})
 	}

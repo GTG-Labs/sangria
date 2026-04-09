@@ -38,7 +38,7 @@ func CreateMerchantAPIKey(pool *pgxpool.Pool) fiber.Handler {
 
 		// Ensure the user has a USDC LIABILITY account before creating the API key,
 		// so we don't end up with an active key but no liability account.
-		if _, err := dbengine.EnsureUSDCLiabilityAccount(c.Context(), pool, user.ID); err != nil {
+		if _, err := dbengine.EnsureUSDLiabilityAccount(c.Context(), pool, user.ID); err != nil {
 			log.Printf("ensure usdc liability account: %v", err)
 			return c.Status(500).JSON(fiber.Map{"error": "failed to create liability account"})
 		}
