@@ -11,6 +11,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"sangrianet/backend/config"
 	dbengine "sangrianet/backend/dbEngine"
 	x402Handlers "sangrianet/backend/x402Handlers"
 )
@@ -158,6 +159,36 @@ func SettlePayment(pool *pgxpool.Pool) fiber.Handler {
 
 		payload := json.RawMessage(payloadBytes)
 
+		// Pre-validate all ledger prerequisites before calling the external facilitator.
+		// This ensures we fail fast on missing accounts rather than after an on-chain settlement.
+		merchantAcct, err := dbengine.GetMerchantUSDLiabilityAccount(c.Context(), pool, merchant.ID)
+		if err != nil {
+			log.Printf("get merchant liability account: %v", err)
+			return c.Status(500).JSON(fiber.Map{"error": "failed to look up merchant account"})
+		}
+
+		convClearingUSDC, err := dbengine.GetSystemAccount(c.Context(), pool, dbengine.SystemAccountConversionClearing, dbengine.USDC)
+		if err != nil {
+			log.Printf("get conversion clearing (USDC): %v", err)
+			return c.Status(500).JSON(fiber.Map{"error": "system account not found"})
+		}
+
+		convClearingUSD, err := dbengine.GetSystemAccount(c.Context(), pool, dbengine.SystemAccountConversionClearing, dbengine.USD)
+		if err != nil {
+			log.Printf("get conversion clearing (USD): %v", err)
+			return c.Status(500).JSON(fiber.Map{"error": "system account not found"})
+		}
+
+		revenueAcct, err := dbengine.GetSystemAccount(c.Context(), pool, dbengine.SystemAccountPlatformFeeRevenue, dbengine.USD)
+		if err != nil {
+			log.Printf("get platform fee revenue account: %v", err)
+			return c.Status(500).JSON(fiber.Map{"error": "system account not found"})
+		}
+
+		// Calculate platform fee.
+		fee := config.PlatformFee.CalculateFee(amount)
+		merchantAmount := amount - fee
+
 		log.Println("")
 		log.Println("════════════════════════════════════════")
 		log.Println("  SETTLE PAYMENT FLOW")
@@ -165,6 +196,7 @@ func SettlePayment(pool *pgxpool.Pool) fiber.Handler {
 		log.Printf("  payer:   %s", envelope.Payload.Authorization.From)
 		log.Printf("  to:      %s", toAddress)
 		log.Printf("  amount:  %s (micro USDC)", valueStr)
+		log.Printf("  fee:     %d (micro USD)", fee)
 		log.Printf("  network: %s", netConfig.CAIP2)
 		log.Println("────────────────────────────────────────")
 
@@ -215,17 +247,24 @@ func SettlePayment(pool *pgxpool.Pool) fiber.Handler {
 		log.Printf("  [2/2] SETTLE SUCCEEDED — tx: %s", settleResp.Transaction)
 		log.Println("════════════════════════════════════════")
 
-		// Write double-entry ledger using the tx hash as idempotency key.
-		merchantAcct, err := dbengine.GetMerchantUSDCLiabilityAccount(c.Context(), pool, merchant.ID)
-		if err != nil {
-			log.Printf("get merchant liability account: %v", err)
-			return c.Status(500).JSON(fiber.Map{"error": "failed to look up merchant account"})
+		// Write cross-currency double-entry ledger using the tx hash as idempotency key.
+		// All account lookups and fee calculation were done above (before facilitator calls)
+		// so a missing account never results in an orphaned on-chain settlement.
+		lines := []dbengine.LedgerLine{
+			// USDC side: hot wallet receives, conversion clearing absorbs.
+			{Currency: dbengine.USDC, Amount: amount, Direction: dbengine.Debit, AccountID: wallet.AccountID},
+			{Currency: dbengine.USDC, Amount: amount, Direction: dbengine.Credit, AccountID: convClearingUSDC.ID},
+			// USD side: conversion clearing bridges, merchant + revenue split.
+			{Currency: dbengine.USD, Amount: amount, Direction: dbengine.Debit, AccountID: convClearingUSD.ID},
+			{Currency: dbengine.USD, Amount: merchantAmount, Direction: dbengine.Credit, AccountID: merchantAcct.ID},
+		}
+		if fee > 0 {
+			lines = append(lines, dbengine.LedgerLine{
+				Currency: dbengine.USD, Amount: fee, Direction: dbengine.Credit, AccountID: revenueAcct.ID,
+			})
 		}
 
-		_, err = dbengine.InsertTransaction(c.Context(), pool, settleResp.Transaction, []dbengine.LedgerLine{
-			{Currency: dbengine.USDC, Amount: amount, Direction: dbengine.Debit, AccountID: wallet.AccountID},
-			{Currency: dbengine.USDC, Amount: amount, Direction: dbengine.Credit, AccountID: merchantAcct.ID},
-		})
+		_, err = dbengine.InsertTransaction(c.Context(), pool, settleResp.Transaction, lines)
 		if err != nil {
 			log.Printf("insert ledger transaction: %v", err)
 			return c.Status(500).JSON(fiber.Map{"error": "failed to create ledger entry"})

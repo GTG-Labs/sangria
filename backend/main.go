@@ -10,6 +10,7 @@ import (
 	"sangrianet/backend/adminHandlers"
 	"sangrianet/backend/auth"
 	"sangrianet/backend/config"
+	dbengine "sangrianet/backend/dbEngine"
 	"sangrianet/backend/merchantHandlers"
 	"sangrianet/backend/utils"
 )
@@ -21,12 +22,23 @@ func main() {
 		log.Fatalf("Failed to setup WorkOS: %v", err)
 	}
 
+	if err := config.LoadPlatformFees(); err != nil {
+		log.Fatalf("Failed to load platform fees: %v", err)
+	}
+	log.Printf("Platform fee: %d basis points (min %d microunits)", config.PlatformFee.RateBasisPoints, config.PlatformFee.MinMicrounits)
+
 	ctx := context.Background()
+
 	pool, err := config.ConnectDatabase(ctx)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer pool.Close()
+
+	// Ensure system-level ledger accounts exist (conversion clearing, revenue, expenses).
+	if err := dbengine.EnsureSystemAccounts(ctx, pool); err != nil {
+		log.Fatalf("Failed to ensure system accounts: %v", err)
+	}
 
 	app := fiber.New()
 	utils.SetupCORSMiddleware(app)
@@ -67,4 +79,5 @@ func setupRoutes(app *fiber.App, pool *pgxpool.Pool) {
 	// matching ADMIN_API_KEY env var, AND role = "admin" in the database.
 	adminMiddleware := auth.RequireAdmin(pool)
 	app.Post("/wallets/pool", auth.WorkosAuthMiddleware, adminMiddleware, adminHandlers.CreateWalletPool(pool))
+	app.Post("/admin/treasury/fund", auth.WorkosAuthMiddleware, adminMiddleware, adminHandlers.FundTreasury(pool))
 }
