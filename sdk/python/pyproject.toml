@@ -1,5 +1,5 @@
 [project]
-name = "sangria-merchant-sdk"
+name = "sangria-core"
 version = "0.1.0"
 description = "Python Merchant SDK for Sangria payment preflight and settlement"
 readme = "README.md"

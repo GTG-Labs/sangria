@@ -4,8 +4,8 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to release (e.g., 0.1.1)'
-        required: true
+        description: 'Version to release (e.g., 0.1.1) — leave empty to auto-increment'
+        required: false
         type: string
       release_type:
         description: 'Release type'
@@ -16,8 +16,8 @@ on:
           - patch
           - minor
           - major
-      dry_run:
-        description: 'Dry run (build but do not publish)'
+      test_mode:
+        description: 'Test mode — npm dry-run, Python publishes to TestPyPI, skips GitHub release'
         required: false
         default: false
         type: boolean
@@ -33,9 +33,11 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
+      commit_sha: ${{ steps.push.outputs.commit_sha }}
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ github.ref }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup pnpm
@@ -76,13 +78,15 @@ jobs:
           sed -i 's/version = "[^"]*"/version = "${{ steps.version.outputs.version }}"/' pyproject.toml
 
       - name: Commit version updates
-        if: ${{ !inputs.dry_run }}
+        id: push
+        if: ${{ !inputs.test_mode }}
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
           git add sdk/sdk-typescript/package.json sdk/python/pyproject.toml
           git commit -m "chore: bump version to ${{ steps.version.outputs.version }}"
           git push
+          echo "commit_sha=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
 
   # Run full test suite before release
   test-before-release:
@@ -91,6 +95,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.update-versions.outputs.commit_sha || github.sha }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v3
@@ -105,7 +111,7 @@ jobs:
           cache-dependency-path: tests/pnpm-lock.yaml
 
       - name: Setup Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -132,6 +138,8 @@ jobs:
     needs: [update-versions, test-before-release]
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.update-versions.outputs.commit_sha || github.sha }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v3
@@ -155,12 +163,12 @@ jobs:
         run: pnpm build
 
       - name: Publish to npm (dry run)
-        if: ${{ inputs.dry_run }}
+        if: ${{ inputs.test_mode }}
         working-directory: sdk/sdk-typescript
         run: pnpm publish --dry-run
 
       - name: Publish to npm
-        if: ${{ !inputs.dry_run }}
+        if: ${{ !inputs.test_mode }}
         working-directory: sdk/sdk-typescript
         run: pnpm publish --no-git-checks
         env:
@@ -173,9 +181,11 @@ jobs:
     needs: [update-versions, test-before-release]
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.update-versions.outputs.commit_sha || github.sha }}
 
       - name: Setup Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -193,7 +203,7 @@ jobs:
         run: python -m twine check dist/*
 
       - name: Publish to PyPI (dry run)
-        if: ${{ inputs.dry_run }}
+        if: ${{ inputs.test_mode }}
         working-directory: sdk/python
         run: python -m twine upload --repository testpypi dist/* || echo "Dry run completed"
         env:
@@ -201,7 +211,7 @@ jobs:
           TWINE_PASSWORD: ${{ secrets.TEST_PYPI_TOKEN }}
 
       - name: Publish to PyPI
-        if: ${{ !inputs.dry_run }}
+        if: ${{ !inputs.test_mode }}
         working-directory: sdk/python
         run: python -m twine upload dist/*
         env:
@@ -213,9 +223,11 @@ jobs:
     name: Create GitHub Release
     runs-on: ubuntu-latest
     needs: [update-versions, deploy-typescript, deploy-python]
-    if: ${{ !inputs.dry_run }}
+    if: ${{ !inputs.test_mode }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.update-versions.outputs.commit_sha || github.sha }}
 
       - name: Create Release
         uses: actions/create-release@v1
@@ -229,14 +241,14 @@ jobs:
 
             ### Packages Published
 
-            **TypeScript SDK** - `sangria@${{ needs.update-versions.outputs.version }}`
+            **TypeScript SDK** - `@sangria/core@${{ needs.update-versions.outputs.version }}`
             ```bash
-            npm install sangria@${{ needs.update-versions.outputs.version }}
+            npm install @sangria/core@${{ needs.update-versions.outputs.version }}
             ```
 
-            **Python SDK** - `sangria@${{ needs.update-versions.outputs.version }}`
+            **Python SDK** - `sangria-core@${{ needs.update-versions.outputs.version }}`
             ```bash
-            pip install sangria==${{ needs.update-versions.outputs.version }}
+            pip install sangria-core==${{ needs.update-versions.outputs.version }}
             ```
 
             ### Framework Support
@@ -252,9 +264,9 @@ jobs:
 
             ### Documentation
 
-            See [README](https://github.com/GTG-Labs/sangria-net#readme) for usage examples and integration guides.
+            See [README](https://github.com/GTG-Labs/sangria#readme) for usage examples and integration guides.
 
-            **Full Changelog**: https://github.com/GTG-Labs/sangria-net/commits/v${{ needs.update-versions.outputs.version }}
+            **Full Changelog**: https://github.com/GTG-Labs/sangria/commits/v${{ needs.update-versions.outputs.version }}
           draft: false
           prerelease: ${{ contains(needs.update-versions.outputs.version, '-') }}
 
@@ -263,14 +275,14 @@ jobs:
     name: Notify Release
     runs-on: ubuntu-latest
     needs: [update-versions, create-release]
-    if: always() && !inputs.dry_run
+    if: always() && !inputs.test_mode
     steps:
       - name: Release status
         run: |
           if [ "${{ needs.create-release.result }}" == "success" ]; then
             echo "Release v${{ needs.update-versions.outputs.version }} completed successfully!"
-            echo "TypeScript SDK: sangria@${{ needs.update-versions.outputs.version }}"
-            echo "Python SDK: sangria@${{ needs.update-versions.outputs.version }}"
+            echo "TypeScript SDK: @sangria/core@${{ needs.update-versions.outputs.version }}"
+            echo "Python SDK: sangria-core@${{ needs.update-versions.outputs.version }}"
           else
             echo "Release v${{ needs.update-versions.outputs.version }} failed!"
             exit 1
