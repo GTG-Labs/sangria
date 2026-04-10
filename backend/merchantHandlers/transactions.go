@@ -11,6 +11,26 @@ import (
 	"sangria/backend/utils"
 )
 
+// GetMerchantBalance handles GET /balance and returns the merchant's USD balance.
+func GetMerchantBalance(pool *pgxpool.Pool) fiber.Handler {
+	return func(c fiber.Ctx) error {
+		user := c.Locals("workos_user").(auth.WorkOSUser)
+
+		balance, err := dbengine.GetAccountBalance(c.Context(), pool, user.ID)
+		if err != nil {
+			slog.Error("fetch balance: query failed", "user_id", user.ID, "error", err)
+			return c.Status(500).JSON(fiber.Map{
+				"error": "Failed to retrieve balance",
+			})
+		}
+
+		return c.JSON(fiber.Map{
+			"balance":  balance,
+			"currency": "USD",
+		})
+	}
+}
+
 // GetMerchantTransactions handles GET /transactions with cursor-based pagination
 // Query params: ?limit=20&cursor=base64_encoded_timestamp
 func GetMerchantTransactions(pool *pgxpool.Pool) fiber.Handler {

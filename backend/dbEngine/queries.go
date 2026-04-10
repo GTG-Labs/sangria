@@ -8,6 +8,25 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// GetAccountBalance returns the net balance (in microunits) of a user's USD
+// LIABILITY account by summing all ledger entries: credits minus debits.
+func GetAccountBalance(ctx context.Context, pool *pgxpool.Pool, userID string) (int64, error) {
+	var balance int64
+	err := pool.QueryRow(ctx, `
+		SELECT COALESCE(SUM(
+			CASE WHEN le.direction = 'CREDIT' THEN le.amount
+			     WHEN le.direction = 'DEBIT'  THEN -le.amount
+			END
+		), 0)
+		FROM ledger_entries le
+		JOIN accounts a ON a.id = le.account_id
+		WHERE a.user_id = $1
+		  AND a.type = 'LIABILITY'
+		  AND a.currency = 'USD'
+	`, userID).Scan(&balance)
+	return balance, err
+}
+
 // GetMerchantTransactionsPaginated returns paginated transactions for a merchant with total count.
 // Uses created_at as cursor for stable, performant pagination.
 // Also returns total count of all transactions (requires additional COUNT query).

@@ -13,6 +13,7 @@ func RegisterJWTRoutes(app *fiber.App, pool *pgxpool.Pool) {
 	internal := app.Group("/internal", auth.WorkosAuthMiddleware)
 
 	internal.Post("/users", auth.CreateUser(pool))
+	internal.Get("/balance", merchantHandlers.GetMerchantBalance(pool))
 	internal.Get("/transactions", merchantHandlers.GetMerchantTransactions(pool))
 	internal.Post("/merchants", adminHandlers.CreateMerchantAPIKey(pool))
 

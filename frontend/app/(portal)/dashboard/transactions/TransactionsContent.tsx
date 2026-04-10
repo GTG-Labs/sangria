@@ -31,6 +31,7 @@ export default function TransactionsContent() {
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [total, setTotal] = useState<number | null>(null);
+  const [balance, setBalance] = useState<number | null>(null);
 
   const fetchTransactions = async (cursor?: string) => {
     const isInitialLoad = !cursor;
@@ -76,9 +77,30 @@ export default function TransactionsContent() {
     }
   };
 
+  const fetchBalance = async () => {
+    try {
+      const response = await fetch("/api/backend/balance");
+      if (response.ok) {
+        const data = await response.json();
+        setBalance(data.balance);
+      }
+    } catch (err) {
+      console.error("Failed to load balance:", err);
+    }
+  };
+
   useEffect(() => {
+    fetchBalance();
     fetchTransactions();
   }, []);
+
+  const formatBalance = (microunits: number) => {
+    const whole = Math.floor(microunits / 1_000_000);
+    const frac = microunits % 1_000_000;
+    // Full 6-digit fractional part, then trim trailing zeros, keep at least 2
+    const fracStr = frac.toString().padStart(6, "0").replace(/0+$/, "").padEnd(2, "0");
+    return `${whole.toLocaleString("en-US")}.${fracStr}`;
+  };
 
   const formatAmount = (microunits: number, currency: string) => {
     const whole = Math.floor(microunits / 1_000_000);
@@ -121,12 +143,15 @@ export default function TransactionsContent() {
   return (
     <div className="mx-auto max-w-6xl">
       <div className="mb-8">
-        <h1 className="text-2xl sm:text-4xl font-semibold tracking-tight text-gray-900">
-          Overview
-        </h1>
-        <p className="mt-2 text-gray-500">
-          View your payment transaction history.
-        </p>
+        <p className="text-sm font-medium text-gray-500">Balance</p>
+        {balance !== null ? (
+          <p className="mt-1 text-4xl sm:text-5xl font-semibold tracking-tight text-gray-900">
+            ${formatBalance(balance)}
+            <span className="ml-2 text-lg font-normal text-gray-400">USD</span>
+          </p>
+        ) : (
+          <div className="mt-1 h-12 w-48 animate-pulse rounded-lg bg-gray-200" />
+        )}
       </div>
 
       {error && (
