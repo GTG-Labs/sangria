@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 
-import { withAuth, getSignInUrl } from "@workos-inc/authkit-nextjs";
+import { getCachedAuth, getCachedSignInUrl } from "@/lib/auth";
 import ScrollNav from "./ScrollNav";
 import ArcadeButton from "./ArcadeButton";
 import MobileMenu from "./MobileMenu";
@@ -9,8 +9,8 @@ import NavLinks from "./NavLinks";
 
 export default async function Navigation() {
   const [{ user }, signInUrl] = await Promise.all([
-    withAuth(),
-    getSignInUrl(),
+    getCachedAuth(),
+    getCachedSignInUrl(),
   ]);
 
   return (

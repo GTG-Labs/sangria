@@ -1,11 +1,11 @@
 import Image from "next/image";
 import ArcadeButton from "@/components/ArcadeButton";
-import { withAuth, getSignInUrl } from "@workos-inc/authkit-nextjs";
+import { getCachedAuth, getCachedSignInUrl } from "@/lib/auth";
 
 export default async function Home() {
   const [{ user }, signInUrl] = await Promise.all([
-    withAuth(),
-    getSignInUrl(),
+    getCachedAuth(),
+    getCachedSignInUrl(),
   ]);
 
   return (
