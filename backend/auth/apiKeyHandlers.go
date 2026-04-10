@@ -2,7 +2,7 @@ package auth
 
 import (
 	"errors"
-	"log"
+	"log/slog"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -15,7 +15,7 @@ func ListAPIKeys(pool *pgxpool.Pool) fiber.Handler {
 
 		apiKeys, err := GetAPIKeysByUserID(c.Context(), pool, user.ID)
 		if err != nil {
-			log.Printf("Failed to get API keys for user %s: %v", user.ID, err)
+			slog.Error("list API keys: query failed", "user_id", user.ID, "error", err)
 			return c.Status(500).JSON(fiber.Map{"error": "Failed to retrieve API keys"})
 		}
 
@@ -43,7 +43,7 @@ func DeleteAPIKey(pool *pgxpool.Pool) fiber.Handler {
 			if errors.Is(err, ErrAPIKeyNotFound) {
 				return c.Status(404).JSON(fiber.Map{"error": "API key not found or not owned by user"})
 			}
-			log.Printf("Failed to revoke API key %s for user %s: %v", keyID, user.ID, err)
+			slog.Error("revoke API key: failed", "key_id", keyID, "user_id", user.ID, "error", err)
 			return c.Status(500).JSON(fiber.Map{"error": "failed to revoke API key"})
 		}
 

@@ -1,7 +1,7 @@
 package utils
 
 import (
-	"log"
+	"log/slog"
 	"os"
 	"slices"
 	"strings"
@@ -13,7 +13,7 @@ import (
 func GetAllowedOrigins() []string {
 	allowedOriginsEnv := os.Getenv("ALLOWED_ORIGINS")
 	if allowedOriginsEnv == "" {
-		log.Println("Warning: ALLOWED_ORIGINS not set, defaulting to localhost:3000")
+		slog.Warn("ALLOWED_ORIGINS not set, defaulting to localhost:3000")
 		return []string{"http://localhost:3000"}
 	}
 

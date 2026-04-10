@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	dbengine "sangria/backend/dbEngine"
@@ -151,7 +151,7 @@ func AuthenticateAPIKey(ctx context.Context, pool *pgxpool.Pool, providedKey str
 		if VerifyAPIKey(providedKey, merchant.APIKey) {
 			// Update last used timestamp — log but don't fail authentication
 			if err := dbengine.UpdateMerchantLastUsedAt(ctx, pool, merchant.ID); err != nil {
-				log.Printf("failed to update last_used_at for merchant %s: %v", merchant.ID, err)
+				slog.Warn("failed to update last_used_at", "merchant_id", merchant.ID, "error", err)
 			}
 
 			return &merchant, nil

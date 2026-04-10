@@ -2,7 +2,7 @@ package adminHandlers
 
 import (
 	"errors"
-	"log"
+	"log/slog"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -31,14 +31,14 @@ func CreateMerchantAPIKey(pool *pgxpool.Pool) fiber.Handler {
 
 		// Ensure the user exists in the database first
 		if _, err := dbengine.UpsertUser(c.Context(), pool, "Admin Created", user.ID); err != nil {
-			log.Printf("upsert user: %v", err)
+			slog.Error("upsert user", "user_id", user.ID, "error", err)
 			return c.Status(500).JSON(fiber.Map{"error": "failed to create user"})
 		}
 
 		// Ensure the user has a USDC LIABILITY account before creating the API key,
 		// so we don't end up with an active key but no liability account.
 		if _, err := dbengine.EnsureUSDLiabilityAccount(c.Context(), pool, user.ID); err != nil {
-			log.Printf("ensure usdc liability account: %v", err)
+			slog.Error("ensure USD liability account", "user_id", user.ID, "error", err)
 			return c.Status(500).JSON(fiber.Map{"error": "failed to create liability account"})
 		}
 
@@ -47,7 +47,7 @@ func CreateMerchantAPIKey(pool *pgxpool.Pool) fiber.Handler {
 			if errors.Is(err, auth.ErrMaxAPIKeysReached) {
 				return c.Status(400).JSON(fiber.Map{"error": "maximum number of API keys reached (10)"})
 			}
-			log.Printf("create merchant api key: %v", err)
+			slog.Error("create merchant API key", "user_id", user.ID, "error", err)
 			return c.Status(500).JSON(fiber.Map{"error": "failed to create merchant"})
 		}
 

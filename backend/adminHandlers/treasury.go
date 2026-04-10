@@ -2,7 +2,7 @@ package adminHandlers
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"math"
 
 	"github.com/gofiber/fiber/v3"
@@ -46,13 +46,13 @@ func FundTreasury(pool *pgxpool.Pool) fiber.Handler {
 		// Look up system accounts.
 		merchantPool, err := dbengine.GetSystemAccount(c.Context(), pool, dbengine.SystemAccountUSDMerchantPool, dbengine.USD)
 		if err != nil {
-			log.Printf("get USD merchant pool account: %v", err)
+			slog.Error("get USD merchant pool account", "error", err)
 			return c.Status(500).JSON(fiber.Map{"error": "system account not found"})
 		}
 
 		ownerEquity, err := dbengine.GetSystemAccount(c.Context(), pool, dbengine.SystemAccountOwnerEquity, dbengine.USD)
 		if err != nil {
-			log.Printf("get owner equity account: %v", err)
+			slog.Error("get owner equity account", "error", err)
 			return c.Status(500).JSON(fiber.Map{"error": "system account not found"})
 		}
 
@@ -64,11 +64,11 @@ func FundTreasury(pool *pgxpool.Pool) fiber.Handler {
 			{Currency: dbengine.USD, Amount: amountMicro, Direction: dbengine.Credit, AccountID: ownerEquity.ID},
 		})
 		if err != nil {
-			log.Printf("insert treasury funding transaction: %v", err)
+			slog.Error("insert treasury funding transaction", "idempotency_key", idempotencyKey, "error", err)
 			return c.Status(500).JSON(fiber.Map{"error": "failed to record funding"})
 		}
 
-		log.Printf("treasury funded: $%.2f (%d microunits) key=%s note=%q", req.Amount, amountMicro, idempotencyKey, req.Note)
+		slog.Info("treasury funded", "amount_micro", amountMicro, "idempotency_key", idempotencyKey)
 
 		return c.Status(201).JSON(fiber.Map{
 			"success":        true,

@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"sync"
@@ -119,9 +119,9 @@ func VerifyWorkOSToken(ctx context.Context, tokenStr string) (string, error) {
 		if errors.Is(err, jwt.ErrTokenExpired()) {
 			return "", fmt.Errorf("token expired, please refresh your session")
 		}
-		// Debug: log actual issuer vs expected for troubleshooting
+		// Log actual issuer vs expected to aid troubleshooting.
 		if actualIssuer, ok := token.Get("iss"); ok {
-			log.Printf("JWT issuer mismatch - expected: %s, actual: %s", expectedIssuer, actualIssuer)
+			slog.Warn("JWT issuer mismatch", "expected", expectedIssuer, "actual", actualIssuer)
 		}
 		return "", fmt.Errorf("token claim validation failed: %w", err)
 	}
@@ -146,7 +146,7 @@ func CreateUser(pool *pgxpool.Pool) fiber.Handler {
 		user := c.Locals("workos_user").(WorkOSUser)
 
 		if user.ID == "" {
-			log.Printf("CreateUser received session without WorkOS ID")
+			slog.Error("CreateUser: session missing WorkOS ID")
 			return c.Status(500).JSON(fiber.Map{"error": "Invalid user session"})
 		}
 
@@ -157,7 +157,7 @@ func CreateUser(pool *pgxpool.Pool) fiber.Handler {
 
 		u, err := dbengine.UpsertUser(c.Context(), pool, owner, user.ID)
 		if err != nil {
-			log.Printf("upsert user error: %v", err)
+			slog.Error("upsert user", "error", err)
 			return c.Status(500).JSON(fiber.Map{"error": "failed to create user"})
 		}
 

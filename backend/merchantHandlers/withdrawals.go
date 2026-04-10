@@ -2,7 +2,7 @@ package merchantHandlers
 
 import (
 	"errors"
-	"log"
+	"log/slog"
 	"math"
 
 	"github.com/gofiber/fiber/v3"
@@ -44,7 +44,7 @@ func RequestWithdrawal(pool *pgxpool.Pool) fiber.Handler {
 			if errors.Is(err, dbengine.ErrMerchantNotFound) {
 				return c.Status(404).JSON(fiber.Map{"error": "merchant not found"})
 			}
-			log.Printf("get merchant %s: %v", req.MerchantID, err)
+			slog.Error("get merchant", "merchant_id", req.MerchantID, "error", err)
 			return c.Status(500).JSON(fiber.Map{"error": "failed to look up merchant"})
 		}
 		if merchant.UserID != user.ID {
@@ -79,7 +79,7 @@ func RequestWithdrawal(pool *pgxpool.Pool) fiber.Handler {
 			if errors.Is(err, dbengine.ErrInsufficientBalance) {
 				return c.Status(400).JSON(fiber.Map{"error": "insufficient balance"})
 			}
-			log.Printf("create withdrawal: %v", err)
+			slog.Error("create withdrawal", "merchant_id", merchant.ID, "error", err)
 			return c.Status(500).JSON(fiber.Map{"error": "failed to create withdrawal"})
 		}
 
@@ -111,7 +111,7 @@ func ListWithdrawals(pool *pgxpool.Pool) fiber.Handler {
 			if errors.Is(err, dbengine.ErrMerchantNotFound) {
 				return c.Status(404).JSON(fiber.Map{"error": "merchant not found"})
 			}
-			log.Printf("get merchant %s: %v", merchantID, err)
+			slog.Error("get merchant", "merchant_id", merchantID, "error", err)
 			return c.Status(500).JSON(fiber.Map{"error": "failed to look up merchant"})
 		}
 		if merchant.UserID != user.ID {
@@ -120,7 +120,7 @@ func ListWithdrawals(pool *pgxpool.Pool) fiber.Handler {
 
 		withdrawals, err := dbengine.ListWithdrawalsByMerchant(c.Context(), pool, merchant.ID)
 		if err != nil {
-			log.Printf("list withdrawals: %v", err)
+			slog.Error("list withdrawals", "merchant_id", merchant.ID, "error", err)
 			return c.Status(500).JSON(fiber.Map{"error": "failed to list withdrawals"})
 		}
 

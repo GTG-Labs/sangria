@@ -5,7 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"log"
+	"log/slog"
 	"math"
 	"strconv"
 
@@ -48,9 +48,11 @@ func GeneratePayment(pool *pgxpool.Pool) fiber.Handler {
 
 		wallet, err := dbengine.GetWalletByNetwork(c.Context(), pool, dbengine.Network(network))
 		if err != nil {
-			log.Printf("get wallet by network: %v", err)
+			slog.Error("get wallet by network", "network", network, "error", err)
 			return c.Status(500).JSON(fiber.Map{"error": "no wallet available for this network"})
 		}
+
+		slog.Info("generate payment: terms issued", "network", netConfig.CAIP2, "amount_micro", amountMicro)
 
 		return c.Status(200).JSON(fiber.Map{
 			"x402Version": 2,
@@ -137,7 +139,7 @@ func SettlePayment(pool *pgxpool.Pool) fiber.Handler {
 			if errors.Is(err, dbengine.ErrWalletNotFound) {
 				return c.Status(400).JSON(fiber.Map{"error": "recipient address not recognized"})
 			}
-			log.Printf("get wallet by address: %v", err)
+			slog.Error("get wallet by address", "to_address", toAddress, "error", err)
 			return c.Status(500).JSON(fiber.Map{"error": "failed to look up wallet"})
 		}
 
@@ -167,25 +169,25 @@ func SettlePayment(pool *pgxpool.Pool) fiber.Handler {
 		// This ensures we fail fast on missing accounts rather than after an on-chain settlement.
 		merchantAcct, err := dbengine.GetMerchantUSDLiabilityAccount(c.Context(), pool, merchant.ID)
 		if err != nil {
-			log.Printf("get merchant liability account: %v", err)
+			slog.Error("get merchant liability account", "merchant_id", merchant.ID, "error", err)
 			return c.Status(500).JSON(fiber.Map{"error": "failed to look up merchant account"})
 		}
 
 		convClearingUSDC, err := dbengine.GetSystemAccount(c.Context(), pool, dbengine.SystemAccountConversionClearing, dbengine.USDC)
 		if err != nil {
-			log.Printf("get conversion clearing (USDC): %v", err)
+			slog.Error("get conversion clearing account", "currency", "USDC", "error", err)
 			return c.Status(500).JSON(fiber.Map{"error": "system account not found"})
 		}
 
 		convClearingUSD, err := dbengine.GetSystemAccount(c.Context(), pool, dbengine.SystemAccountConversionClearing, dbengine.USD)
 		if err != nil {
-			log.Printf("get conversion clearing (USD): %v", err)
+			slog.Error("get conversion clearing account", "currency", "USD", "error", err)
 			return c.Status(500).JSON(fiber.Map{"error": "system account not found"})
 		}
 
 		revenueAcct, err := dbengine.GetSystemAccount(c.Context(), pool, dbengine.SystemAccountPlatformFeeRevenue, dbengine.USD)
 		if err != nil {
-			log.Printf("get platform fee revenue account: %v", err)
+			slog.Error("get platform fee revenue account", "error", err)
 			return c.Status(500).JSON(fiber.Map{"error": "system account not found"})
 		}
 
@@ -193,23 +195,20 @@ func SettlePayment(pool *pgxpool.Pool) fiber.Handler {
 		fee := config.PlatformFee.CalculateFee(amount)
 		merchantAmount := amount - fee
 
-		log.Println("")
-		log.Println("════════════════════════════════════════")
-		log.Println("  SETTLE PAYMENT FLOW")
-		log.Println("════════════════════════════════════════")
-		log.Printf("  payer:   %s", envelope.Payload.Authorization.From)
-		log.Printf("  to:      %s", toAddress)
-		log.Printf("  amount:  %s (micro USDC)", valueStr)
-		log.Printf("  fee:     %d (micro USD)", fee)
-		log.Printf("  network: %s", netConfig.CAIP2)
-		log.Println("────────────────────────────────────────")
+		// Attach stable fields to a child logger for the entire settle flow.
+		// Payer address is intentionally omitted to avoid building a correlation record.
+		logger := slog.With(
+			"merchant_id", merchant.ID,
+			"network", netConfig.CAIP2,
+			"amount_micro", amount,
+			"fee_micro", fee,
+		)
 
 		// Step 1: Verify
-		log.Println("  [1/2] Calling facilitator /verify ...")
+		logger.Info("settle payment: calling verify")
 		verifyResp, err := x402Handlers.Verify(c.Context(), payload, canonicalRequirements)
 		if err != nil {
-			log.Printf("  [1/2] VERIFY FAILED (error): %v", err)
-			log.Println("════════════════════════════════════════")
+			logger.Error("settle payment: verify error", "error", err)
 			return c.Status(502).JSON(fiber.Map{
 				"success":       false,
 				"error_reason":  "verify_failed",
@@ -217,22 +216,22 @@ func SettlePayment(pool *pgxpool.Pool) fiber.Handler {
 			})
 		}
 		if !verifyResp.IsValid {
-			log.Printf("  [1/2] VERIFY FAILED (invalid): reason=%s message=%s", verifyResp.InvalidReason, verifyResp.InvalidMessage)
-			log.Println("════════════════════════════════════════")
+			logger.Warn("settle payment: verify rejected",
+				"reason", verifyResp.InvalidReason,
+				"message", verifyResp.InvalidMessage)
 			return c.Status(400).JSON(fiber.Map{
 				"success":       false,
 				"error_reason":  verifyResp.InvalidReason,
 				"error_message": verifyResp.InvalidMessage,
 			})
 		}
-		log.Printf("  [1/2] VERIFY SUCCEEDED — payer: %s", verifyResp.Payer)
+		logger.Info("settle payment: verify ok")
 
 		// Step 2: Settle
-		log.Println("  [2/2] Calling facilitator /settle ...")
+		logger.Info("settle payment: calling settle")
 		settleResp, err := x402Handlers.Settle(c.Context(), payload, canonicalRequirements)
 		if err != nil {
-			log.Printf("  [2/2] SETTLE FAILED (error): %v", err)
-			log.Println("════════════════════════════════════════")
+			logger.Error("settle payment: settle error", "error", err)
 			return c.Status(502).JSON(fiber.Map{
 				"success":       false,
 				"error_reason":  "settle_failed",
@@ -240,16 +239,16 @@ func SettlePayment(pool *pgxpool.Pool) fiber.Handler {
 			})
 		}
 		if !settleResp.Success {
-			log.Printf("  [2/2] SETTLE FAILED (rejected): reason=%s message=%s", settleResp.ErrorReason, settleResp.ErrorMessage)
-			log.Println("════════════════════════════════════════")
+			logger.Warn("settle payment: settle rejected",
+				"reason", settleResp.ErrorReason,
+				"message", settleResp.ErrorMessage)
 			return c.Status(400).JSON(fiber.Map{
 				"success":       false,
 				"error_reason":  settleResp.ErrorReason,
 				"error_message": settleResp.ErrorMessage,
 			})
 		}
-		log.Printf("  [2/2] SETTLE SUCCEEDED — tx: %s", settleResp.Transaction)
-		log.Println("════════════════════════════════════════")
+		logger.Info("settle payment: complete", "tx", settleResp.Transaction)
 
 		// Write cross-currency double-entry ledger using the tx hash as idempotency key.
 		// All account lookups and fee calculation were done above (before facilitator calls)
@@ -270,7 +269,7 @@ func SettlePayment(pool *pgxpool.Pool) fiber.Handler {
 
 		_, err = dbengine.InsertTransaction(c.Context(), pool, settleResp.Transaction, lines)
 		if err != nil {
-			log.Printf("insert ledger transaction: %v", err)
+			logger.Error("insert ledger transaction", "tx", settleResp.Transaction, "error", err)
 			return c.Status(500).JSON(fiber.Map{"error": "failed to create ledger entry"})
 		}
 

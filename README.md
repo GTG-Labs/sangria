@@ -1,5 +1,5 @@
 <p align="center">
-  <img width="3168" height="1019" alt="Sangria_GH_Banner" src="https://github.com/user-attachments/assets/d756eeb8-c0b9-4f4c-802a-21a0331e2003" />
+  <img alt="Sangria" src="frontend/public/sangria_centered.png" />
 </p>
 
 <p align="center">

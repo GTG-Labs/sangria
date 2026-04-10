@@ -1,7 +1,7 @@
 package adminHandlers
 
 import (
-	"log"
+	"log/slog"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -30,7 +30,7 @@ func CreateWalletPool(pool *pgxpool.Pool) fiber.Handler {
 		// Create CDP EVM account on-chain.
 		address, err := cdpHandlers.CreateEvmAccount(c.Context())
 		if err != nil {
-			log.Printf("create evm account: %v", err)
+			slog.Error("create EVM account", "network", req.Network, "error", err)
 			return c.Status(500).JSON(fiber.Map{"error": "failed to create wallet"})
 		}
 
@@ -41,14 +41,13 @@ func CreateWalletPool(pool *pgxpool.Pool) fiber.Handler {
 			"Hot Wallet USDC - "+address[:10],
 		)
 		if err != nil {
-			log.Printf("create crypto wallet with account: %v", err)
+			slog.Error("create crypto wallet with account", "network", req.Network, "error", err)
 			return c.Status(500).JSON(fiber.Map{"error": "failed to create wallet record"})
 		}
 
 		// Fund with testnet ETH for gas — best-effort after DB records exist.
 		if err := cdpHandlers.FundETH(c.Context(), address, req.Network); err != nil {
-			log.Printf("fund eth: %v", err)
-			// Non-fatal — wallet is created, can be funded later.
+			slog.Warn("fund ETH: non-fatal, wallet can be funded later", "network", req.Network, "error", err)
 		}
 
 		return c.Status(201).JSON(fiber.Map{
