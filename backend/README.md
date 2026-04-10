@@ -173,7 +173,7 @@ backend/
 The TypeScript Drizzle schema (`dbSchema/schema.ts`) is the source of truth.
 
 1. Edit `dbSchema/schema.ts`
-2. Push with `pnpm push` (from `dbSchema/`)
+2. Push with `pnpm push:dev` or `pnpm push:prd` (from `dbSchema/`)
 3. Update Go structs in `dbEngine/models.go`
 4. Add DB operations in the appropriate `dbEngine/*.go` file
 5. Add handlers in the appropriate `*Handlers/` package

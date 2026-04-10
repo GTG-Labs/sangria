@@ -3,9 +3,13 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "push": "drizzle-kit push",
-    "generate": "drizzle-kit generate",
-    "studio": "drizzle-kit studio"
+    "push": "dotenv -e .env.dev -- drizzle-kit push",
+    "push:dev": "dotenv -e .env.dev -- drizzle-kit push",
+    "push:prd": "dotenv -e .env.prd -- drizzle-kit push",
+    "generate": "dotenv -e .env.dev -- drizzle-kit generate",
+    "studio": "dotenv -e .env.dev -- drizzle-kit studio",
+    "studio:dev": "dotenv -e .env.dev -- drizzle-kit studio",
+    "studio:prd": "dotenv -e .env.prd -- drizzle-kit studio"
   },
   "dependencies": {
     "drizzle-orm": "^0.39.0",
@@ -14,6 +18,7 @@
   "devDependencies": {
     "@types/node": "^22.0.0",
     "dotenv": "^17.3.1",
+    "dotenv-cli": "^11.0.0",
     "drizzle-kit": "^0.31.10",
     "typescript": "^5.7.0"
   }

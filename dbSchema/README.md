@@ -14,24 +14,31 @@ The Go backend does **not** run migrations — it expects these tables to alread
 
 ```bash
 pnpm install
-cp .env.example .env   # fill in your DATABASE_URL
 ```
 
-### Environment variables
+Create `.env.dev` and `.env.prd` with your PlanetScale connection strings (see `.env.example` for format):
 
-| Variable | Description |
-|---|---|
-| `DATABASE_URL` | Postgres connection string. Uses `sslmode=require` (see [SSL note](#ssl-note) below). |
+```bash
+# .env.dev
+DATABASE_URL=postgres://user:pass@dev-host:5432/dbname?sslmode=require
+
+# .env.prd
+DATABASE_URL=postgres://user:pass@prd-host:5432/dbname?sslmode=require
+```
 
 ## Commands
 
 | Command | What it does |
 |---|---|
-| `pnpm push` | Apply the current schema to the database (creates/alters tables) |
+| `pnpm push` | Push schema to **dev** (default) |
+| `pnpm push:dev` | Push schema to dev |
+| `pnpm push:prd` | Push schema to prod |
 | `pnpm generate` | Generate migration SQL files (saved to `./drizzle/`) |
-| `pnpm studio` | Open Drizzle Studio — a visual browser for your database |
+| `pnpm studio` | Open Drizzle Studio for **dev** (default) |
+| `pnpm studio:dev` | Open Drizzle Studio for dev |
+| `pnpm studio:prd` | Open Drizzle Studio for prod |
 
-`pnpm push` is the main command you'll use during development. It compares `schema.ts` against the live database and applies any differences.
+`pnpm push` compares `schema.ts` against the live database and applies any differences. It defaults to the dev environment.
 
 ## Current schema
 
@@ -143,7 +150,7 @@ Constraints: `UNIQUE(address, network)`, `UNIQUE(account_id)`
 ## Updating the schema
 
 1. Edit `schema.ts` — add/modify tables using [Drizzle's column types](https://orm.drizzle.team/docs/column-types/pg)
-2. Run `pnpm push` to apply changes to the database
+2. Run `pnpm push:dev` to apply changes to dev, `pnpm push:prd` for prod
 3. Update the Go structs in `backend/dbEngine/models.go` to match
 4. Wire up DB operations and handlers as needed
 
