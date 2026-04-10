@@ -306,6 +306,10 @@ class W {
       this.positionData[idx] = MathUtils.randFloatSpread(2 * config.maxX);
       this.positionData[idx + 1] = MathUtils.randFloatSpread(2 * config.maxY);
       this.positionData[idx + 2] = MathUtils.randFloatSpread(2 * config.maxZ);
+      // Initial random velocity so balls start drifting
+      this.velocityData[idx] = MathUtils.randFloatSpread(config.maxVelocity * 0.5);
+      this.velocityData[idx + 1] = MathUtils.randFloatSpread(config.maxVelocity * 0.5);
+      this.velocityData[idx + 2] = MathUtils.randFloatSpread(config.maxVelocity * 0.2);
     }
     this.setSizes();
   }
@@ -331,6 +335,12 @@ class W {
       const pos = new Vector3().fromArray(positionData, base);
       const vel = new Vector3().fromArray(velocityData, base);
       vel.y -= deltaInfo.delta * config.gravity * sizeData[idx];
+      // Brownian motion — tiny random nudge each frame
+      if (config.brownianMotion > 0) {
+        vel.x += MathUtils.randFloatSpread(config.brownianMotion);
+        vel.y += MathUtils.randFloatSpread(config.brownianMotion);
+        vel.z += MathUtils.randFloatSpread(config.brownianMotion * 0.3);
+      }
       // Center repulsion
       if (config.centerRepelRadius > 0) {
         const dx = pos.x;
@@ -482,7 +492,8 @@ const DefaultConfig = {
   controlSphere0: false,
   followCursor: true,
   centerRepelRadius: 0,
-  centerRepelStrength: 0
+  centerRepelStrength: 0,
+  brownianMotion: 0
 };
 
 const DummyObj = new Object3D();

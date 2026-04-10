@@ -25,6 +25,7 @@ export default function BlogHeader() {
           friction={1}
           wallBounce={1}
           maxVelocity={0.03}
+          brownianMotion={0.0004}
           centerRepelRadius={3.5}
           centerRepelStrength={0.003}
           followCursor={false}
