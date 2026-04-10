@@ -1,0 +1,290 @@
+name: PR Tests
+
+on:
+  pull_request:
+    branches: [ main ]
+    types: [ opened, synchronize, reopened ]
+
+env:
+  NODE_VERSION: '18'
+  PYTHON_VERSION: '3.10'
+
+jobs:
+  test-python-sdk:
+    name: Test Python SDK
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
+        cache-dependency-path: 'tests/requirements.txt'
+
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r tests/requirements.txt
+
+    - name: Install Python SDK dependencies
+      run: |
+        cd sdk/python
+        pip install -e .
+
+    - name: Run Python SDK unit tests
+      run: |
+        python -m pytest tests/python/unit/ -v --tb=short --junitxml=test-results-python-unit.xml
+
+    - name: Run Python SDK integration tests
+      run: |
+        python -m pytest tests/python/integration/ -v --tb=short --junitxml=test-results-python-integration.xml
+
+    - name: Python code formatting check
+      run: |
+        python -m black --check tests/python/ sdk/python/src/
+
+    - name: Python linting
+      run: |
+        flake8 tests/python/ sdk/python/src/
+
+    - name: Python type checking
+      run: |
+        mypy sdk/python/src/sangria_sdk/
+      continue-on-error: true  # Allow mypy warnings for now
+
+    - name: Upload Python test results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: python-test-results
+        path: test-results-python-*.xml
+
+  test-typescript-sdk:
+    name: Test TypeScript SDK
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: 'tests/package-lock.json'
+
+    - name: Install test dependencies
+      run: |
+        cd tests
+        npm ci
+
+    - name: Install TypeScript SDK dependencies
+      run: |
+        cd sdk/sdk-typescript
+        npm ci
+
+    - name: Build TypeScript SDK
+      run: |
+        cd sdk/sdk-typescript
+        npm run build
+
+    - name: Run TypeScript SDK unit tests
+      run: |
+        cd tests
+        npm run test:typescript:unit -- --reporter=junit --outputFile=../test-results-typescript-unit.xml
+
+    - name: Run TypeScript SDK integration tests
+      run: |
+        cd tests
+        npm run test:typescript:integration -- --reporter=junit --outputFile=../test-results-typescript-integration.xml
+
+    - name: TypeScript linting
+      run: |
+        cd tests
+        npm run lint:ts
+
+    - name: TypeScript type checking
+      run: |
+        cd sdk/sdk-typescript
+        npx tsc --noEmit
+
+    - name: Upload TypeScript test results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: typescript-test-results
+        path: test-results-typescript-*.xml
+
+  test-integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: [test-python-sdk, test-typescript-sdk]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+
+    - name: Install all dependencies
+      run: |
+        # Python dependencies
+        python -m pip install --upgrade pip
+        pip install -r tests/requirements.txt
+        cd sdk/python && pip install -e . && cd ../..
+
+        # TypeScript dependencies
+        cd tests && npm ci && cd ..
+        cd sdk/sdk-typescript && npm ci && cd ../..
+
+    - name: Run comprehensive test suite
+      run: |
+        cd tests
+        ./run-all-tests.sh
+
+    - name: Generate test coverage report
+      run: |
+        cd tests
+        npm run test:coverage -- --reporter=json --outputFile=../coverage-report.json
+
+    - name: Upload coverage report
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: coverage-report
+        path: coverage-report.json
+
+  build-verification:
+    name: Build Verification
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [18, 20]
+        python-version: ['3.10', '3.11']
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Set up Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+
+    - name: Test Python SDK installation
+      run: |
+        cd sdk/python
+        python -m pip install -e .
+        python -c "import sangria_sdk; from sangria_sdk import SangriaMerchantClient; print('✅ Python SDK import successful')"
+
+    - name: Test TypeScript SDK build
+      run: |
+        cd sdk/sdk-typescript
+        npm ci
+        npm run build
+        echo "✅ TypeScript SDK build successful"
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+
+    - name: Upload Trivy scan results
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+  pr-summary:
+    name: PR Summary
+    runs-on: ubuntu-latest
+    needs: [test-python-sdk, test-typescript-sdk, test-integration, build-verification]
+    if: always()
+
+    steps:
+    - name: Download test artifacts
+      uses: actions/download-artifact@v3
+      with:
+        path: test-results/
+
+    - name: Generate PR summary
+      run: |
+        echo "## 🧪 Test Results Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+
+        # Check job statuses
+        python_status="${{ needs.test-python-sdk.result }}"
+        typescript_status="${{ needs.test-typescript-sdk.result }}"
+        integration_status="${{ needs.test-integration.result }}"
+        build_status="${{ needs.build-verification.result }}"
+
+        echo "| Test Suite | Status |" >> $GITHUB_STEP_SUMMARY
+        echo "|------------|--------|" >> $GITHUB_STEP_SUMMARY
+
+        if [ "$python_status" == "success" ]; then
+          echo "| Python SDK | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "| Python SDK | ❌ Failed |" >> $GITHUB_STEP_SUMMARY
+        fi
+
+        if [ "$typescript_status" == "success" ]; then
+          echo "| TypeScript SDK | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "| TypeScript SDK | ❌ Failed |" >> $GITHUB_STEP_SUMMARY
+        fi
+
+        if [ "$integration_status" == "success" ]; then
+          echo "| Integration Tests | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "| Integration Tests | ❌ Failed |" >> $GITHUB_STEP_SUMMARY
+        fi
+
+        if [ "$build_status" == "success" ]; then
+          echo "| Build Verification | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "| Build Verification | ❌ Failed |" >> $GITHUB_STEP_SUMMARY
+        fi
+
+        echo "" >> $GITHUB_STEP_SUMMARY
+
+        # Overall status
+        if [ "$python_status" == "success" ] && [ "$typescript_status" == "success" ] && [ "$integration_status" == "success" ] && [ "$build_status" == "success" ]; then
+          echo "### 🎉 All tests passed! This PR is ready for review." >> $GITHUB_STEP_SUMMARY
+        else
+          echo "### ❌ Some tests failed. Please review and fix the issues above." >> $GITHUB_STEP_SUMMARY
+        fi
+
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Tested SDKs:**" >> $GITHUB_STEP_SUMMARY
+        echo "- 🐍 Python Merchant SDK" >> $GITHUB_STEP_SUMMARY
+        echo "- 📜 TypeScript Core SDK (Express, Hono, Fastify adapters)" >> $GITHUB_STEP_SUMMARY

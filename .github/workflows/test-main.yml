@@ -1,0 +1,200 @@
+name: Main Branch Tests
+
+on:
+  push:
+    branches: [ main ]
+  schedule:
+    # Run tests daily at 6 AM UTC to catch any dependency issues
+    - cron: '0 6 * * *'
+
+env:
+  NODE_VERSION: '18'
+  PYTHON_VERSION: '3.10'
+
+jobs:
+  comprehensive-test:
+    name: Comprehensive Test Suite
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        cache: 'pip'
+        cache-dependency-path: 'tests/requirements.txt'
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: 'tests/package-lock.json'
+
+    - name: Install all dependencies
+      run: |
+        # Python dependencies
+        python -m pip install --upgrade pip
+        pip install -r tests/requirements.txt
+        cd sdk/python && pip install -e . && cd ../..
+
+        # TypeScript dependencies
+        cd tests && npm ci && cd ..
+        cd sdk/sdk-typescript && npm ci && cd ../..
+
+    - name: Run comprehensive test suite
+      run: |
+        cd tests
+        ./run-all-tests.sh
+
+    - name: Generate detailed coverage report
+      run: |
+        cd tests
+        npm run test:coverage -- --reporter=html --outputFile=../coverage-report/
+
+        # Python coverage
+        cd ..
+        python -m pytest tests/python/ --cov=sdk/python/src --cov-report=html:python-coverage/ --cov-report=xml:python-coverage.xml
+
+    - name: Upload coverage reports
+      uses: actions/upload-artifact@v3
+      with:
+        name: coverage-reports
+        path: |
+          coverage-report/
+          python-coverage/
+          python-coverage.xml
+
+    - name: Notify on failure
+      if: failure()
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const { context, github } = require('@actions/github');
+
+          const issue = {
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            title: `🚨 Main Branch Test Failure - ${new Date().toISOString().split('T')[0]}`,
+            body: `## Test Failure Alert
+
+            The comprehensive test suite failed on the main branch.
+
+            **Details:**
+            - **Commit:** ${context.sha}
+            - **Run:** [${context.runNumber}](${context.payload.repository.html_url}/actions/runs/${context.runId})
+            - **Triggered by:** ${context.eventName}
+            - **Time:** ${new Date().toISOString()}
+
+            Please investigate and fix the failing tests as soon as possible.
+
+            /cc @${context.actor}`,
+            labels: ['bug', 'urgent', 'tests']
+          };
+
+          try {
+            const result = await github.rest.issues.create(issue);
+            console.log(`Created issue: ${result.data.html_url}`);
+          } catch (error) {
+            console.log(`Failed to create issue: ${error.message}`);
+          }
+
+  multi-platform-test:
+    name: Multi-Platform Tests
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ['3.10', '3.11']
+        node-version: [18, 20]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Set up Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r tests/requirements.txt
+
+    - name: Install Python SDK
+      run: |
+        cd sdk/python
+        pip install -e .
+
+    - name: Install TypeScript dependencies
+      run: |
+        cd tests && npm ci && cd ..
+        cd sdk/sdk-typescript && npm ci
+
+    - name: Build TypeScript SDK
+      run: |
+        cd sdk/sdk-typescript
+        npm run build
+
+    - name: Run Python tests
+      run: |
+        python -m pytest tests/python/ -v
+
+    - name: Run TypeScript tests
+      run: |
+        cd tests
+        npm run test:typescript
+
+  security-audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Install dependencies
+      run: |
+        cd tests && npm ci && cd ..
+        cd sdk/sdk-typescript && npm ci && cd ../..
+        pip install -r tests/requirements.txt
+
+    - name: Run npm audit
+      run: |
+        cd sdk/sdk-typescript
+        npm audit --audit-level=high
+
+    - name: Run Python security checks
+      run: |
+        pip install safety bandit
+        safety check -r tests/requirements.txt
+        bandit -r sdk/python/src/ -ll
+
+    - name: Run CodeQL Analysis
+      uses: github/codeql-action/init@v2
+      with:
+        languages: python, javascript
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v2

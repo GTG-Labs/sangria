@@ -1,0 +1,33 @@
+{
+  "name": "sangria-tests",
+  "version": "0.1.0",
+  "description": "Comprehensive test suite for Sangria SDKs",
+  "type": "module",
+  "scripts": {
+    "test": "npm run test:python && npm run test:typescript",
+    "test:python": "cd .. && python -m pytest tests/python/ -v",
+    "test:python:unit": "cd .. && python -m pytest tests/python/unit/ -v -m unit",
+    "test:python:integration": "cd .. && python -m pytest tests/python/integration/ -v -m integration",
+    "test:typescript": "vitest run",
+    "test:typescript:unit": "vitest run tests/typescript/unit/",
+    "test:typescript:integration": "vitest run tests/typescript/integration/",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "npm run lint:ts && npm run lint:py",
+    "lint:ts": "eslint tests/typescript/**/*.ts",
+    "lint:py": "cd .. && python -m flake8 tests/python/ && python -m mypy tests/python/",
+    "install:deps": "npm install && cd .. && pip install -r tests/requirements.txt"
+  },
+  "devDependencies": {
+    "@types/node": "^18.19.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.56.0",
+    "msw": "^2.2.0",
+    "typescript": "^5.3.0",
+    "vitest": "^1.2.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

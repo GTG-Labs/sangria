@@ -1,0 +1,152 @@
+#!/bin/bash
+
+# Sangria SDK Pre-Push Hook
+# Runs tests and linting before allowing push to remote repository
+
+set -e
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Function to print colored output
+print_status() {
+    local color=$1
+    local message=$2
+    echo -e "${color}${message}${NC}"
+}
+
+# Check if we're pushing to a protected branch
+protected_branch="refs/heads/main"
+current_branch=$(git rev-parse --abbrev-ref HEAD)
+
+print_status $BLUE "🔍 Pre-push hook running..."
+print_status $BLUE "Current branch: $current_branch"
+
+# Read stdin to get the list of refs being pushed
+while read local_ref local_sha remote_ref remote_sha; do
+    if [[ "$remote_ref" == "$protected_branch" ]]; then
+        print_status $YELLOW "🛡️  Pushing to protected branch 'main' - running full test suite..."
+
+        # Run the comprehensive test suite
+        cd tests/
+
+        print_status $BLUE "🧪 Running test suite..."
+        if ./run-all-tests.sh > /tmp/sangria-pre-push.log 2>&1; then
+            print_status $GREEN "✅ All tests passed!"
+        else
+            print_status $RED "❌ Tests failed! Push blocked."
+            print_status $RED "📋 Test output:"
+            cat /tmp/sangria-pre-push.log
+            exit 1
+        fi
+
+        cd ..
+
+        # Run linting checks
+        print_status $BLUE "🔍 Running linting checks..."
+
+        # TypeScript linting
+        if command -v pnpm >/dev/null 2>&1; then
+            if pnpm lint:ts > /tmp/sangria-lint-ts.log 2>&1; then
+                print_status $GREEN "✅ TypeScript linting passed"
+            else
+                print_status $RED "❌ TypeScript linting failed!"
+                cat /tmp/sangria-lint-ts.log
+                exit 1
+            fi
+        else
+            print_status $YELLOW "⚠️  pnpm not found, skipping TypeScript linting"
+        fi
+
+        # Python linting (if available)
+        if command -v python >/dev/null 2>&1; then
+            print_status $BLUE "Checking Python code formatting..."
+
+            # Check if black is available
+            if python -m black --check tests/python/ sdk/python/src/ > /tmp/sangria-lint-py.log 2>&1; then
+                print_status $GREEN "✅ Python formatting check passed"
+            else
+                print_status $RED "❌ Python formatting issues found!"
+                print_status $RED "Run: python -m black tests/python/ sdk/python/src/"
+                cat /tmp/sangria-lint-py.log
+                exit 1
+            fi
+
+            # Check if flake8 is available
+            if command -v flake8 >/dev/null 2>&1; then
+                if flake8 tests/python/ sdk/python/src/ > /tmp/sangria-flake8.log 2>&1; then
+                    print_status $GREEN "✅ Python style check passed"
+                else
+                    print_status $RED "❌ Python style issues found!"
+                    cat /tmp/sangria-flake8.log
+                    exit 1
+                fi
+            fi
+        fi
+
+        print_status $GREEN "🎉 All checks passed! Push allowed."
+        break
+    else
+        print_status $BLUE "📤 Pushing to branch: ${remote_ref#refs/heads/}"
+        print_status $YELLOW "⚡ Running quick validation checks..."
+
+        # For non-main branches, run a lighter check
+        # Check if any critical files are broken
+        if [[ -f "tests/run-all-tests.sh" ]]; then
+            print_status $BLUE "🔍 Validating test script..."
+            if bash -n tests/run-all-tests.sh; then
+                print_status $GREEN "✅ Test script validation passed"
+            else
+                print_status $RED "❌ Test script has syntax errors!"
+                exit 1
+            fi
+        fi
+
+        # Quick smoke test for SDK imports
+        if command -v python >/dev/null 2>&1; then
+            print_status $BLUE "🔍 Validating Python SDK imports..."
+            if python -c "
+import sys
+sys.path.insert(0, 'sdk/python/src')
+try:
+    import sangria_sdk
+    from sangria_sdk import SangriaMerchantClient
+    print('✅ Python SDK imports successful')
+except ImportError as e:
+    print(f'❌ Python SDK import failed: {e}')
+    sys.exit(1)
+" 2>/dev/null; then
+                print_status $GREEN "✅ Python SDK validation passed"
+            else
+                print_status $RED "❌ Python SDK validation failed!"
+                exit 1
+            fi
+        fi
+
+        if command -v node >/dev/null 2>&1; then
+            print_status $BLUE "🔍 Validating TypeScript SDK..."
+            cd sdk/sdk-typescript
+            if npm run build > /tmp/sangria-ts-build.log 2>&1; then
+                print_status $GREEN "✅ TypeScript SDK build successful"
+            else
+                print_status $RED "❌ TypeScript SDK build failed!"
+                cat /tmp/sangria-ts-build.log
+                exit 1
+            fi
+            cd ../..
+        fi
+
+        print_status $GREEN "✅ Quick validation passed! Push allowed."
+    fi
+done
+
+print_status $GREEN "🚀 Pre-push hook completed successfully!"
+
+# Clean up temporary files
+rm -f /tmp/sangria-pre-push.log /tmp/sangria-lint-ts.log /tmp/sangria-lint-py.log /tmp/sangria-flake8.log /tmp/sangria-ts-build.log
+
+exit 0
