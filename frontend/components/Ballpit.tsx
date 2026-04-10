@@ -629,8 +629,18 @@ class Spheres extends InstancedMesh {
     this.physics.update(deltaInfo);
     for (let idx = 0; idx < this.count; idx++) {
       DummyObj.position.fromArray(this.physics.positionData, 3 * idx);
-      if (idx === 0 && this.config.followCursor === false) DummyObj.scale.setScalar(0);
-      else DummyObj.scale.setScalar(this.physics.sizeData[idx]);
+      if (idx === 0 && this.config.followCursor === false) {
+        DummyObj.scale.setScalar(0);
+      } else {
+        const s = this.physics.sizeData[idx];
+        const vy = this.physics.velocityData[3 * idx + 1];
+        const vx = this.physics.velocityData[3 * idx];
+        const speed = Math.sqrt(vx * vx + vy * vy);
+        const deform = Math.min(speed * 8, 0.35);
+        const squashY = vy < -0.02 ? 1 - deform : 1 + deform * 0.5;
+        const squashX = vy < -0.02 ? 1 + deform * 0.6 : 1 - deform * 0.3;
+        DummyObj.scale.set(s * squashX, s * squashY, s * (squashX * 0.5 + squashY * 0.5));
+      }
       DummyObj.updateMatrix();
       this.setMatrixAt(idx, DummyObj.matrix);
       if (idx === 0) this.light!.position.copy(DummyObj.position);
