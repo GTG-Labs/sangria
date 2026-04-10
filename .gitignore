@@ -1,4 +1,5 @@
 .env
+.env.*
 .claude/
 backend/backend
 __pycache__/
