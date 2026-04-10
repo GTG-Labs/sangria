@@ -6,9 +6,9 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"sangrianet/backend/auth"
-	dbengine "sangrianet/backend/dbEngine"
-	"sangrianet/backend/utils"
+	"sangria/backend/auth"
+	dbengine "sangria/backend/dbEngine"
+	"sangria/backend/utils"
 )
 
 // GetMerchantTransactions handles GET /transactions with cursor-based pagination
