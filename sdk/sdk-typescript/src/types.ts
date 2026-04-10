@@ -1,4 +1,4 @@
-export interface SangriaNetConfig {
+export interface SangriaConfig {
   apiKey: string;
   baseUrl?: string;
 }
@@ -25,5 +25,10 @@ export interface PaymentContext {
 
 /** Discriminated union returned by core payment logic */
 export type PaymentResult =
-  | { action: "respond"; status: number; body: X402ChallengePayload | { error: string; error_reason?: string }; headers?: Record<string, string> }
+  | {
+      action: "respond";
+      status: number;
+      body: X402ChallengePayload | { error: string; error_reason?: string };
+      headers?: Record<string, string>;
+    }
   | { action: "proceed"; data: SangriaRequestData };

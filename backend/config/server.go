@@ -10,8 +10,8 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/workos/workos-go/v4/pkg/usermanagement"
 
-	"sangrianet/backend/auth"
-	dbengine "sangrianet/backend/dbEngine"
+	"sangria/backend/auth"
+	dbengine "sangria/backend/dbEngine"
 )
 
 // LoadEnvironment loads environment variables from .env file

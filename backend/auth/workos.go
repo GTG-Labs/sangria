@@ -17,7 +17,7 @@ import (
 	"github.com/lestrrat-go/jwx/v2/jwt"
 	"github.com/workos/workos-go/v4/pkg/usermanagement"
 
-	dbengine "sangrianet/backend/dbEngine"
+	dbengine "sangria/backend/dbEngine"
 )
 
 // jwksState holds the JWKS cache and URL for WorkOS JWT validation

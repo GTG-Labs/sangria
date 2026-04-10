@@ -43,7 +43,7 @@ export default async function Navigation() {
             className="w-8 h-8 dark:mix-blend-normal mix-blend-multiply"
           />
           <span className="text-gray-900 dark:text-white text-lg font-bold">
-            sangriaNet
+            Sangria
           </span>
         </Link>
         <div className="hidden md:flex items-center gap-8 text-sm text-gray-600 dark:text-zinc-400">

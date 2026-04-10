@@ -87,6 +87,10 @@
   --color-fd-ring: #52525b;
 }
 
+#nd-docs-layout {
+  --fd-layout-width: 100%;
+}
+
 #nd-sidebar {
   padding-top: 1rem;
 }

@@ -7,8 +7,8 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"sangrianet/backend/auth"
-	dbengine "sangrianet/backend/dbEngine"
+	"sangria/backend/auth"
+	dbengine "sangria/backend/dbEngine"
 )
 
 // CreateMerchantAPIKey handles POST /merchants.

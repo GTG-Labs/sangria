@@ -1,4 +1,4 @@
-module sangrianet/backend
+module sangria/backend
 
 go 1.25.0
 

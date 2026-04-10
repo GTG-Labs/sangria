@@ -11,9 +11,9 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"sangrianet/backend/config"
-	dbengine "sangrianet/backend/dbEngine"
-	x402Handlers "sangrianet/backend/x402Handlers"
+	"sangria/backend/config"
+	dbengine "sangria/backend/dbEngine"
+	x402Handlers "sangria/backend/x402Handlers"
 )
 
 const maxTimeoutSeconds = 60

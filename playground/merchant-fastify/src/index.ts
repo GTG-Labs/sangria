@@ -1,15 +1,15 @@
 import Fastify from "fastify";
-import { SangriaNet } from "@sangrianet/core";
-import { sangrianetPlugin, fixedPrice } from "@sangrianet/core/fastify";
+import { Sangria } from "@sangria/core";
+import { sangriaPlugin, fixedPrice } from "@sangria/core/fastify";
 
 const fastify = Fastify({ logger: false });
 
-const sangrianet = new SangriaNet({
+const sangria = new Sangria({
   apiKey: process.env.SANGRIA_SECRET_KEY ?? "sk_test_abc123",
   baseUrl: process.env.SANGRIA_URL ?? "http://localhost:8080",
 });
 
-fastify.register(sangrianetPlugin);
+fastify.register(sangriaPlugin);
 
 fastify.get("/", async () => {
   return { message: "Hello! This endpoint is free." };
@@ -17,7 +17,12 @@ fastify.get("/", async () => {
 
 fastify.get(
   "/premium",
-  { preHandler: fixedPrice(sangrianet, { price: 0.01, description: "Access premium content" }) },
+  {
+    preHandler: fixedPrice(sangria, {
+      price: 0.01,
+      description: "Access premium content",
+    }),
+  },
   async () => {
     return { message: "You accessed the premium endpoint!" };
   }

@@ -1,11 +1,11 @@
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
-import { SangriaNet } from "@sangrianet/core";
-import { fixedPrice } from "@sangrianet/core/hono";
+import { Sangria } from "@sangria/core";
+import { fixedPrice } from "@sangria/core/hono";
 
 const app = new Hono();
 
-const sangrianet = new SangriaNet({
+const sangria = new Sangria({
   apiKey: process.env.SANGRIA_SECRET_KEY ?? "sk_test_abc123",
   baseUrl: process.env.SANGRIA_URL ?? "http://localhost:8080",
 });
@@ -16,7 +16,7 @@ app.get("/", (c) => {
 
 app.get(
   "/premium",
-  fixedPrice(sangrianet, { price: 0.01, description: "Access premium content" }),
+  fixedPrice(sangria, { price: 0.01, description: "Access premium content" }),
   (c) => {
     return c.json({ message: "You accessed the premium endpoint!" });
   }
