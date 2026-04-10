@@ -1,0 +1,6 @@
+{
+  "version": 3,
+  "sources": [],
+  "sections": [
+    {"offset": {"line": 46, "column": 0}, "map": {"version":3,"sources":["file:///Users/jared/Documents/GitHub/sangria-net/playground/merchant-nextjs/app/api/premium/route.ts"],"sourcesContent":["import { NextRequest, NextResponse } from \"next/server\";\nimport { Sangria } from \"@sangria-sdk/core\";\nimport { fixedPrice } from \"@sangria-sdk/core/nextjs\";\n\nconst sangria = new Sangria({\n  apiKey: process.env.SANGRIA_SECRET_KEY ?? \"sk_test_abc123\",\n  baseUrl: process.env.SANGRIA_URL ?? \"http://localhost:8080\",\n});\n\n// GET /api/premium → $0.01 (fixed)\nexport const GET = fixedPrice(\n  sangria,\n  { price: 0.01, description: \"Access premium content\" },\n  async (_request: NextRequest) => {\n    return NextResponse.json({\n      message: \"You accessed the premium endpoint!\",\n    });\n  }\n);\n"],"names":["sangria","apiKey","process","env","SANGRIA_SECRET_KEY","baseUrl","SANGRIA_URL","GET","price","description","_request","json","message"],"mappings":";;;;AAAA;AACA;AAAA;AACA;;;;AAEA,MAAMA,UAAU,IAAI,oQAAO,CAAC;IAC1BC,QAAQC,QAAQC,GAAG,CAACC,kBAAkB,IAAI;IAC1CC,SAASH,QAAQC,GAAG,CAACG,WAAW,IAAI;AACtC;AAGO,MAAMC,MAAM,IAAA,qRAAU,EAC3BP,SACA;IAAEQ,OAAO;IAAMC,aAAa;AAAyB,GACrD,OAAOC;IACL,OAAO,qPAAY,CAACC,IAAI,CAAC;QACvBC,SAAS;IACX;AACF"}}]
+}
