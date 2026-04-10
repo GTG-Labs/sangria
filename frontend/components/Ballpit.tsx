@@ -701,7 +701,23 @@ function createBallpit(canvas: HTMLCanvasElement, config: any = {}) {
   });
 
   threeInstance.onBeforeRender = deltaInfo => { if (!isPaused) spheres.update(deltaInfo); };
-  threeInstance.onAfterResize = size => { spheres.config.maxX = size.wWidth / 2; spheres.config.maxY = size.wHeight / 2; };
+  threeInstance.onAfterResize = size => {
+    spheres.config.maxX = size.wWidth / 2;
+    spheres.config.maxY = size.wHeight / 2;
+    // Clamp any balls outside new bounds back inside
+    for (let i = 0; i < spheres.config.count; i++) {
+      const base = 3 * i;
+      const r = spheres.physics.sizeData[i];
+      const px = spheres.physics.positionData[base];
+      const py = spheres.physics.positionData[base + 1];
+      if (Math.abs(px) + r > spheres.config.maxX) {
+        spheres.physics.positionData[base] = Math.sign(px) * (spheres.config.maxX - r);
+      }
+      if (Math.abs(py) + r > spheres.config.maxY) {
+        spheres.physics.positionData[base + 1] = Math.sign(py) * (spheres.config.maxY - r);
+      }
+    }
+  };
 
   return {
     three: threeInstance,
