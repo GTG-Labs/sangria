@@ -88,7 +88,3 @@ func FundETH(ctx context.Context, address, network string) error {
 	return requestFaucet(ctx, address, network, "eth")
 }
 
-// FundUSDC requests testnet USDC from the faucet.
-func FundUSDC(ctx context.Context, address, network string) error {
-	return requestFaucet(ctx, address, network, "usdc")
-}

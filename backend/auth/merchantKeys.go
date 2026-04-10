@@ -131,32 +131,3 @@ func ExtractKeyID(fullKey string) (string, error) {
 	return keyID, nil
 }
 
-// IsLiveKey returns true if the API key is a live/production key.
-func IsLiveKey(key string) bool {
-	return strings.HasPrefix(key, KeyPrefixLive)
-}
-
-// GetKeyPrefix extracts the display prefix from a full API key.
-func GetKeyPrefix(key string) string {
-	if err := ValidateAPIKeyFormat(key); err != nil {
-		return ""
-	}
-
-	var prefix string
-	var randomPart string
-
-	if strings.HasPrefix(key, KeyPrefixLive) {
-		prefix = KeyPrefixLive
-		randomPart = strings.TrimPrefix(key, KeyPrefixLive)
-	} else {
-		prefix = KeyPrefixTest
-		randomPart = strings.TrimPrefix(key, KeyPrefixTest)
-	}
-
-	// Return first 8 chars of random part with ellipsis
-	if len(randomPart) >= 8 {
-		return prefix + randomPart[:8] + "..."
-	}
-
-	return prefix + randomPart + "..."
-}

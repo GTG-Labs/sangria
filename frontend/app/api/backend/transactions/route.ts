@@ -10,6 +10,6 @@ export async function GET(request: NextRequest) {
   if (limit) queryString.set("limit", limit);
   if (cursor) queryString.set("cursor", cursor);
 
-  const path = `/transactions${queryString.toString() ? `?${queryString}` : ""}`;
+  const path = `/internal/transactions${queryString.toString() ? `?${queryString}` : ""}`;
   return proxyToBackend("GET", path);
 }

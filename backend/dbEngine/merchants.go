@@ -9,17 +9,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// GetMerchantByID returns a merchant by its UUID.
-func GetMerchantByID(ctx context.Context, pool *pgxpool.Pool, id string) (Merchant, error) {
-	var m Merchant
-	err := pool.QueryRow(ctx,
-		`SELECT id, user_id, api_key, key_id, name, is_active, last_used_at, created_at
-		 FROM merchants WHERE id = $1`,
-		id,
-	).Scan(&m.ID, &m.UserID, &m.APIKey, &m.KeyID, &m.Name, &m.IsActive, &m.LastUsedAt, &m.CreatedAt)
-	return m, err
-}
-
 // EnsureUSDLiabilityAccount returns the user's USD LIABILITY account,
 // creating one if it doesn't exist yet. Uses a transaction with a row lock
 // to prevent concurrent requests from creating duplicate accounts.
@@ -88,16 +77,6 @@ func GetMerchantUSDLiabilityAccount(ctx context.Context, pool *pgxpool.Pool, mer
 		merchantID,
 	).Scan(&a.ID, &a.Name, &a.Type, &a.Currency, &a.UserID, &a.CreatedAt)
 	return a, err
-}
-
-// GetMerchantBalance returns the net USD balance for a merchant by looking
-// up their USD LIABILITY account and computing the ledger balance.
-func GetMerchantBalance(ctx context.Context, pool *pgxpool.Pool, merchantID string) (int64, error) {
-	acct, err := GetMerchantUSDLiabilityAccount(ctx, pool, merchantID)
-	if err != nil {
-		return 0, fmt.Errorf("get merchant liability account: %w", err)
-	}
-	return GetAccountBalance(ctx, pool, acct.ID, USD)
 }
 
 // UpdateMerchantLastUsedAt updates the last_used_at timestamp for a merchant.

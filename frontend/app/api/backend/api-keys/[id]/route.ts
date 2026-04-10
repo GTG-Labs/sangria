@@ -6,5 +6,5 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  return proxyToBackend("DELETE", `/api-keys/${id}`, { rawResponse: true });
+  return proxyToBackend("DELETE", `/internal/api-keys/${id}`, { rawResponse: true });
 }

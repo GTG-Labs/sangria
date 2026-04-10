@@ -109,24 +109,6 @@ func GetAPIKeysByUserID(ctx context.Context, pool *pgxpool.Pool, userID string) 
 	return merchants, nil
 }
 
-// GetAPIKeyByKeyID retrieves a specific API key by its key_id (the 8-char hex
-// identifier embedded in the API key, not the merchant UUID).
-func GetAPIKeyByKeyID(ctx context.Context, pool *pgxpool.Pool, keyID string) (*dbengine.Merchant, error) {
-	var merchant dbengine.Merchant
-	err := pool.QueryRow(ctx,
-		`SELECT id, user_id, api_key, key_id, name, is_active, last_used_at, created_at
-		 FROM merchants WHERE key_id = $1`,
-		keyID,
-	).Scan(
-		&merchant.ID, &merchant.UserID, &merchant.APIKey, &merchant.KeyID,
-		&merchant.Name, &merchant.IsActive, &merchant.LastUsedAt, &merchant.CreatedAt,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get merchant by key_id: %w", err)
-	}
-	return &merchant, nil
-}
-
 // AuthenticateAPIKey validates an API key and returns the associated merchant.
 // Uses GitHub-style indexed lookup by key_id for O(1) performance.
 func AuthenticateAPIKey(ctx context.Context, pool *pgxpool.Pool, providedKey string) (*dbengine.Merchant, error) {

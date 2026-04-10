@@ -1,10 +1,6 @@
 package auth
 
-import (
-	"crypto/subtle"
-
-	"golang.org/x/crypto/bcrypt"
-)
+import "golang.org/x/crypto/bcrypt"
 
 // HashAPIKey hashes an API key using bcrypt for secure storage.
 func HashAPIKey(key string) (string, error) {
@@ -21,8 +17,3 @@ func VerifyAPIKey(key, hash string) bool {
 	return err == nil
 }
 
-// SecureCompare performs constant-time comparison of strings
-// to prevent timing attacks.
-func SecureCompare(a, b string) bool {
-	return subtle.ConstantTimeCompare([]byte(a), []byte(b)) == 1
-}

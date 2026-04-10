@@ -14,7 +14,7 @@ export const GET = handleAuth({
     const timeoutId = setTimeout(() => controller.abort(), 5000);
 
     try {
-      const response = await fetch(`${process.env.BACKEND_URL}/users`, {
+      const response = await fetch(`${process.env.BACKEND_URL}/internal/users`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${accessToken}`,
