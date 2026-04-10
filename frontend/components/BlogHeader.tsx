@@ -10,7 +10,17 @@ export default function BlogHeader() {
       <div className="absolute inset-0">
         <Ballpit
           count={100}
-          colors={[0xa51c30, 0x8c1728, 0xc74b4b]}
+          colors={[0x4a0d1a, 0x5a0e1a, 0x3b0a14]}
+          lightIntensity={30}
+          ambientIntensity={0.4}
+          materialParams={{
+            metalness: 0.1,
+            roughness: 0.8,
+            clearcoat: 0.3,
+            clearcoatRoughness: 0.6,
+          }}
+          minSize={0.3}
+          maxSize={0.7}
           gravity={0.5}
           friction={0.99}
           wallBounce={0.5}
