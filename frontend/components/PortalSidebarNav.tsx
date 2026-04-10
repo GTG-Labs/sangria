@@ -2,13 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { KeyRound, CreditCard, BarChart3, Settings } from "lucide-react";
+import { KeyRound, LayoutDashboard, ExternalLink } from "lucide-react";
 
 const navItems = [
+  { href: "/dashboard/transactions", label: "Overview", icon: LayoutDashboard },
   { href: "/dashboard/api-keys", label: "API Keys", icon: KeyRound },
-  { href: "/dashboard/transactions", label: "Transactions", icon: CreditCard },
-  { href: "/dashboard/analytics", label: "Analytics", icon: BarChart3 },
-  { href: "/dashboard/settings", label: "Settings", icon: Settings },
+  { href: "/docs", label: "Docs", icon: ExternalLink, external: true },
 ];
 
 export default function PortalSidebarNav() {
@@ -18,13 +17,16 @@ export default function PortalSidebarNav() {
     <nav className="mt-8 space-y-1">
       {navItems.map((item) => {
         const Icon = item.icon;
+        const isExternal = "external" in item && item.external;
         const isActive =
-          pathname === item.href || pathname.startsWith(`${item.href}/`);
+          !isExternal &&
+          (pathname === item.href || pathname.startsWith(`${item.href}/`));
 
         return (
           <Link
             key={item.href}
             href={item.href}
+            target={isExternal ? "_blank" : undefined}
             aria-current={isActive ? "page" : undefined}
             className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors ${
               isActive

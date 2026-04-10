@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
 export default function DashboardPage() {
-  redirect("/dashboard/api-keys");
+  redirect("/dashboard/transactions");
 }

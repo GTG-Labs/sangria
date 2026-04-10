@@ -9,9 +9,9 @@ export default async function Home() {
   ]);
 
   return (
-    <div className="min-h-screen">
+    <div className="h-screen overflow-hidden">
       {/* Hero */}
-      <section className="relative pt-32 pb-20 md:pt-44 md:pb-32 overflow-hidden">
+      <section className="relative h-full flex items-center overflow-hidden">
         <div className="relative max-w-7xl mx-auto px-6">
           <div className="grid md:grid-cols-2 gap-12 items-center">
             {/* Left: text */}

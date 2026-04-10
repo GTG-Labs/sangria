@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Copy, Plus, Trash2, AlertCircle } from "lucide-react";
+import ArcadeButton from "@/components/ArcadeButton";
 
 interface APIKey {
   id: string;
@@ -167,13 +168,10 @@ export default function APIKeysContent() {
             Manage your API keys for authenticating with Sangria services.
           </p>
         </div>
-        <button
-          onClick={() => setShowCreateForm(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-sangria-500 text-white rounded-lg hover:bg-sangria-600 transition-colors self-start sm:self-auto"
-        >
-          <Plus className="w-4 h-4" />
+        <ArcadeButton onClick={() => setShowCreateForm(true)} size="sm" variant="blue">
+          <Plus className="w-3.5 h-3.5 mr-1.5 inline" />
           Create API Key
-        </button>
+        </ArcadeButton>
       </div>
 
       {error && (

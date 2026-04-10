@@ -231,3 +231,41 @@ h6 {
   transform: translateY(-0.5px);
   transition: transform 50ms ease;
 }
+
+/* Blue variant */
+.btn-raised-blue {
+  position: relative;
+  display: inline-flex;
+  border: 1.5px solid #1e3a5f;
+  border-radius: 0.75rem;
+  background: #0f1f33;
+}
+
+.btn-raised-blue > span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid #1e3a5f;
+  border-radius: 0.75rem;
+  margin: -1.5px;
+  background: #2563eb;
+  color: white;
+  font-weight: 700;
+  transform: translateY(-2px);
+  transition: transform 0.1s ease;
+  user-select: none;
+}
+
+.btn-raised-blue:hover > span {
+  transform: translateY(-3px);
+}
+
+.btn-raised-blue:active > span {
+  transform: translateY(-0.5px);
+  transition: transform 50ms ease;
+}
+
+.btn-raised-blue:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}

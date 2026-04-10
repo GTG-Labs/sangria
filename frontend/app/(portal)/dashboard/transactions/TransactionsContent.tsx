@@ -46,14 +46,11 @@ export default function TransactionsContent() {
       if (response.ok) {
         const data = await response.json();
 
-        // Handle both old format (array) and new format (paginated)
         if (Array.isArray(data)) {
-          // Legacy format - no pagination
           setTransactions(data);
           setHasMore(false);
           setTotal(data.length);
         } else {
-          // New paginated format
           const paginatedData = data as PaginatedResponse;
           setTransactions((prev) =>
             cursor ? [...prev, ...paginatedData.data] : paginatedData.data
@@ -68,16 +65,12 @@ export default function TransactionsContent() {
           .json()
           .catch(() => ({ error: "Unknown error" }));
         setError(errorData.error || "Failed to load transactions");
-        if (isInitialLoad) {
-          setTransactions([]);
-        }
+        if (isInitialLoad) setTransactions([]);
       }
     } catch (err) {
       console.error("Failed to load transactions:", err);
       setError("Failed to load transactions");
-      if (isInitialLoad) {
-        setTransactions([]);
-      }
+      if (isInitialLoad) setTransactions([]);
     } finally {
       isInitialLoad ? setLoading(false) : setLoadingMore(false);
     }
@@ -99,20 +92,20 @@ export default function TransactionsContent() {
   };
 
   const getBlockExplorerUrl = (hash: string) => {
-    // All payments currently go through Base network
     return `https://basescan.org/tx/${hash}`;
   };
 
-  const formatDate = (dateString: string) => {
+  const timeAgo = (dateString: string) => {
+    const now = new Date();
     const date = new Date(dateString);
-    return date.toLocaleString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-    });
+    const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+    if (seconds < 60) return "just now";
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `about ${minutes} minute${minutes !== 1 ? "s" : ""} ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `about ${hours} hour${hours !== 1 ? "s" : ""} ago`;
+    const days = Math.floor(hours / 24);
+    return `about ${days} day${days !== 1 ? "s" : ""} ago`;
   };
 
   if (loading) {
@@ -129,7 +122,7 @@ export default function TransactionsContent() {
     <div className="mx-auto max-w-6xl">
       <div className="mb-8">
         <h1 className="text-2xl sm:text-4xl font-semibold tracking-tight text-gray-900">
-          Transactions
+          Overview
         </h1>
         <p className="mt-2 text-gray-500">
           View your payment transaction history.
@@ -143,115 +136,94 @@ export default function TransactionsContent() {
         </div>
       )}
 
-      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-        {!transactions || transactions.length === 0 ? (
-          <div className="p-12 text-center">
-            <div className="mx-auto w-16 h-16 mb-4 text-gray-300">
-              <svg
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={1.5}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z"
-                />
-              </svg>
-            </div>
-            <p className="text-gray-500 mb-2 font-medium">
-              No transactions yet
-            </p>
-            <p className="text-sm text-gray-400">
-              Transactions will appear here once you receive payments.
-            </p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Date
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Type
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Amount
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Transaction
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {transactions.map((tx) => (
-                  <tr key={tx.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {formatDate(tx.created_at)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
-                        Payment Received
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">
-                      +{formatAmount(tx.amount, tx.currency)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      {tx.idempotency_key.startsWith("0x") ? (
-                        <a
-                          href={getBlockExplorerUrl(tx.idempotency_key)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-sangria-600 hover:text-sangria-800 transition-colors"
-                        >
-                          <span className="font-mono text-xs">
-                            {truncateKey(tx.idempotency_key)}
-                          </span>
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
-                      ) : (
-                        <span className="font-mono text-xs text-gray-500">
+      {!transactions || transactions.length === 0 ? (
+        <div className="py-16 text-center">
+          <p className="text-gray-400 mb-1">No transactions yet</p>
+          <p className="text-sm text-gray-400">
+            Transactions will appear here once you receive payments.
+          </p>
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-zinc-200">
+                <th className="pb-3 pr-6 text-left text-sm font-medium text-gray-400">
+                  Transaction
+                </th>
+                <th className="pb-3 px-6 text-left text-sm font-medium text-gray-400">
+                  Status
+                </th>
+                <th className="pb-3 px-6 text-left text-sm font-medium text-gray-400">
+                  Amount
+                </th>
+                <th className="pb-3 pl-6 text-right text-sm font-medium text-gray-400">
+                  Sent
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {transactions.map((tx, i) => (
+                <tr
+                  key={tx.id}
+                  className={`border-b border-zinc-200 hover:bg-zinc-200/50 transition-colors ${
+                    i % 2 === 0 ? "bg-zinc-100/50" : ""
+                  }`}
+                >
+                  <td className="py-4 pl-4 pr-6">
+                    {tx.idempotency_key.startsWith("0x") ? (
+                      <a
+                        href={getBlockExplorerUrl(tx.idempotency_key)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 text-sm text-gray-900 hover:text-sangria-600 transition-colors"
+                      >
+                        <span className="font-mono">
                           {truncateKey(tx.idempotency_key)}
                         </span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+                        <ExternalLink className="w-3.5 h-3.5 text-gray-400" />
+                      </a>
+                    ) : (
+                      <span className="font-mono text-sm text-gray-900">
+                        {truncateKey(tx.idempotency_key)}
+                      </span>
+                    )}
+                  </td>
+                  <td className="py-4 px-6">
+                    <span className="text-sm font-medium text-green-600">
+                      Received
+                    </span>
+                  </td>
+                  <td className="py-4 px-6 text-sm text-gray-900">
+                    +{formatAmount(tx.amount, tx.currency)}
+                  </td>
+                  <td className="py-4 pl-6 pr-4 text-right text-sm text-gray-900">
+                    {timeAgo(tx.created_at)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {hasMore && (
         <div className="mt-6 flex justify-center">
           <button
             onClick={() => fetchTransactions(nextCursor!)}
             disabled={loadingMore}
-            className="px-6 py-2 bg-sangria-600 text-white rounded-lg hover:bg-sangria-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="px-5 py-2 text-sm border border-zinc-200 rounded-lg text-gray-600 hover:bg-zinc-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            {loadingMore ? (
-              <span className="flex items-center gap-2">
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                Loading...
-              </span>
-            ) : (
-              "Load More"
-            )}
+            {loadingMore ? "Loading..." : "Load More"}
           </button>
         </div>
       )}
 
       {transactions.length > 0 && (
-        <div className="mt-4 text-sm text-gray-500 text-center">
+        <div className="mt-4 text-xs text-gray-400 text-center">
           Showing {transactions.length}
           {total !== null && ` of ${total}`} transaction
           {transactions.length !== 1 ? "s" : ""}
-          {hasMore && " • Load more to see older transactions"}
         </div>
       )}
     </div>

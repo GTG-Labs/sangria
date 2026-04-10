@@ -1,12 +1,13 @@
 import Link from "next/link";
 import type { ComponentProps, ReactNode } from "react";
 
-type Variant = "primary" | "secondary";
+type Variant = "primary" | "secondary" | "blue";
 type Size = "sm" | "md";
 
 const slotStyles: Record<Variant, string> = {
   primary: "btn-raised",
   secondary: "btn-raised-secondary",
+  blue: "btn-raised-blue",
 };
 
 const sizeStyles: Record<Size, string> = {
