@@ -400,11 +400,12 @@ class W {
         }
       }
       if (config.flowSpeed !== 0) {
-        // Wrap around horizontally
-        if (pos.x - radius > config.maxX) {
-          pos.x = -config.maxX - radius;
-        } else if (pos.x + radius < -config.maxX) {
-          pos.x = config.maxX + radius;
+        // Wrap around horizontally — fully off one side, spawn fully off the other
+        const margin = radius * 2;
+        if (pos.x > config.maxX + margin) {
+          pos.x = -config.maxX - margin;
+        } else if (pos.x < -config.maxX - margin) {
+          pos.x = config.maxX + margin;
         }
       } else if (Math.abs(pos.x) + radius > config.maxX) {
         pos.x = Math.sign(pos.x) * (config.maxX - radius);
