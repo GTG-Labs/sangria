@@ -1,6 +1,6 @@
 import Fastify from "fastify";
-import { Sangria } from "@sangria/core";
-import { sangriaPlugin, fixedPrice } from "@sangria/core/fastify";
+import { Sangria } from "@sangria-sdk/core";
+import { sangriaPlugin, fixedPrice } from "@sangria-sdk/core/fastify";
 
 const fastify = Fastify({ logger: false });
 

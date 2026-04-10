@@ -9,7 +9,7 @@
     "start": "next start --port 4005"
   },
   "dependencies": {
-    "@sangria/core": "file:../../sdk/sdk-typescript",
+    "@sangria-sdk/core": "file:../../sdk/sdk-typescript",
     "next": "^16.2.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"

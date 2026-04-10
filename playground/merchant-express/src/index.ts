@@ -1,6 +1,6 @@
 import express from "express";
-import { Sangria } from "@sangria/core";
-import { fixedPrice } from "@sangria/core/express";
+import { Sangria } from "@sangria-sdk/core";
+import { fixedPrice } from "@sangria-sdk/core/express";
 
 const app = express();
 app.use(express.json());

@@ -1,7 +1,7 @@
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
-import { Sangria } from "@sangria/core";
-import { fixedPrice } from "@sangria/core/hono";
+import { Sangria } from "@sangria-sdk/core";
+import { fixedPrice } from "@sangria-sdk/core/hono";
 
 const app = new Hono();
 

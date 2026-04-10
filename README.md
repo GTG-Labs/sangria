@@ -13,13 +13,13 @@
 ### TypeScript (Express)
 
 ```bash
-pnpm add @sangria/core express
+pnpm add @sangria-sdk/core express
 ```
 
 ```typescript
 import express from "express";
-import { Sangria } from "@sangria/core";
-import { fixedPrice } from "@sangria/core/express";
+import { Sangria } from "@sangria-sdk/core";
+import { fixedPrice } from "@sangria-sdk/core/express";
 
 const app = express();
 const sangria = new Sangria({ apiKey: process.env.SANGRIA_SECRET_KEY! });
@@ -38,7 +38,7 @@ app.listen(3000);
 ### Python (FastAPI)
 
 ```bash
-pip install sangria-core[fastapi]
+pip install sangria-merchant-sdk[fastapi]
 ```
 
 ```python
@@ -63,9 +63,9 @@ async def premium(request: Request):
 
 | Language   | Framework        | Adapter Import                 |
 | ---------- | ---------------- | ------------------------------ |
-| TypeScript | Express >= 4     | `@sangria/core/express`        |
-| TypeScript | Fastify >= 4     | `@sangria/core/fastify`        |
-| TypeScript | Hono >= 4        | `@sangria/core/hono`           |
+| TypeScript | Express >= 4     | `@sangria-sdk/core/express`        |
+| TypeScript | Fastify >= 4     | `@sangria-sdk/core/fastify`        |
+| TypeScript | Hono >= 4        | `@sangria-sdk/core/hono`           |
 | Python     | FastAPI >= 0.135 | `sangria_sdk.adapters.fastapi` |
 
 ---
@@ -112,8 +112,8 @@ sequenceDiagram
 | [`backend/`](backend/)                       | Orchestration API — accounts, payments, settlement | Go, Fiber, pgx                  |
 | [`dbSchema/`](dbSchema/)                     | Database schema (single source of truth)           | Drizzle ORM                     |
 | [`frontend/`](frontend/)                     | Documentation site                                 | Next.js, Tailwind               |
-| [`sdk/sdk-typescript/`](sdk/sdk-typescript/) | TypeScript merchant SDK (`@sangria/core`)          | TypeScript                      |
-| [`sdk/python/`](sdk/python/)                 | Python merchant SDK (`sangria-core`)       | Python, httpx                   |
+| [`sdk/sdk-typescript/`](sdk/sdk-typescript/) | TypeScript merchant SDK (`@sangria-sdk/core`)          | TypeScript                      |
+| [`sdk/python/`](sdk/python/)                 | Python merchant SDK (`sangria-merchant-sdk`)       | Python, httpx                   |
 | [`playground/`](playground/)                 | Example merchants + buyer client                   | Express, Fastify, Hono, FastAPI |
 
 ---

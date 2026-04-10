@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Sangria } from "@sangria/core";
-import { fixedPrice } from "@sangria/core/nextjs";
+import { Sangria } from "@sangria-sdk/core";
+import { fixedPrice } from "@sangria-sdk/core/nextjs";
 
 const sangria = new Sangria({
   apiKey: process.env.SANGRIA_SECRET_KEY ?? "sk_test_abc123",

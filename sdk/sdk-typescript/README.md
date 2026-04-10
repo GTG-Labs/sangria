@@ -1,11 +1,11 @@
-# @sangria/core
+# @sangria-sdk/core
 
 TypeScript SDK for accepting x402 payments. Supports Express, Fastify, and Hono.
 
 ## Install
 
 ```bash
-pnpm add @sangria/core
+pnpm add @sangria-sdk/core
 ```
 
 ## Quick Start
@@ -14,8 +14,8 @@ pnpm add @sangria/core
 
 ```typescript
 import express from "express";
-import { Sangria } from "@sangria/core";
-import { fixedPrice } from "@sangria/core/express";
+import { Sangria } from "@sangria-sdk/core";
+import { fixedPrice } from "@sangria-sdk/core/express";
 
 const app = express();
 const sangria = new Sangria({
@@ -40,8 +40,8 @@ app.listen(3000);
 
 ```typescript
 import Fastify from "fastify";
-import { Sangria } from "@sangria/core";
-import { sangriaPlugin, fixedPrice } from "@sangria/core/fastify";
+import { Sangria } from "@sangria-sdk/core";
+import { sangriaPlugin, fixedPrice } from "@sangria-sdk/core/fastify";
 
 const app = Fastify();
 const sangria = new Sangria({ apiKey: process.env.SANGRIA_SECRET_KEY });
@@ -64,8 +64,8 @@ await app.listen({ port: 3000 });
 
 ```typescript
 import { Hono } from "hono";
-import { Sangria } from "@sangria/core";
-import { fixedPrice, getSangria } from "@sangria/core/hono";
+import { Sangria } from "@sangria-sdk/core";
+import { fixedPrice, getSangria } from "@sangria-sdk/core/hono";
 
 const app = new Hono();
 const sangria = new Sangria({ apiKey: process.env.SANGRIA_SECRET_KEY });

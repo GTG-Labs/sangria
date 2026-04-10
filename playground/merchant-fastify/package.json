@@ -9,7 +9,7 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
-    "@sangria/core": "file:../../sdk/sdk-typescript",
+    "@sangria-sdk/core": "file:../../sdk/sdk-typescript",
     "fastify": "^5.0.0"
   },
   "devDependencies": {

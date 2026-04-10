@@ -1,10 +1,11 @@
 {
-  "name": "@sangria/core",
-  "version": "0.1.0",
+  "name": "@sangria-sdk/core",
+  "version": "0.1.1",
   "description": "Sangria payment network SDK for Express, Hono, Fastify, and Next.js",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "files": ["dist"],
   "exports": {
     ".": {
       "import": "./dist/index.js",
@@ -28,6 +29,7 @@
     }
   },
   "scripts": {
+    "prepublishOnly": "tsc",
     "build": "tsc",
     "dev": "tsc --watch",
     "test-server": "tsx --watch test-server/server.ts",

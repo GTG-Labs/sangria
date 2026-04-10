@@ -15,7 +15,7 @@ To get the most out of this guide, you'll need to:
 Install the Sangria SDK in your Next.js project.
 
 ```bash
-npm install @sangria/core
+npm install @sangria-sdk/core
 ```
 
 ## 2. Initialize the client
@@ -23,7 +23,7 @@ npm install @sangria/core
 Create a Sangria instance with your API key. Store your key in an environment variable — never hard-code it.
 
 ```ts
-import { Sangria } from "@sangria/core";
+import { Sangria } from "@sangria-sdk/core";
 
 const sangria = new Sangria({
   apiKey: process.env.SANGRIA_SECRET_KEY!,
@@ -36,8 +36,8 @@ Import the Next.js adapter and wrap your route handler with `fixedPrice`. Your e
 
 ```ts
 import { NextRequest, NextResponse } from "next/server";
-import { Sangria } from "@sangria/core";
-import { fixedPrice } from "@sangria/core/nextjs";
+import { Sangria } from "@sangria-sdk/core";
+import { fixedPrice } from "@sangria-sdk/core/nextjs";
 
 const sangria = new Sangria({
   apiKey: process.env.SANGRIA_SECRET_KEY!,
@@ -78,7 +78,7 @@ export const GET = fixedPrice(
 Use the `getSangria` helper to read payment details inside your handler:
 
 ```ts
-import { fixedPrice, getSangria } from "@sangria/core/nextjs";
+import { fixedPrice, getSangria } from "@sangria-sdk/core/nextjs";
 
 async function handler(request: NextRequest) {
   const payment = getSangria(request);

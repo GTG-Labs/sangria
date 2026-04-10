@@ -15,7 +15,7 @@ To get the most out of this guide, you'll need to:
 Install the Sangria SDK in your Hono project.
 
 ```bash
-npm install @sangria/core
+npm install @sangria-sdk/core
 ```
 
 ## 2. Initialize the client
@@ -23,7 +23,7 @@ npm install @sangria/core
 Create a Sangria instance with your API key.
 
 ```ts
-import { Sangria } from "@sangria/core";
+import { Sangria } from "@sangria-sdk/core";
 
 const sangria = new Sangria({
   apiKey: process.env.SANGRIA_SECRET_KEY,
@@ -37,8 +37,8 @@ Import the Hono adapter and add `fixedPrice` as middleware to any route.
 ```ts
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
-import { Sangria } from "@sangria/core";
-import { fixedPrice } from "@sangria/core/hono";
+import { Sangria } from "@sangria-sdk/core";
+import { fixedPrice } from "@sangria-sdk/core/hono";
 
 const app = new Hono();
 

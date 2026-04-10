@@ -27,7 +27,7 @@ export interface NextJSConfig {
 
 // ── Entry point: wrap a route handler to gate it behind payment ──
 //
-//   import { fixedPrice } from "@sangria/core/nextjs";
+//   import { fixedPrice } from "@sangria-sdk/core/nextjs";
 //
 //   export const GET = fixedPrice(sangria, { price: 0.01 }, handler);
 //   export const POST = fixedPrice(sangria, { price: 0.01 }, handler, config);

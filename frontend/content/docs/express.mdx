@@ -15,7 +15,7 @@ To get the most out of this guide, you'll need to:
 Install the Sangria SDK in your Express project.
 
 ```bash
-npm install @sangria/core
+npm install @sangria-sdk/core
 ```
 
 ## 2. Initialize the client
@@ -23,7 +23,7 @@ npm install @sangria/core
 Create a Sangria instance with your API key. Store your key in an environment variable — never hard-code it.
 
 ```ts
-import { Sangria } from "@sangria/core";
+import { Sangria } from "@sangria-sdk/core";
 
 const sangria = new Sangria({
   apiKey: process.env.SANGRIA_SECRET_KEY,
@@ -36,8 +36,8 @@ Import the Express adapter and add `fixedPrice` as middleware to any route you w
 
 ```ts
 import express from "express";
-import { Sangria } from "@sangria/core";
-import { fixedPrice } from "@sangria/core/express";
+import { Sangria } from "@sangria-sdk/core";
+import { fixedPrice } from "@sangria-sdk/core/express";
 
 const app = express();
 
