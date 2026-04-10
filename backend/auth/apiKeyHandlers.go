@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"errors"
 	"log"
 
 	"github.com/gofiber/fiber/v3"
@@ -39,8 +40,11 @@ func DeleteAPIKey(pool *pgxpool.Pool) fiber.Handler {
 
 		err := RevokeAPIKey(c.Context(), pool, keyID, user.ID)
 		if err != nil {
+			if errors.Is(err, ErrAPIKeyNotFound) {
+				return c.Status(404).JSON(fiber.Map{"error": "API key not found or not owned by user"})
+			}
 			log.Printf("Failed to revoke API key %s for user %s: %v", keyID, user.ID, err)
-			return c.Status(404).JSON(fiber.Map{"error": "API key not found or not owned by user"})
+			return c.Status(500).JSON(fiber.Map{"error": "failed to revoke API key"})
 		}
 
 		return c.Status(204).Send(nil)

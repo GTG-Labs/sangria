@@ -9,6 +9,9 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// ErrMerchantNotFound is returned when a merchant does not exist.
+var ErrMerchantNotFound = errors.New("merchant not found")
+
 // GetMerchantByID returns a merchant by its UUID.
 func GetMerchantByID(ctx context.Context, pool *pgxpool.Pool, id string) (Merchant, error) {
 	var m Merchant
@@ -17,6 +20,9 @@ func GetMerchantByID(ctx context.Context, pool *pgxpool.Pool, id string) (Mercha
 		 FROM merchants WHERE id = $1`,
 		id,
 	).Scan(&m.ID, &m.UserID, &m.APIKey, &m.KeyID, &m.Name, &m.IsActive, &m.LastUsedAt, &m.CreatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return m, ErrMerchantNotFound
+	}
 	return m, err
 }
 

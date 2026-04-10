@@ -41,7 +41,11 @@ func RequestWithdrawal(pool *pgxpool.Pool) fiber.Handler {
 		// Verify this merchant belongs to the authenticated user.
 		merchant, err := dbengine.GetMerchantByID(c.Context(), pool, req.MerchantID)
 		if err != nil {
-			return c.Status(404).JSON(fiber.Map{"error": "merchant not found"})
+			if errors.Is(err, dbengine.ErrMerchantNotFound) {
+				return c.Status(404).JSON(fiber.Map{"error": "merchant not found"})
+			}
+			log.Printf("get merchant %s: %v", req.MerchantID, err)
+			return c.Status(500).JSON(fiber.Map{"error": "failed to look up merchant"})
 		}
 		if merchant.UserID != user.ID {
 			return c.Status(403).JSON(fiber.Map{"error": "Forbidden"})
@@ -104,7 +108,11 @@ func ListWithdrawals(pool *pgxpool.Pool) fiber.Handler {
 		// Verify this merchant belongs to the authenticated user.
 		merchant, err := dbengine.GetMerchantByID(c.Context(), pool, merchantID)
 		if err != nil {
-			return c.Status(404).JSON(fiber.Map{"error": "merchant not found"})
+			if errors.Is(err, dbengine.ErrMerchantNotFound) {
+				return c.Status(404).JSON(fiber.Map{"error": "merchant not found"})
+			}
+			log.Printf("get merchant %s: %v", merchantID, err)
+			return c.Status(500).JSON(fiber.Map{"error": "failed to look up merchant"})
 		}
 		if merchant.UserID != user.ID {
 			return c.Status(403).JSON(fiber.Map{"error": "Forbidden"})

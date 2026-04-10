@@ -2,10 +2,15 @@ package dbengine
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+// ErrWalletNotFound is returned when a crypto wallet does not exist.
+var ErrWalletNotFound = errors.New("wallet not found")
 
 // CreateCryptoWalletWithAccount atomically creates a USDC ASSET ledger account
 // and a crypto wallet record in a single transaction. If either insert fails,
@@ -71,6 +76,9 @@ func GetWalletByAddress(ctx context.Context, pool *pgxpool.Pool, address string)
 		 WHERE LOWER(address) = LOWER($1)`,
 		address,
 	).Scan(&w.ID, &w.Address, &w.Network, &w.AccountID, &w.LastUsedAt, &w.CreatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return w, ErrWalletNotFound
+	}
 	return w, err
 }
 

@@ -2,7 +2,6 @@ package config
 
 import (
 	"fmt"
-	"math"
 	"os"
 	"strconv"
 )
@@ -43,7 +42,7 @@ func LoadWithdrawalConfig() error {
 	if thresholdStr == "" {
 		thresholdStr = "200000000" // $200
 	}
-	threshold, err := strconv.ParseFloat(thresholdStr, 64)
+	threshold, err := strconv.ParseInt(thresholdStr, 10, 64)
 	if err != nil {
 		return fmt.Errorf("invalid WITHDRAWAL_AUTO_APPROVE_THRESHOLD: %w", err)
 	}
@@ -76,7 +75,7 @@ func LoadWithdrawalConfig() error {
 	}
 
 	WithdrawalConfig = WithdrawalSettings{
-		AutoApproveThreshold: int64(math.Round(threshold)),
+		AutoApproveThreshold: threshold,
 		MinAmount:            minAmount,
 		FeeFlat:              feeFlat,
 	}

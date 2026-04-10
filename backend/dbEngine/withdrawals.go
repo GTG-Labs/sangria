@@ -6,11 +6,15 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // ErrInsufficientBalance is returned when a merchant doesn't have enough balance for a withdrawal.
 var ErrInsufficientBalance = errors.New("insufficient balance")
+
+// ErrWithdrawalNotFound is returned when a withdrawal does not exist or is not in the expected state.
+var ErrWithdrawalNotFound = errors.New("withdrawal not found or not in expected state")
 
 // withdrawalColumns is the shared SELECT column list for scanning into a Withdrawal.
 const withdrawalColumns = `id, merchant_id, amount, fee, net_amount, status,
@@ -195,6 +199,27 @@ func ListWithdrawalsByMerchant(ctx context.Context, pool *pgxpool.Pool, merchant
 	return withdrawals, rows.Err()
 }
 
+// ListAllWithdrawals returns all withdrawals, ordered by created_at desc.
+func ListAllWithdrawals(ctx context.Context, pool *pgxpool.Pool) ([]Withdrawal, error) {
+	rows, err := pool.Query(ctx,
+		fmt.Sprintf(`SELECT %s FROM withdrawals ORDER BY created_at DESC`, withdrawalColumns),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("query withdrawals: %w", err)
+	}
+	defer rows.Close()
+
+	var withdrawals []Withdrawal
+	for rows.Next() {
+		w, err := scanWithdrawal(rows)
+		if err != nil {
+			return nil, fmt.Errorf("scan withdrawal: %w", err)
+		}
+		withdrawals = append(withdrawals, w)
+	}
+	return withdrawals, rows.Err()
+}
+
 // ListWithdrawalsByStatus returns all withdrawals with the given status, ordered by created_at asc.
 func ListWithdrawalsByStatus(ctx context.Context, pool *pgxpool.Pool, status WithdrawalStatus) ([]Withdrawal, error) {
 	rows, err := pool.Query(ctx,
@@ -229,7 +254,7 @@ func ApproveWithdrawal(ctx context.Context, pool *pgxpool.Pool, withdrawalID, ad
 		return fmt.Errorf("approve withdrawal: %w", err)
 	}
 	if result.RowsAffected() == 0 {
-		return fmt.Errorf("withdrawal not found or not pending approval")
+		return ErrWithdrawalNotFound
 	}
 	return nil
 }
@@ -250,7 +275,10 @@ func RejectWithdrawal(ctx context.Context, pool *pgxpool.Pool, withdrawalID, adm
 		withdrawalID,
 	))
 	if err != nil {
-		return fmt.Errorf("withdrawal not found or not pending approval: %w", err)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrWithdrawalNotFound
+		}
+		return fmt.Errorf("load withdrawal for rejection: %w", err)
 	}
 
 	// Look up accounts for reversal.
@@ -338,7 +366,10 @@ func CompleteWithdrawal(ctx context.Context, pool *pgxpool.Pool, withdrawalID st
 		withdrawalID,
 	))
 	if err != nil {
-		return fmt.Errorf("withdrawal not found or not in approved/processing state: %w", err)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrWithdrawalNotFound
+		}
+		return fmt.Errorf("load withdrawal for completion: %w", err)
 	}
 
 	// Look up system accounts.
@@ -419,7 +450,10 @@ func FailWithdrawal(ctx context.Context, pool *pgxpool.Pool, withdrawalID, failu
 		withdrawalID,
 	))
 	if err != nil {
-		return fmt.Errorf("withdrawal not found or not in approved/processing state: %w", err)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrWithdrawalNotFound
+		}
+		return fmt.Errorf("load withdrawal for failure: %w", err)
 	}
 
 	// Look up accounts for reversal.

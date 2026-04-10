@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"log"
 	"math"
 	"strconv"
@@ -133,8 +134,11 @@ func SettlePayment(pool *pgxpool.Pool) fiber.Handler {
 		// Look up the wallet by the signed to address — verify it's ours.
 		wallet, err := dbengine.GetWalletByAddress(c.Context(), pool, toAddress)
 		if err != nil {
+			if errors.Is(err, dbengine.ErrWalletNotFound) {
+				return c.Status(400).JSON(fiber.Map{"error": "recipient address not recognized"})
+			}
 			log.Printf("get wallet by address: %v", err)
-			return c.Status(400).JSON(fiber.Map{"error": "recipient address not recognized"})
+			return c.Status(500).JSON(fiber.Map{"error": "failed to look up wallet"})
 		}
 
 		netConfig, ok := x402Handlers.NetworkConfigs[string(wallet.Network)]
