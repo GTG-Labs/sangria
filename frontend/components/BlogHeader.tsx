@@ -9,7 +9,7 @@ export default function BlogHeader() {
     <div className="relative overflow-hidden h-[220px] flex items-center justify-center" style={{ background: 'var(--bg-primary)' }}>
       <div className="absolute inset-0">
         <Ballpit
-          count={67}
+          count={33}
           colors={[0xc74b4b, 0xa51c30, 0x8c1728]}
           lightIntensity={0}
           ambientIntensity={0.6}
@@ -24,9 +24,9 @@ export default function BlogHeader() {
           minSize={0.3}
           maxSize={0.8}
           gravity={0}
-          friction={0.9995}
-          wallBounce={0.98}
-          maxVelocity={0.1}
+          friction={0.9999}
+          wallBounce={0.99}
+          maxVelocity={0.06}
           flowSpeed={0.0003}
           followCursor={false}
         />
