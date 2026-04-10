@@ -386,6 +386,14 @@ class W {
           otherVel.add(correction.clone().multiplyScalar(Math.max(otherVel.length(), 1)));
           otherPos.toArray(positionData, otherBase);
           otherVel.toArray(velocityData, otherBase);
+        } else if (config.ballRepelRadius > 0 && dist < sumRadius + config.ballRepelRadius) {
+          // Soft repulsion zone — gentle push apart when nearby
+          const proximity = 1 - (dist - sumRadius) / config.ballRepelRadius;
+          const push = diff.normalize().multiplyScalar(proximity * config.ballRepelStrength);
+          vel.add(push.clone().negate());
+          otherVel.add(push);
+          vel.toArray(velocityData, base);
+          otherVel.toArray(velocityData, otherBase);
         }
       }
       if (config.controlSphere0) {
@@ -506,7 +514,9 @@ const DefaultConfig = {
   centerRepelRadius: 0,
   centerRepelStrength: 0,
   brownianMotion: 0,
-  flowSpeed: 0
+  flowSpeed: 0,
+  ballRepelRadius: 0,
+  ballRepelStrength: 0
 };
 
 const DummyObj = new Object3D();

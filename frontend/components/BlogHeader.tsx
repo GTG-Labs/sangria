@@ -26,6 +26,8 @@ export default function BlogHeader() {
           wallBounce={0.99}
           maxVelocity={0.06}
           flowSpeed={0.0003}
+          ballRepelRadius={1.5}
+          ballRepelStrength={0.0005}
           followCursor={false}
         />
       </div>
