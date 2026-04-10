@@ -7,7 +7,7 @@ import (
 	"log"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	dbengine "sangrianet/backend/dbEngine"
+	dbengine "sangria/backend/dbEngine"
 )
 
 // ErrMaxAPIKeysReached is returned when a user tries to create more than 10 API keys.

@@ -1,6 +1,6 @@
-export { SangriaNet } from "./core.js";
+export { Sangria } from "./core.js";
 export type {
-  SangriaNetConfig,
+  SangriaConfig,
   FixedPriceOptions,
   SangriaRequestData,
   X402ChallengePayload,

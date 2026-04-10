@@ -1,5 +1,5 @@
 <p align="center">
-  <img width="3168" height="1019" alt="SangriaNet_GH_Banner" src="https://github.com/user-attachments/assets/d756eeb8-c0b9-4f4c-802a-21a0331e2003" />
+  <img width="3168" height="1019" alt="Sangria_GH_Banner" src="https://github.com/user-attachments/assets/d756eeb8-c0b9-4f4c-802a-21a0331e2003" />
 </p>
 
 <p align="center">
@@ -13,22 +13,22 @@
 ### TypeScript (Express)
 
 ```bash
-pnpm add @sangrianet/core express
+pnpm add @sangria/core express
 ```
 
 ```typescript
 import express from "express";
-import { SangriaNet } from "@sangrianet/core";
-import { fixedPrice } from "@sangrianet/core/express";
+import { Sangria } from "@sangria/core";
+import { fixedPrice } from "@sangria/core/express";
 
 const app = express();
-const sangria = new SangriaNet({ apiKey: process.env.SANGRIA_SECRET_KEY! });
+const sangria = new Sangria({ apiKey: process.env.SANGRIA_SECRET_KEY! });
 
 app.get(
   "/premium",
   fixedPrice(sangria, { price: 0.01, description: "Premium content" }),
   (req, res) => {
-    res.json({ data: "premium content", tx: req.sangrianet?.transaction });
+    res.json({ data: "premium content", tx: req.sangria?.transaction });
   }
 );
 
@@ -61,12 +61,12 @@ async def premium(request: Request):
 
 ## Supported Frameworks
 
-| Language | Framework | Adapter Import | 
-|---|---|---|
-| TypeScript | Express >= 4 | `@sangrianet/core/express` |
-| TypeScript | Fastify >= 4 | `@sangrianet/core/fastify` |
-| TypeScript | Hono >= 4 | `@sangrianet/core/hono` |
-| Python | FastAPI >= 0.135 | `sangria_sdk.adapters.fastapi` |
+| Language   | Framework        | Adapter Import                 |
+| ---------- | ---------------- | ------------------------------ |
+| TypeScript | Express >= 4     | `@sangria/core/express`        |
+| TypeScript | Fastify >= 4     | `@sangria/core/fastify`        |
+| TypeScript | Hono >= 4        | `@sangria/core/hono`           |
+| Python     | FastAPI >= 0.135 | `sangria_sdk.adapters.fastapi` |
 
 ---
 
@@ -107,14 +107,14 @@ sequenceDiagram
 
 ## Project Structure
 
-| Directory | What | Stack |
-|---|---|---|
-| [`backend/`](backend/) | Orchestration API — accounts, payments, settlement | Go, Fiber, pgx |
-| [`dbSchema/`](dbSchema/) | Database schema (single source of truth) | Drizzle ORM |
-| [`frontend/`](frontend/) | Documentation site | Next.js, Tailwind |
-| [`sdk/sdk-typescript/`](sdk/sdk-typescript/) | TypeScript merchant SDK (`@sangrianet/core`) | TypeScript |
-| [`sdk/python/`](sdk/python/) | Python merchant SDK (`sangria-merchant-sdk`) | Python, httpx |
-| [`playground/`](playground/) | Example merchants + buyer client | Express, Fastify, Hono, FastAPI |
+| Directory                                    | What                                               | Stack                           |
+| -------------------------------------------- | -------------------------------------------------- | ------------------------------- |
+| [`backend/`](backend/)                       | Orchestration API — accounts, payments, settlement | Go, Fiber, pgx                  |
+| [`dbSchema/`](dbSchema/)                     | Database schema (single source of truth)           | Drizzle ORM                     |
+| [`frontend/`](frontend/)                     | Documentation site                                 | Next.js, Tailwind               |
+| [`sdk/sdk-typescript/`](sdk/sdk-typescript/) | TypeScript merchant SDK (`@sangria/core`)          | TypeScript                      |
+| [`sdk/python/`](sdk/python/)                 | Python merchant SDK (`sangria-merchant-sdk`)       | Python, httpx                   |
+| [`playground/`](playground/)                 | Example merchants + buyer client                   | Express, Fastify, Hono, FastAPI |
 
 ---
 

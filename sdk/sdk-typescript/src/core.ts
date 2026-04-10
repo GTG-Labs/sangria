@@ -1,5 +1,5 @@
 import type {
-  SangriaNetConfig,
+  SangriaConfig,
   FixedPriceOptions,
   PaymentContext,
   PaymentResult,
@@ -8,13 +8,13 @@ import type {
 
 const DEFAULT_BASE_URL = "http://localhost:8080";
 
-export class SangriaNet {
+export class Sangria {
   private apiKey: string;
   private baseUrl: string;
 
-  constructor(config: SangriaNetConfig) {
+  constructor(config: SangriaConfig) {
     if (!config.apiKey) {
-      throw new Error("SangriaNet: apiKey is required");
+      throw new Error("Sangria: apiKey is required");
     }
 
     this.apiKey = config.apiKey;
@@ -23,15 +23,13 @@ export class SangriaNet {
 
   private validateFixedPriceOptions(options: FixedPriceOptions): void {
     if (!Number.isFinite(options.price) || options.price <= 0) {
-      throw new Error(
-        "SangriaNet: price must be a finite number greater than 0",
-      );
+      throw new Error("Sangria: price must be a finite number greater than 0");
     }
   }
 
   async handleFixedPrice(
     ctx: PaymentContext,
-    options: FixedPriceOptions,
+    options: FixedPriceOptions
   ): Promise<PaymentResult> {
     this.validateFixedPriceOptions(options);
 
@@ -46,14 +44,17 @@ export class SangriaNet {
   // and send the client a 402 response with details on how to pay us
   private async generatePayment(
     ctx: PaymentContext,
-    options: FixedPriceOptions,
+    options: FixedPriceOptions
   ): Promise<PaymentResult> {
     try {
-      const x402_responsePayload = await this.postToSangriaBackend("/v1/generate-payment", {
-        amount: options.price,
-        resource: ctx.resourceUrl,
-        description: options.description,
-      }) as X402ChallengePayload;
+      const x402_responsePayload = (await this.postToSangriaBackend(
+        "/v1/generate-payment",
+        {
+          amount: options.price,
+          resource: ctx.resourceUrl,
+          description: options.description,
+        }
+      )) as X402ChallengePayload;
 
       // you gotta encode the payload before sending it back (part of the spec)
       const encoded = btoa(JSON.stringify(x402_responsePayload));
@@ -77,7 +78,7 @@ export class SangriaNet {
   // there was a payment header so we try to settle the payment
   private async settlePayment(
     paymentHeader: string,
-    options: FixedPriceOptions,
+    options: FixedPriceOptions
   ): Promise<PaymentResult> {
     try {
       const result = (await this.postToSangriaBackend("/v1/settle-payment", {
@@ -117,7 +118,10 @@ export class SangriaNet {
     }
   }
 
-  private async postToSangriaBackend(path: string, body: Record<string, unknown>) {
+  private async postToSangriaBackend(
+    path: string,
+    body: Record<string, unknown>
+  ) {
     const res = await fetch(`${this.baseUrl}${path}`, {
       method: "POST",
       headers: {
@@ -129,7 +133,7 @@ export class SangriaNet {
     });
 
     if (!res.ok) {
-      throw new Error(`SangriaNet API error (${res.status})`);
+      throw new Error(`Sangria API error (${res.status})`);
     }
 
     return res.json();

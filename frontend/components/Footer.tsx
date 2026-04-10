@@ -16,7 +16,7 @@ export default function Footer() {
               style={{ mixBlendMode: "multiply" }}
             />
             <span className="text-zinc-400 dark:text-zinc-500 text-sm font-medium">
-              sangriaNet
+              Sangria
             </span>
           </Link>
 
@@ -49,7 +49,7 @@ export default function Footer() {
         </div>
 
         <p className="text-xs text-zinc-400 dark:text-zinc-600">
-          &copy; {new Date().getFullYear()} sangriaNet. All rights reserved.
+          &copy; {new Date().getFullYear()} Sangria. All rights reserved.
         </p>
       </div>
     </footer>

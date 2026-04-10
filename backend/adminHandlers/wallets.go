@@ -6,9 +6,9 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	cdpHandlers "sangrianet/backend/cdpHandlers"
-	dbengine "sangrianet/backend/dbEngine"
-	x402Handlers "sangrianet/backend/x402Handlers"
+	cdpHandlers "sangria/backend/cdpHandlers"
+	dbengine "sangria/backend/dbEngine"
+	x402Handlers "sangria/backend/x402Handlers"
 )
 
 // CreateWalletPool handles POST /wallets/pool.
