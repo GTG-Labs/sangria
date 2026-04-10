@@ -3,7 +3,6 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig({
   test: {
     // Test configuration for Sangria comprehensive test suite
-    setupFiles: ['./utils/vitest-setup.ts'],
     environment: 'node',
     reporters: ['verbose'],
     globals: true,
