@@ -14,9 +14,9 @@ import (
 var ErrMaxAPIKeysReached = errors.New("max active API keys reached")
 
 // CreateAPIKey creates a new API key for a user.
-func CreateAPIKey(ctx context.Context, pool *pgxpool.Pool, userID, name string, isLive bool) (*dbengine.Merchant, string, error) {
+func CreateAPIKey(ctx context.Context, pool *pgxpool.Pool, userID, name string) (*dbengine.Merchant, string, error) {
 	// Generate new API key first
-	fullKey, keyID, err := GenerateAPIKey(isLive)
+	fullKey, keyID, err := GenerateAPIKey()
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to generate API key: %w", err)
 	}

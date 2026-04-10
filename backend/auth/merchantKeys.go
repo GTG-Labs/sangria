@@ -8,16 +8,15 @@ import (
 )
 
 const (
-	// API key format: sg_live_8charKeyID_32randomchars or sg_test_8charKeyID_32randomchars
+	// API key format: sg_live_8charKeyID_32randomchars
 	KeyPrefixLive   = "sg_live_"
-	KeyPrefixTest   = "sg_test_"
 	KeyIDLength     = 8
 	KeyRandomLength = 32
 )
 
 // GenerateAPIKey generates a new API key with embedded key_id like GitHub.
-// Returns the full key, key_id, and display identifier.
-func GenerateAPIKey(isLive bool) (string, string, error) {
+// Returns the full key and key_id.
+func GenerateAPIKey() (string, string, error) {
 	// Generate 8-char key ID for database lookup (4 bytes -> 8 hex chars)
 	keyIDBytes := make([]byte, KeyIDLength/2)
 	_, err := rand.Read(keyIDBytes)
@@ -34,16 +33,8 @@ func GenerateAPIKey(isLive bool) (string, string, error) {
 	}
 	randomStr := hex.EncodeToString(randomBytes)
 
-	// Choose prefix based on environment
-	var prefix string
-	if isLive {
-		prefix = KeyPrefixLive
-	} else {
-		prefix = KeyPrefixTest
-	}
-
 	// Construct full key: prefix + keyID + randomStr
-	fullKey := prefix + keyID + "_" + randomStr
+	fullKey := KeyPrefixLive + keyID + "_" + randomStr
 
 	return fullKey, keyID, nil
 }
@@ -55,17 +46,12 @@ func ValidateAPIKeyFormat(key string) error {
 	}
 
 	// Check if it starts with valid prefix
-	if !strings.HasPrefix(key, KeyPrefixLive) && !strings.HasPrefix(key, KeyPrefixTest) {
-		return fmt.Errorf("API key must start with %s or %s", KeyPrefixLive, KeyPrefixTest)
+	if !strings.HasPrefix(key, KeyPrefixLive) {
+		return fmt.Errorf("API key must start with %s", KeyPrefixLive)
 	}
 
 	// Extract the portion after prefix
-	var afterPrefix string
-	if strings.HasPrefix(key, KeyPrefixLive) {
-		afterPrefix = strings.TrimPrefix(key, KeyPrefixLive)
-	} else {
-		afterPrefix = strings.TrimPrefix(key, KeyPrefixTest)
-	}
+	afterPrefix := strings.TrimPrefix(key, KeyPrefixLive)
 
 	// Split by underscore: keyID_randomPart
 	parts := strings.Split(afterPrefix, "_")
@@ -107,22 +93,11 @@ func ExtractKeyID(fullKey string) (string, error) {
 		return "", fmt.Errorf("invalid API key format: %w", err)
 	}
 
-	var keyID string
-	if strings.HasPrefix(fullKey, KeyPrefixLive) {
-		parts := strings.Split(strings.TrimPrefix(fullKey, KeyPrefixLive), "_")
-		if len(parts) != 2 {
-			return "", fmt.Errorf("invalid live key format")
-		}
-		keyID = parts[0]
-	} else if strings.HasPrefix(fullKey, KeyPrefixTest) {
-		parts := strings.Split(strings.TrimPrefix(fullKey, KeyPrefixTest), "_")
-		if len(parts) != 2 {
-			return "", fmt.Errorf("invalid test key format")
-		}
-		keyID = parts[0]
-	} else {
-		return "", fmt.Errorf("unsupported key prefix")
+	parts := strings.Split(strings.TrimPrefix(fullKey, KeyPrefixLive), "_")
+	if len(parts) != 2 {
+		return "", fmt.Errorf("invalid key format")
 	}
+	keyID := parts[0]
 
 	if len(keyID) != KeyIDLength {
 		return "", fmt.Errorf("invalid key ID length: expected %d, got %d", KeyIDLength, len(keyID))

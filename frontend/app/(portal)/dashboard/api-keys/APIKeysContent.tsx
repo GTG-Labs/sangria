@@ -20,7 +20,6 @@ export default function APIKeysContent() {
   const [createLoading, setCreateLoading] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newKeyName, setNewKeyName] = useState("");
-  const [newKeyIsLive, setNewKeyIsLive] = useState(false);
   const [newKeyResult, setNewKeyResult] = useState<string | null>(null);
   const [showNewKey, setShowNewKey] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -28,7 +27,6 @@ export default function APIKeysContent() {
 
   const resetCreateForm = () => {
     setNewKeyName("");
-    setNewKeyIsLive(false);
     setShowCreateForm(false);
   };
 
@@ -79,7 +77,6 @@ export default function APIKeysContent() {
         },
         body: JSON.stringify({
           name: newKeyName.trim(),
-          is_live: newKeyIsLive,
         }),
       });
 
@@ -270,18 +267,6 @@ export default function APIKeysContent() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md bg-white text-gray-900 placeholder-gray-500"
                 maxLength={255}
               />
-            </div>
-            <div className="flex items-center gap-2">
-              <input
-                id="isLive"
-                type="checkbox"
-                checked={newKeyIsLive}
-                onChange={(e) => setNewKeyIsLive(e.target.checked)}
-                className="rounded border-gray-300"
-              />
-              <label htmlFor="isLive" className="text-sm text-gray-700">
-                Live environment (production use)
-              </label>
             </div>
             <div className="flex gap-3">
               <button

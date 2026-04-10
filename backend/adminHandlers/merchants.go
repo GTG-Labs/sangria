@@ -19,8 +19,7 @@ func CreateMerchantAPIKey(pool *pgxpool.Pool) fiber.Handler {
 		user := c.Locals("workos_user").(auth.WorkOSUser)
 
 		var req struct {
-			Name   string `json:"name"`
-			IsLive bool   `json:"is_live"`
+			Name string `json:"name"`
 		}
 		if err := c.Bind().JSON(&req); err != nil {
 			return c.Status(400).JSON(fiber.Map{"error": "invalid request body"})
@@ -43,8 +42,7 @@ func CreateMerchantAPIKey(pool *pgxpool.Pool) fiber.Handler {
 			return c.Status(500).JSON(fiber.Map{"error": "failed to create liability account"})
 		}
 
-		// Use the structured API key generation (sg_live_/sg_test_ prefix with keyID).
-		merchant, fullKey, err := auth.CreateAPIKey(c.Context(), pool, user.ID, req.Name, req.IsLive)
+		merchant, fullKey, err := auth.CreateAPIKey(c.Context(), pool, user.ID, req.Name)
 		if err != nil {
 			if errors.Is(err, auth.ErrMaxAPIKeysReached) {
 				return c.Status(400).JSON(fiber.Map{"error": "maximum number of API keys reached (10)"})
