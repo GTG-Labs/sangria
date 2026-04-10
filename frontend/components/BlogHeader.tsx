@@ -18,6 +18,8 @@ export default function BlogHeader() {
             roughness: 0.2,
             clearcoat: 1,
             clearcoatRoughness: 0.05,
+            transparent: true,
+            opacity: 0.35,
           }}
           minSize={0.3}
           maxSize={0.8}
@@ -26,8 +28,6 @@ export default function BlogHeader() {
           wallBounce={0.98}
           maxVelocity={0.1}
           flowSpeed={0.0003}
-          centerRepelRadius={3.5}
-          centerRepelStrength={0.003}
           followCursor={false}
         />
       </div>
