@@ -3,7 +3,7 @@ package adminHandlers
 import (
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -35,7 +35,7 @@ func ApproveWithdrawal(pool *pgxpool.Pool) fiber.Handler {
 			if errors.Is(err, dbengine.ErrWithdrawalNotFound) {
 				return c.Status(400).JSON(fiber.Map{"error": "withdrawal not found or not pending approval"})
 			}
-			log.Printf("approve withdrawal %s: %v", withdrawalID, err)
+			slog.Error("approve withdrawal", "withdrawal_id", withdrawalID, "error", err)
 			return c.Status(500).JSON(fiber.Map{"error": "failed to approve withdrawal"})
 		}
 
@@ -70,7 +70,7 @@ func RejectWithdrawal(pool *pgxpool.Pool) fiber.Handler {
 			if errors.Is(err, dbengine.ErrWithdrawalNotFound) {
 				return c.Status(400).JSON(fiber.Map{"error": "withdrawal not found or not pending approval"})
 			}
-			log.Printf("reject withdrawal %s: %v", withdrawalID, err)
+			slog.Error("reject withdrawal", "withdrawal_id", withdrawalID, "error", err)
 			return c.Status(500).JSON(fiber.Map{"error": "failed to reject withdrawal"})
 		}
 
@@ -93,7 +93,7 @@ func CompleteWithdrawal(pool *pgxpool.Pool) fiber.Handler {
 			if errors.Is(err, dbengine.ErrWithdrawalNotFound) {
 				return c.Status(400).JSON(fiber.Map{"error": "withdrawal not found or not in approved/processing state"})
 			}
-			log.Printf("complete withdrawal %s: %v", withdrawalID, err)
+			slog.Error("complete withdrawal", "withdrawal_id", withdrawalID, "error", err)
 			return c.Status(500).JSON(fiber.Map{"error": "failed to complete withdrawal"})
 		}
 
@@ -115,7 +115,7 @@ func ListAllWithdrawals(pool *pgxpool.Pool) fiber.Handler {
 		if status != "" {
 			withdrawals, err := dbengine.ListWithdrawalsByStatus(c.Context(), pool, dbengine.WithdrawalStatus(status))
 			if err != nil {
-				log.Printf("list withdrawals by status: %v", err)
+				slog.Error("list withdrawals by status", "status", status, "error", err)
 				return c.Status(500).JSON(fiber.Map{"error": "failed to list withdrawals"})
 			}
 			return c.JSON(withdrawals)
@@ -124,7 +124,7 @@ func ListAllWithdrawals(pool *pgxpool.Pool) fiber.Handler {
 		// No filter — return all withdrawals.
 		withdrawals, err := dbengine.ListAllWithdrawals(c.Context(), pool)
 		if err != nil {
-			log.Printf("list all withdrawals: %v", err)
+			slog.Error("list all withdrawals", "error", err)
 			return c.Status(500).JSON(fiber.Map{"error": "failed to list withdrawals"})
 		}
 		return c.JSON(withdrawals)

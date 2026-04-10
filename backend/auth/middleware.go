@@ -2,7 +2,7 @@ package auth
 
 import (
 	"crypto/subtle"
-	"log"
+	"log/slog"
 	"os"
 	"strings"
 
@@ -38,7 +38,7 @@ func WorkosAuthMiddleware(c fiber.Ctx) error {
 	// Validate JWT token and extract user ID
 	userID, err := VerifyWorkOSToken(c.Context(), token)
 	if err != nil {
-		log.Printf("JWT validation failed: %v", err)
+		slog.Error("JWT validation failed", "error", err)
 		return c.Status(401).JSON(fiber.Map{"error": "Invalid or expired session token"})
 	}
 
@@ -47,7 +47,7 @@ func WorkosAuthMiddleware(c fiber.Ctx) error {
 		User: userID,
 	})
 	if err != nil {
-		log.Printf("WorkOS user lookup failed for validated user %s: %v", userID, err)
+		slog.Error("WorkOS user lookup failed", "user_id", userID, "error", err)
 		return c.Status(401).JSON(fiber.Map{"error": "User session not found"})
 	}
 
@@ -88,7 +88,7 @@ func APIKeyAuthMiddleware(pool *pgxpool.Pool) fiber.Handler {
 		// Validate and authenticate the API key
 		merchantKey, err := AuthenticateAPIKey(c.Context(), pool, apiKey)
 		if err != nil {
-			log.Printf("API key authentication failed: %v", err)
+			slog.Error("API key authentication failed", "error", err)
 			return c.Status(401).JSON(fiber.Map{"error": "Invalid API key"})
 		}
 
@@ -111,7 +111,7 @@ func RequireAdmin(pool *pgxpool.Pool) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		// Check admin API key header.
 		if adminKey == "" {
-			log.Printf("ADMIN_API_KEY env var not set — admin endpoints are disabled")
+			slog.Warn("ADMIN_API_KEY not set, admin endpoints are disabled")
 			return c.Status(503).JSON(fiber.Map{"error": "Admin access not configured"})
 		}
 
@@ -124,7 +124,7 @@ func RequireAdmin(pool *pgxpool.Pool) fiber.Handler {
 		user := c.Locals("workos_user").(WorkOSUser)
 		dbUser, err := dbengine.GetUserByWorkosID(c.Context(), pool, user.ID)
 		if err != nil {
-			log.Printf("admin role check: database lookup failed for user %s: %v", user.ID, err)
+			slog.Error("admin role check: database lookup failed", "user_id", user.ID, "error", err)
 			return c.Status(500).JSON(fiber.Map{"error": "Internal server error"})
 		}
 		if dbUser.Role != "admin" {

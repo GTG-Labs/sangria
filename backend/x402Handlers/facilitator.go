@@ -10,7 +10,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"strings"
@@ -116,7 +116,7 @@ func Verify(ctx context.Context, payload json.RawMessage, requirements PaymentRe
 		return nil, fmt.Errorf("build verify request: %w", err)
 	}
 
-	log.Printf("facilitator verify request body: %s", string(body))
+	slog.Debug("calling facilitator verify", "url", facilitatorURL)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, facilitatorURL+"/verify", bytes.NewReader(body))
 	if err != nil {

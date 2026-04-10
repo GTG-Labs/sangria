@@ -1,7 +1,7 @@
 package merchantHandlers
 
 import (
-	"log"
+	"log/slog"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -33,7 +33,7 @@ func GetMerchantTransactions(pool *pgxpool.Pool) fiber.Handler {
 			c.Context(), pool, user.ID, limit, cursor,
 		)
 		if err != nil {
-			log.Printf("Failed to fetch transactions for user %s: %v", user.ID, err)
+			slog.Error("fetch transactions: query failed", "user_id", user.ID, "error", err)
 			return c.Status(500).JSON(fiber.Map{
 				"error": "Failed to retrieve transactions",
 			})
