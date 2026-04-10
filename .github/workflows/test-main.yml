@@ -27,18 +27,18 @@ jobs:
         cache: 'pip'
         cache-dependency-path: 'tests/requirements.txt'
 
+    - name: Install pnpm
+      uses: pnpm/action-setup@v2
+      with:
+        version: 8
+        run_install: false
+
     - name: Set up Node.js
       uses: actions/setup-node@v4
       with:
         node-version: ${{ env.NODE_VERSION }}
         cache: 'pnpm'
         cache-dependency-path: 'tests/pnpm-lock.yaml'
-
-    - name: Install pnpm
-      uses: pnpm/action-setup@v2
-      with:
-        version: 8
-        run_install: false
 
     - name: Install all dependencies
       run: |

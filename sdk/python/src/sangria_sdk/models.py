@@ -12,7 +12,12 @@ class FixedPriceOptions:
 
     def __post_init__(self) -> None:
         import math
-        if not isinstance(self.price, (int, float)) or not math.isfinite(self.price) or self.price <= 0:
+
+        if (
+            not isinstance(self.price, (int, float))
+            or not math.isfinite(self.price)
+            or self.price <= 0
+        ):
             raise ValueError("price must be a finite number greater than 0")
 
     def to_generate_dict(self) -> dict[str, Any]:
@@ -28,6 +33,7 @@ class FixedPriceOptions:
 @dataclass(slots=True)
 class PaymentResponse:
     """Return this as an HTTP response — payment not yet completed."""
+
     status_code: int
     body: dict[str, Any]
     headers: dict[str, str] = field(default_factory=dict)
@@ -36,6 +42,7 @@ class PaymentResponse:
 @dataclass(slots=True)
 class PaymentProceeded:
     """Payment succeeded — run the handler."""
+
     paid: bool
     amount: float
     transaction: str | None = None

@@ -33,7 +33,9 @@ def require_sangria_payment(
                         break
 
             if request is None:
-                raise HTTPException(status_code=500, detail="FastAPI request not available")
+                raise HTTPException(
+                    status_code=500, detail="FastAPI request not available"
+                )
 
             if bypass_if and bypass_if(request):
                 return await func(*args, **kwargs)

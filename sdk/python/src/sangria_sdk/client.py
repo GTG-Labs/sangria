@@ -55,7 +55,9 @@ class SangriaMerchantClient:
             )
 
             # you gotta encode the payload before sending it back (part of the spec)
-            encoded = base64.b64encode(json.dumps(x402_response_payload).encode()).decode()
+            encoded = base64.b64encode(
+                json.dumps(x402_response_payload).encode()
+            ).decode()
 
             return PaymentResponse(
                 status_code=402,
