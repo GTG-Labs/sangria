@@ -1,12 +1,12 @@
 {
-  "title": "Sangria Docs",
+  "title": "Documentation",
   "pages": [
-    "---[BookOpen]Introduction---",
-    "getting-started",
-    "---[Zap]Protocol---",
-    "x402-protocol",
-    "variable-pricing",
-    "---[Blocks]Reference---",
-    "architecture"
+    "---Documentation---",
+    "index",
+    "---Quickstart---",
+    "express",
+    "hono",
+    "fastify",
+    "fastapi"
   ]
 }

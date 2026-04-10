@@ -1,14 +1,26 @@
 ---
 title: Introduction
-description: Learn how to use the x402 protocol and run the Sangria demo.
-icon: House
 ---
 
-Welcome to the Sangria documentation. Choose a topic to get started.
+Sangria lets you monetize any API endpoint so AI agents can pay per request.
 
-## Guides
+Drop in the SDK, set a price, and start earning. No payment processor, no checkout flow — agents pay with USDC via the [x402 protocol](/docs/x402-protocol).
 
-- [Getting Started](/docs/getting-started) — Prerequisites, setup, and running your first x402 micropayment demo.
-- [x402 Protocol](/docs/x402-protocol) — Deep dive into how the x402 protocol works under the hood.
-- [Variable Pricing](/docs/variable-pricing) — Advanced: implementing dynamic pricing and usage-based costs.
-- [Project Architecture](/docs/architecture) — Understanding the code structure, wallet management, and components.
+## Quickstart
+
+Learn how to set up Sangria in your project.
+
+<Cards>
+  <Card title="Express" href="/docs/express">
+    Accept payments in an Express app with one middleware.
+  </Card>
+  <Card title="Hono" href="/docs/hono">
+    Accept payments in a Hono app with one middleware.
+  </Card>
+  <Card title="Fastify" href="/docs/fastify">
+    Accept payments in a Fastify app with a preHandler hook.
+  </Card>
+  <Card title="FastAPI (Python)" href="/docs/fastapi">
+    Accept payments in a FastAPI app with a decorator.
+  </Card>
+</Cards>

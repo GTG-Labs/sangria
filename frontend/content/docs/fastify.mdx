@@ -1,0 +1,104 @@
+---
+title: Fastify
+description: Learn how to accept your first payment using Fastify and the Sangria TypeScript SDK.
+---
+
+## Prerequisites
+
+To get the most out of this guide, you'll need to:
+
+- [Create an API key](https://sangria.dev/dashboard/api-keys) from the Sangria dashboard
+- Have Node.js 18+ installed
+
+## 1. Install
+
+Install the Sangria SDK in your Fastify project.
+
+```bash
+npm install @sangria/core
+```
+
+## 2. Initialize the client
+
+Create a Sangria instance with your API key.
+
+```ts
+import { Sangria } from "@sangria/core";
+
+const sangria = new Sangria({
+  apiKey: process.env.SANGRIA_SECRET_KEY,
+});
+```
+
+## 3. Register the plugin
+
+Fastify requires a one-time plugin registration before using the payment middleware. This decorates the request object so `request.sangria` is available in your handlers.
+
+```ts
+import Fastify from "fastify";
+import { sangriaPlugin } from "@sangria/core/fastify";
+
+const fastify = Fastify();
+fastify.register(sangriaPlugin);
+```
+
+## 4. Protect a route
+
+Use `fixedPrice` as a `preHandler` hook on any route.
+
+```ts
+import Fastify from "fastify";
+import { Sangria } from "@sangria/core";
+import { sangriaPlugin, fixedPrice } from "@sangria/core/fastify";
+
+const fastify = Fastify();
+
+const sangria = new Sangria({
+  apiKey: process.env.SANGRIA_SECRET_KEY,
+});
+
+fastify.register(sangriaPlugin);
+
+// This endpoint is free
+fastify.get("/", async () => {
+  return { message: "Hello! This endpoint is free." };
+});
+
+// This endpoint costs $0.01 per request
+fastify.get(
+  "/premium",
+  {
+    preHandler: fixedPrice(sangria, {
+      price: 0.01,
+      description: "Access premium content",
+    }),
+  },
+  async () => {
+    return { message: "You accessed the premium endpoint!" };
+  }
+);
+
+await fastify.listen({ port: 4002 });
+```
+
+## 5. Run it
+
+Start your server:
+
+```bash
+SANGRIA_SECRET_KEY=sg_live_xxx node server.js
+```
+
+When an agent calls `GET /premium`:
+
+1. **First request** (no payment) — the SDK returns `402 Payment Required` with the price and payment details
+2. **Agent signs** the USDC payment off-chain
+3. **Retry with payment** — the agent sends the signed payment in a `payment-signature` header
+4. **SDK settles** the payment on-chain and your handler runs
+
+## Try it yourself
+
+```bash
+# This will return a 402 with payment requirements
+curl http://localhost:4002/premium
+```

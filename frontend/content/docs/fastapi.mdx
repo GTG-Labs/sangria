@@ -1,0 +1,84 @@
+---
+title: FastAPI
+description: Learn how to accept your first payment using FastAPI and the Sangria Python SDK.
+---
+
+## Prerequisites
+
+To get the most out of this guide, you'll need to:
+
+- [Create an API key](https://sangria.dev/dashboard/api-keys) from the Sangria dashboard
+- Have Python 3.10+ installed
+
+## 1. Install
+
+Install the Sangria SDK with the FastAPI adapter.
+
+```bash
+pip install sangria-merchant-sdk[fastapi]
+```
+
+## 2. Initialize the client
+
+Create a `SangriaMerchantClient` with your API key.
+
+```python
+import os
+from sangria_sdk import SangriaMerchantClient
+
+client = SangriaMerchantClient(
+    api_key=os.getenv("SANGRIA_SECRET_KEY"),
+)
+```
+
+## 3. Protect a route
+
+Import the FastAPI adapter and add the `@require_sangria_payment` decorator to any endpoint you want to charge for.
+
+```python
+import os
+from fastapi import FastAPI, Request
+from sangria_sdk import SangriaMerchantClient
+from sangria_sdk.adapters.fastapi import require_sangria_payment
+
+app = FastAPI()
+
+client = SangriaMerchantClient(
+    api_key=os.getenv("SANGRIA_SECRET_KEY"),
+)
+
+# This endpoint is free
+@app.get("/")
+async def health():
+    return {"message": "Hello! This endpoint is free."}
+
+# This endpoint costs $0.01 per request
+@app.get("/premium")
+@require_sangria_payment(client, amount=0.01, description="Access premium content")
+async def premium(request: Request):
+    return {"message": "You accessed the premium endpoint!"}
+```
+
+## 4. Run it
+
+Start your server:
+
+```bash
+SANGRIA_SECRET_KEY=sg_live_xxx uvicorn main:app --port 4004
+```
+
+When an agent calls `GET /premium`:
+
+1. **First request** (no payment) — the SDK returns `402 Payment Required` with the price and payment details
+2. **Agent signs** the USDC payment off-chain
+3. **Retry with payment** — the agent sends the signed payment in a `PAYMENT-SIGNATURE` header
+4. **SDK settles** the payment on-chain and your handler runs
+
+Payment data is available in your handler via `request.state.sangria_payment`.
+
+## Try it yourself
+
+```bash
+# This will return a 402 with payment requirements
+curl http://localhost:4004/premium
+```
