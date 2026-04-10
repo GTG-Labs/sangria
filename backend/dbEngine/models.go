@@ -139,3 +139,40 @@ type TransactionsResponse struct {
 	Pagination PaginationMeta    `json:"pagination"`
 }
 
+type WithdrawalStatus string
+
+const (
+	WithdrawalStatusPendingApproval WithdrawalStatus = "pending_approval"
+	WithdrawalStatusApproved        WithdrawalStatus = "approved"
+	WithdrawalStatusProcessing      WithdrawalStatus = "processing"
+	WithdrawalStatusCompleted       WithdrawalStatus = "completed"
+	WithdrawalStatusFailed          WithdrawalStatus = "failed"
+	WithdrawalStatusReversed        WithdrawalStatus = "reversed"
+	WithdrawalStatusCanceled        WithdrawalStatus = "canceled"
+)
+
+type Withdrawal struct {
+	ID                      string           `json:"id"`
+	MerchantID              string           `json:"merchant_id"`
+	Amount                  int64            `json:"amount"`
+	Fee                     int64            `json:"fee"`
+	NetAmount               int64            `json:"net_amount"`
+	Status                  WithdrawalStatus `json:"status"`
+	DebitTransactionID      *string          `json:"debit_transaction_id"`
+	CompletionTransactionID *string          `json:"completion_transaction_id"`
+	ReversalTransactionID   *string          `json:"reversal_transaction_id"`
+	FailureCode             *string          `json:"failure_code"`
+	FailureMessage          *string          `json:"failure_message"`
+	ReviewedBy              *string          `json:"reviewed_by"`
+	ReviewedAt              *time.Time       `json:"reviewed_at"`
+	ReviewNote              *string          `json:"review_note"`
+	IdempotencyKey          string           `json:"idempotency_key"`
+	CreatedAt               time.Time        `json:"created_at"`
+	ApprovedAt              *time.Time       `json:"approved_at"`
+	ProcessedAt             *time.Time       `json:"processed_at"`
+	CompletedAt             *time.Time       `json:"completed_at"`
+	FailedAt                *time.Time       `json:"failed_at"`
+	ReversedAt              *time.Time       `json:"reversed_at"`
+	CanceledAt              *time.Time       `json:"canceled_at"`
+}
+

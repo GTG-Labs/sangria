@@ -43,7 +43,7 @@ CDP Facilitator (Coinbase)
    CDP_SECRET_KEY=<your key secret>
    CDP_WALLET_SECRET=<your wallet secret>
    ```
-4. **Buyer wallet** funded with USDC + ETH on base-sepolia
+4. **Buyer wallet** funded with USDC + ETH on base
 
 ## Usage
 
@@ -109,7 +109,7 @@ Final status: 200
   "settlement": {
     "transaction": "0xabc...",
     "payer": "0x...",
-    "network": "base-sepolia"
+    "network": "base"
   }
 }
 

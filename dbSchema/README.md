@@ -35,31 +35,117 @@ cp .env.example .env   # fill in your DATABASE_URL
 
 ## Current schema
 
-Defined in `schema.ts`:
+Defined in `schema.ts`. All tables use UUID primary keys with `defaultRandom()`.
 
-**users**
+### Enums
+
+| Enum | Values |
+|---|---|
+| `direction` | DEBIT, CREDIT |
+| `currency` | USD, USDC, ETH |
+| `account_type` | ASSET, LIABILITY, EQUITY, REVENUE, EXPENSE |
+| `user_role` | member, admin |
+| `network` | base, base-sepolia, polygon, solana, solana-devnet |
+| `withdrawal_status` | pending_approval, approved, processing, completed, failed, reversed, canceled |
+
+### Tables
+
+**users** — WorkOS identities
+
 | Column | Type | Notes |
 |---|---|---|
 | workos_id | text | Primary key |
-| owner | text | Not null |
-| created_at | timestamp (tz) | Defaults to now |
-| updated_at | timestamp (tz) | Defaults to now |
+| owner | text | Display name or email |
+| role | user_role | Default "member" |
+| created_at | timestamp (tz) | Default now() |
+| updated_at | timestamp (tz) | Default now() |
 
-**transactions**
+**accounts** — double-entry ledger accounts
+
 | Column | Type | Notes |
 |---|---|---|
-| id | bigserial | Primary key |
-| from_account | bigint | FK → accounts.id |
-| to_account | bigint | FK → accounts.id |
-| value | numeric | Not null |
-| created_at | timestamp (tz) | Defaults to now |
+| id | uuid | Primary key |
+| name | varchar(255) | Account name |
+| type | account_type | ASSET, LIABILITY, etc. |
+| currency | currency | USD, USDC, ETH |
+| user_id | text | Nullable, FK → users.workos_id |
+| created_at | timestamp (tz) | Default now() |
+
+**transactions** — idempotency envelopes for ledger writes
+
+| Column | Type | Notes |
+|---|---|---|
+| id | uuid | Primary key |
+| idempotency_key | varchar(255) | NOT NULL, UNIQUE |
+| description | text | Nullable |
+| created_at | timestamp (tz) | Default now() |
+
+**ledger_entries** — append-only journal lines
+
+| Column | Type | Notes |
+|---|---|---|
+| id | uuid | Primary key |
+| transaction_id | uuid | FK → transactions.id |
+| currency | currency | Must match account currency |
+| amount | bigint | Microunits, CHECK > 0 |
+| direction | direction | DEBIT or CREDIT |
+| account_id | uuid | FK → accounts.id |
+
+**merchants** — API keys for businesses receiving x402 payments
+
+| Column | Type | Notes |
+|---|---|---|
+| id | uuid | Primary key |
+| user_id | text | FK → users.workos_id |
+| api_key | text | bcrypt hash |
+| key_id | varchar(8) | For O(1) indexed lookup |
+| name | varchar(255) | Human-readable name |
+| is_active | boolean | Default true |
+| last_used_at | timestamp (tz) | Nullable |
+| created_at | timestamp (tz) | Default now() |
+
+**cards** — API keys for SDK developers (future)
+
+Same structure as merchants, with card-specific key generation (TODO).
+
+**crypto_wallets** — Sangria-owned CDP wallet pool
+
+| Column | Type | Notes |
+|---|---|---|
+| id | uuid | Primary key |
+| address | varchar(255) | On-chain address |
+| network | network | Which chain |
+| account_id | uuid | FK → accounts.id (USDC ASSET) |
+| last_used_at | timestamp (tz) | For LRU selection |
+| created_at | timestamp (tz) | Default now() |
+
+Constraints: `UNIQUE(address, network)`, `UNIQUE(account_id)`
+
+**withdrawals** — merchant payout requests
+
+| Column | Type | Notes |
+|---|---|---|
+| id | uuid | Primary key |
+| merchant_id | uuid | FK → merchants.id |
+| amount | bigint | Microunits, CHECK > 0 |
+| fee | bigint | Fee deducted |
+| net_amount | bigint | amount - fee |
+| status | withdrawal_status | Default pending_approval |
+| debit_transaction_id | uuid | FK → transactions.id |
+| completion_transaction_id | uuid | FK → transactions.id |
+| reversal_transaction_id | uuid | FK → transactions.id |
+| failure_code | varchar(100) | Nullable |
+| failure_message | text | Nullable |
+| reviewed_by | text | Admin workos_id |
+| idempotency_key | varchar(255) | UNIQUE |
+| created_at + per-status timestamps | timestamp (tz) | approved_at, completed_at, etc. |
 
 ## Updating the schema
 
 1. Edit `schema.ts` — add/modify tables using [Drizzle's column types](https://orm.drizzle.team/docs/column-types/pg)
 2. Run `pnpm push` to apply changes to the database
 3. Update the Go structs in `backend/dbEngine/models.go` to match
-4. Update queries in `backend/dbEngine/queries.go` if needed
+4. Wire up DB operations and handlers as needed
 
 ## SSL note
 

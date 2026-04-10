@@ -13,4 +13,10 @@ func RegisterAdminRoutes(app *fiber.App, pool *pgxpool.Pool) {
 
 	admin.Post("/wallets/pool", adminHandlers.CreateWalletPool(pool))
 	admin.Post("/treasury/fund", adminHandlers.FundTreasury(pool))
+
+	// Withdrawal management
+	admin.Post("/withdrawals/:id/approve", adminHandlers.ApproveWithdrawal(pool))
+	admin.Post("/withdrawals/:id/reject", adminHandlers.RejectWithdrawal(pool))
+	admin.Post("/withdrawals/:id/complete", adminHandlers.CompleteWithdrawal(pool))
+	admin.Get("/withdrawals", adminHandlers.ListAllWithdrawals(pool))
 }

@@ -1,31 +1,41 @@
 # dbEngine
 
-Double-entry ledger engine and account management layer.
+Double-entry ledger engine, account management, and database operations.
 
 ## Core invariant
 
-**Every transaction must net to zero per currency.** If you debit 10 USDC somewhere, you must credit 10 USDC somewhere else. This is what keeps the books balanced.
+**Every transaction must net to zero per currency.** If you debit 10 USD somewhere, you must credit 10 USD somewhere else. This is what keeps the books balanced.
 
 ```text
-Deposit 10 USDC:
+Payment settlement (cross-currency):
 
-  DEBIT   10,000,000  Asset (platform wallet)     USDC
-  CREDIT  10,000,000  Liability (user balance)    USDC
-  ─────────────────────────────────────────────────────
-  Net:             0                               OK
+  DEBIT   100  Hot Wallet (USDC ASSET)          USDC
+  CREDIT  100  Conversion Clearing              USDC
+  ──────────────────────────────────────────────────
+  USDC net:  0                                   OK
+
+  DEBIT   100  Conversion Clearing              USD
+  CREDIT   99  Merchant Payable (USD LIABILITY)  USD
+  CREDIT    1  Platform Fee Revenue             USD
+  ──────────────────────────────────────────────────
+  USD net:   0                                   OK
 ```
 
-Amounts are positive integers in microunits (1 USDC = 1,000,000). Direction (`DEBIT`/`CREDIT`) determines sign. No signed amounts, no ambiguity.
+Amounts are positive integers in microunits (1 USD = 1,000,000). Direction (`DEBIT`/`CREDIT`) determines sign. No signed amounts, no ambiguity.
 
 ## Files
 
 | File | Purpose |
 |------|---------|
 | `engine.go` | `Connect(ctx, connStr)` — creates and pings a `pgxpool.Pool` |
-| `models.go` | Go structs mirroring the Drizzle schema. `Currency`, `Direction`, and `AccountType` typed enums |
-| `creation.go` | `CreateAccount` — insert any account type |
-| `queries.go` | Read queries — list accounts, ledger entries, balances |
-| `transaction.go` | `InsertTransaction` — zero-net enforced ledger writes |
+| `models.go` | Go structs mirroring the Drizzle schema. Typed enums for Currency, Direction, AccountType, Network, WithdrawalStatus |
+| `systemAccounts.go` | `EnsureSystemAccounts` — creates system-level accounts at startup (Conversion Clearing, Platform Fee Revenue, etc.) |
+| `merchants.go` | `GetMerchantByID`, `EnsureUSDLiabilityAccount`, `GetMerchantUSDLiabilityAccount` |
+| `cryptoWallets.go` | `CreateCryptoWalletWithAccount`, `GetWalletByNetwork`, `GetWalletByAddress` |
+| `transaction.go` | `InsertTransaction` — zero-net enforced ledger writes with idempotency |
+| `withdrawals.go` | `CreateWithdrawal`, `ApproveWithdrawal`, `RejectWithdrawal`, `CompleteWithdrawal`, `FailWithdrawal` |
+| `users.go` | `UpsertUser`, `GetUserByWorkosID` |
+| `queries.go` | Paginated transaction queries with cursor-based pagination |
 
 ## Transaction engine
 
@@ -59,17 +69,32 @@ Rules 1–5 run **before** touching the database. Rule 6 runs inside the DB tran
 
 Failure at any step rolls back. Nothing partial hits the database.
 
-## Models
+## System accounts
 
-### Account types
+Created automatically at startup via `EnsureSystemAccounts`:
+
+| Account | Type | Currency | Purpose |
+|---|---|---|---|
+| Conversion Clearing | ASSET | USDC | Bridge: USDC side |
+| Conversion Clearing | ASSET | USD | Bridge: USD side |
+| Platform Fee Revenue | REVENUE | USD | Sangria's cut per transaction |
+| Conversion Fees | EXPENSE | USD | Off-ramp fees (batch conversion) |
+| Gas Fees | EXPENSE | USD | On-chain gas costs (future) |
+| USD Merchant Pool | ASSET | USD | Pre-funded pool for merchant payouts |
+| Owner Equity | EQUITY | USD | Capital deposited by Sangria |
+| Withdrawal Clearing | ASSET | USD | Funds in transit during merchant payouts |
+
+## Account types
 
 A single `accounts` table with a `type` enum:
 
-- **ASSET** — things the platform owns (e.g. USDC wallet)
-- **LIABILITY** — obligations to users (e.g. user balances)
-- **EQUITY** — owner's equity
-- **REVENUE** — income earned (e.g. fees collected)
-- **EXPENSE** — costs incurred (e.g. fees paid)
+- **ASSET** — things the platform owns (e.g. USDC wallet, USD pool)
+- **LIABILITY** — obligations to users (e.g. merchant USD balances)
+- **EQUITY** — owner's equity (capital invested)
+- **REVENUE** — income earned (e.g. platform fees)
+- **EXPENSE** — costs incurred (e.g. conversion fees, gas)
+
+## Models
 
 ### `LedgerLine` (input)
 
@@ -85,17 +110,6 @@ type LedgerLine struct {
 ### `LedgerEntry` (output)
 
 Same fields as `LedgerLine` plus `ID` and `TransactionID`, populated after insert.
-
-## Queries
-
-| Function | Description |
-|----------|-------------|
-| `CreateAccount(ctx, pool, name, type, currency, userID)` | Create an account of any type |
-| `GetAllAccounts` | List all accounts |
-| `GetAccountsByType(accountType)` | List accounts filtered by type |
-| `GetAllLedgerEntries` | List all ledger entries ordered by transaction |
-| `GetLedgerEntriesByTransaction(txID)` | Entries for a specific transaction |
-| `GetAccountBalance(accountID, currency)` | Net balance (credits - debits) for any account |
 
 ## Schema
 

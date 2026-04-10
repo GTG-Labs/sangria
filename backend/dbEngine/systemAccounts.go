@@ -17,6 +17,7 @@ const (
 	SystemAccountGasFees            = "Gas Fees"
 	SystemAccountUSDMerchantPool    = "USD Merchant Pool"
 	SystemAccountOwnerEquity        = "Owner Equity"
+	SystemAccountWithdrawalClearing = "Withdrawal Clearing"
 )
 
 // ensureSystemAccount creates a system-level account if it doesn't exist.
@@ -91,6 +92,9 @@ func EnsureSystemAccounts(ctx context.Context, pool *pgxpool.Pool) error {
 
 		// Owner equity — tracks capital deposited by Sangria into the treasury.
 		{SystemAccountOwnerEquity, AccountTypeEquity, USD},
+
+		// Withdrawal clearing — holds funds in transit during merchant payouts.
+		{SystemAccountWithdrawalClearing, AccountTypeAsset, USD},
 	}
 
 	for _, a := range accounts {

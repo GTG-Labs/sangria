@@ -34,8 +34,13 @@ The server starts on `http://localhost:8080`.
 | `X402_FACILITATOR_URL` | Yes | Facilitator URL (testnet: `https://x402.org/facilitator`) |
 | `PLATFORM_FEE_PERCENT` | No | Fee percentage per payment (default: `0`, recommended: `0.5`) |
 | `PLATFORM_FEE_MIN_MICROUNITS` | No | Minimum fee in microunits (default: `0`, recommended: `1000` = $0.001) |
+| `WITHDRAWAL_AUTO_APPROVE_THRESHOLD` | No | Auto-approve withdrawals up to this amount in microunits (default: `200000000` = $200) |
+| `WITHDRAWAL_MIN_AMOUNT` | No | Minimum withdrawal in microunits (default: `1000000` = $1.00) |
+| `WITHDRAWAL_FEE_FLAT` | No | Flat fee per withdrawal in microunits (default: `0`) |
 
 ## API reference
+
+All routes are organized by auth type. The route prefix indicates the auth pattern.
 
 ### Public
 
@@ -43,34 +48,45 @@ The server starts on `http://localhost:8080`.
 |---|---|---|---|
 | GET | `/` | None | Health check |
 
-### User endpoints (WorkOS JWT)
+### Dashboard endpoints — `/internal/*` (WorkOS JWT)
+
+These are called by the Sangria frontend dashboard. The user logs in via WorkOS and gets a JWT.
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| POST | `/users` | WorkOS JWT | Register/upsert user on login |
-| GET | `/api-keys` | WorkOS JWT | List user's API keys |
-| DELETE | `/api-keys/:id` | WorkOS JWT | Revoke an API key |
-| POST | `/merchants` | WorkOS JWT | Create a merchant API key + USD liability account |
+| POST | `/internal/users` | WorkOS JWT | Register/upsert user on login |
+| GET | `/internal/transactions` | WorkOS JWT | List merchant transactions (paginated) |
+| POST | `/internal/merchants` | WorkOS JWT | Create a merchant API key + USD liability account |
+| GET | `/internal/api-keys` | WorkOS JWT | List user's API keys |
+| DELETE | `/internal/api-keys/:id` | WorkOS JWT | Revoke an API key |
+| POST | `/internal/withdrawals` | WorkOS JWT | Request a merchant withdrawal (requires merchant_id) |
+| GET | `/internal/withdrawals` | WorkOS JWT | List withdrawals for a merchant (?merchant_id=) |
 
-### Merchant endpoints (API key)
+### SDK endpoints — `/v1/*` (API key)
+
+These are called by merchant servers using the Sangria SDK. Authenticated via merchant API key.
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| GET | `/merchant/profile` | API key | Get merchant profile |
-| GET | `/merchant/balance` | API key | Get merchant USD balance |
 | POST | `/v1/generate-payment` | API key | Generate x402 PaymentRequired |
 | POST | `/v1/settle-payment` | API key | Verify + settle payment, credit merchant |
 
-### Admin endpoints (WorkOS JWT + admin key + admin role)
+### Admin endpoints — `/admin/*` (WorkOS JWT + admin key + admin role)
+
+Triple-gated: requires WorkOS JWT, `X-Admin-Key` header, and `role = "admin"` in the database.
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| POST | `/wallets/pool` | Admin | Create a CDP wallet in the pool |
+| POST | `/admin/wallets/pool` | Admin | Create a CDP wallet in the pool |
 | POST | `/admin/treasury/fund` | Admin | Record a USD treasury deposit (bookkeeping only) |
+| POST | `/admin/withdrawals/:id/approve` | Admin | Approve a pending withdrawal |
+| POST | `/admin/withdrawals/:id/reject` | Admin | Reject and reverse a pending withdrawal |
+| POST | `/admin/withdrawals/:id/complete` | Admin | Mark withdrawal as completed after bank transfer |
+| GET | `/admin/withdrawals` | Admin | List withdrawals (filterable by ?status=) |
 
 ### API key format
 
-Merchant API keys follow the format `sg_live_<key_id>_<random>` or `sg_test_<key_id>_<random>`. Pass via `X-API-Key` header or `Authorization: Bearer <key>`.
+Merchant API keys follow the format `sg_live_<key_id>_<random>` or `sg_test_<key_id>_<random>`. Pass via `Authorization: Bearer <key>` header.
 
 ### Admin authentication
 
@@ -79,14 +95,22 @@ Admin endpoints require all three:
 2. `X-Admin-Key: <admin-api-key>` header
 3. User's `role = "admin"` in the database
 
+All admin auth failures return a generic `403 Forbidden`.
+
 ## Project structure
 
 ```
 backend/
-├── main.go                        # Route wiring + server startup
+├── main.go                        # Server startup + route registration
+├── routes/
+│   ├── public.go                  # RegisterPublicRoutes (health check)
+│   ├── jwt.go                     # RegisterJWTRoutes (dashboard endpoints, /internal/*)
+│   ├── apikey.go                  # RegisterAPIKeyRoutes (SDK endpoints, /v1/*)
+│   └── admin.go                   # RegisterAdminRoutes (admin endpoints, /admin/*)
 ├── config/
 │   ├── server.go                  # Environment loading, WorkOS setup, DB connection
-│   └── fees.go                    # Platform fee config + calculation
+│   ├── fees.go                    # Platform fee config + calculation
+│   └── withdrawals.go             # Withdrawal config (auto-approve, min amount, fee)
 ├── auth/
 │   ├── middleware.go              # WorkosAuthMiddleware, APIKeyAuthMiddleware, RequireAdmin
 │   ├── workos.go                  # JWKS cache, JWT validation, CreateUser handler
@@ -96,30 +120,31 @@ backend/
 │   └── hash.go                    # bcrypt hashing + verification
 ├── merchantHandlers/
 │   ├── payments.go                # GeneratePayment, SettlePayment
-│   ├── balance.go                 # GetMerchantBalance
-│   └── profile.go                 # GetMerchantProfile
+│   ├── transactions.go            # GetMerchantTransactions (paginated)
+│   └── withdrawals.go             # RequestWithdrawal, ListWithdrawals
 ├── adminHandlers/
 │   ├── merchants.go               # CreateMerchantAPIKey
 │   ├── wallets.go                 # CreateWalletPool
-│   └── treasury.go               # FundTreasury
+│   ├── treasury.go               # FundTreasury
+│   └── withdrawals.go             # ApproveWithdrawal, RejectWithdrawal, CompleteWithdrawal
 ├── dbEngine/
 │   ├── models.go                  # All Go types + enums
 │   ├── engine.go                  # DB connection pool
-│   ├── accounts.go                # Account CRUD + balance queries
 │   ├── systemAccounts.go          # System account initialization
-│   ├── merchants.go               # Merchant DB operations
-│   ├── cards.go                   # Card DB operations
-│   ├── cryptoWallets.go           # Wallet pool operations (LRU)
+│   ├── merchants.go               # GetMerchantByID, EnsureUSDLiabilityAccount
+│   ├── cryptoWallets.go           # CreateCryptoWalletWithAccount, GetWalletByNetwork/Address
+│   ├── withdrawals.go             # CreateWithdrawal, Approve/Reject/Complete/FailWithdrawal
 │   ├── transaction.go             # Double-entry ledger (InsertTransaction, validateZeroNet)
 │   ├── users.go                   # User CRUD
-│   └── queries.go                 # Generic ledger queries
+│   └── queries.go                 # Transaction queries (paginated)
 ├── cdpHandlers/
 │   └── wallet.go                  # CDP client, wallet creation, faucet funding
 ├── x402Handlers/
 │   ├── facilitator.go             # Facilitator HTTP client (Verify, Settle)
 │   └── types.go                   # x402 protocol types, network config map
 └── utils/
-    └── cors.go                    # CORS middleware
+    ├── cors.go                    # CORS middleware
+    └── pagination.go              # Cursor-based pagination helpers
 ```
 
 ## How payments work
@@ -133,6 +158,16 @@ backend/
    - USDC received → Conversion Clearing (bridge) → USD owed to merchant + platform fee
 7. Merchant sees their USD balance increase on the dashboard
 
+## How withdrawals work
+
+1. Merchant requests withdrawal from the dashboard (`POST /internal/withdrawals`)
+2. Balance is debited immediately (prevents overdraw)
+3. If amount <= $200: auto-approved. If > $200: goes to `pending_approval`
+4. Admin reviews pending withdrawals via `GET /admin/withdrawals?status=pending_approval`
+5. Admin approves or rejects. Rejection reverses the balance debit.
+6. After manual bank transfer, admin marks as completed (`POST /admin/withdrawals/:id/complete`)
+7. Completion ledger entry moves funds from Withdrawal Clearing to USD Merchant Pool
+
 ## Schema-first workflow
 
 The TypeScript Drizzle schema (`dbSchema/schema.ts`) is the source of truth.
@@ -142,6 +177,6 @@ The TypeScript Drizzle schema (`dbSchema/schema.ts`) is the source of truth.
 3. Update Go structs in `dbEngine/models.go`
 4. Add DB operations in the appropriate `dbEngine/*.go` file
 5. Add handlers in the appropriate `*Handlers/` package
-6. Wire routes in `main.go`
+6. Wire routes in the appropriate `routes/*.go` file
 
 See [`dbSchema/README.md`](../dbSchema/README.md) for more on the schema workflow.

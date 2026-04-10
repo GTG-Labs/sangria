@@ -103,6 +103,16 @@ export const ledgerEntries = pgTable(
   ],
 );
 
+export const withdrawalStatusEnum = pgEnum("withdrawal_status", [
+  "pending_approval", // amount > auto-approve threshold, awaiting admin review
+  "approved", // auto-approved or admin approved, ready for bank transfer
+  "processing", // bank transfer initiated
+  "completed", // funds arrived at merchant's bank
+  "failed", // bank rejected the transfer
+  "reversed", // funds returned after initial success (bounce-back)
+  "canceled", // admin rejected or merchant canceled before processing
+]);
+
 // ---------------------------------------------------------------------------
 // x402 Enums
 // ---------------------------------------------------------------------------
@@ -194,6 +204,68 @@ export const cryptoWallets = pgTable(
     index("idx_crypto_wallets_network").on(table.network),
     unique("uq_crypto_wallets_address_network").on(table.address, table.network),
     unique("uq_crypto_wallets_account_id").on(table.accountId),
+  ],
+);
+
+// ---------------------------------------------------------------------------
+// Withdrawals — merchant payout requests
+// ---------------------------------------------------------------------------
+
+export const withdrawals = pgTable(
+  "withdrawals",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    merchantId: uuid("merchant_id")
+      .notNull()
+      .references(() => merchants.id),
+
+    // Money
+    amount: bigint({ mode: "bigint" }).notNull(),
+    fee: bigint({ mode: "bigint" }).notNull().default(0),
+    netAmount: bigint("net_amount", { mode: "bigint" }).notNull(),
+
+    // Status lifecycle
+    status: withdrawalStatusEnum().notNull().default("pending_approval"),
+
+    // Ledger transaction references
+    debitTransactionId: uuid("debit_transaction_id").references(
+      () => transactions.id,
+    ),
+    completionTransactionId: uuid("completion_transaction_id").references(
+      () => transactions.id,
+    ),
+    reversalTransactionId: uuid("reversal_transaction_id").references(
+      () => transactions.id,
+    ),
+
+    // Failure info
+    failureCode: varchar("failure_code", { length: 100 }),
+    failureMessage: text("failure_message"),
+
+    // Admin review
+    reviewedBy: text("reviewed_by"),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    reviewNote: text("review_note"),
+
+    // Idempotency
+    idempotencyKey: varchar("idempotency_key", { length: 255 }).notNull(),
+
+    // Per-status timestamps
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    processedAt: timestamp("processed_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    failedAt: timestamp("failed_at", { withTimezone: true }),
+    reversedAt: timestamp("reversed_at", { withTimezone: true }),
+    canceledAt: timestamp("canceled_at", { withTimezone: true }),
+  },
+  (table) => [
+    index("idx_withdrawals_merchant_id").on(table.merchantId),
+    index("idx_withdrawals_status").on(table.status),
+    unique("uq_withdrawals_idempotency_key").on(table.idempotencyKey),
+    check("chk_withdrawals_amount_positive", sql`${table.amount} > 0`),
   ],
 );
 

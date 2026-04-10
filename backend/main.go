@@ -25,6 +25,12 @@ func main() {
 	}
 	log.Printf("Platform fee: %d basis points (min %d microunits)", config.PlatformFee.RateBasisPoints, config.PlatformFee.MinMicrounits)
 
+	if err := config.LoadWithdrawalConfig(); err != nil {
+		log.Fatalf("Failed to load withdrawal config: %v", err)
+	}
+	log.Printf("Withdrawal: auto-approve <= %d microunits, min %d microunits, fee %d microunits",
+		config.WithdrawalConfig.AutoApproveThreshold, config.WithdrawalConfig.MinAmount, config.WithdrawalConfig.FeeFlat)
+
 	ctx := context.Background()
 
 	pool, err := config.ConnectDatabase(ctx)

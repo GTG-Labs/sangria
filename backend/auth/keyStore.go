@@ -13,6 +13,9 @@ import (
 // ErrMaxAPIKeysReached is returned when a user tries to create more than 10 API keys.
 var ErrMaxAPIKeysReached = errors.New("max active API keys reached")
 
+// ErrAPIKeyNotFound is returned when an API key does not exist or is not owned by the user.
+var ErrAPIKeyNotFound = errors.New("API key not found or not owned by user")
+
 // CreateAPIKey creates a new API key for a user.
 func CreateAPIKey(ctx context.Context, pool *pgxpool.Pool, userID, name string) (*dbengine.Merchant, string, error) {
 	// Generate new API key first
@@ -172,7 +175,7 @@ func RevokeAPIKey(ctx context.Context, pool *pgxpool.Pool, merchantID, userID st
 		return fmt.Errorf("failed to revoke API key: %w", err)
 	}
 	if result.RowsAffected() == 0 {
-		return fmt.Errorf("API key not found or not owned by user")
+		return ErrAPIKeyNotFound
 	}
 	return nil
 }
