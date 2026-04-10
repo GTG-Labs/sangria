@@ -6,7 +6,7 @@
     "push": "dotenv -e .env.dev -- drizzle-kit push",
     "push:dev": "dotenv -e .env.dev -- drizzle-kit push",
     "push:prd": "dotenv -e .env.prd -- drizzle-kit push",
-    "generate": "drizzle-kit generate",
+    "generate": "dotenv -e .env.dev -- drizzle-kit generate",
     "studio": "dotenv -e .env.dev -- drizzle-kit studio",
     "studio:dev": "dotenv -e .env.dev -- drizzle-kit studio",
     "studio:prd": "dotenv -e .env.prd -- drizzle-kit studio"
