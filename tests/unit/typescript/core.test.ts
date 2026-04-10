@@ -1,13 +1,13 @@
 /**
  * TypeScript SDK Core Unit Tests
- * Comprehensive tests for the SangriaNet TypeScript SDK core functionality
+ * Comprehensive tests for the Sangria TypeScript SDK core functionality
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { SangriaNet } from '../../../sdk/sdk-typescript/src/core.js'
-import type { SangriaNetConfig, FixedPriceOptions, PaymentContext, PaymentResult } from '../../../sdk/sdk-typescript/src/types.js'
+import { Sangria } from '../../../sdk/sdk-typescript/src/core.js'
+import type { SangriaConfig, FixedPriceOptions, PaymentContext, PaymentResult } from '../../../sdk/sdk-typescript/src/types.js'
 
-describe('SangriaNet SDK Core', () => {
+describe('Sangria SDK Core', () => {
   let mockFetch: any
   let consoleErrorSpy: any
 
@@ -27,26 +27,26 @@ describe('SangriaNet SDK Core', () => {
 
   describe('Constructor', () => {
     it('should create instance with valid config', () => {
-      const config: SangriaNetConfig = {
+      const config: SangriaConfig = {
         apiKey: 'test-api-key'
       }
 
-      const sangria = new SangriaNet(config)
-      expect(sangria).toBeInstanceOf(SangriaNet)
+      const sangria = new Sangria(config)
+      expect(sangria).toBeInstanceOf(Sangria)
     })
 
     it('should use custom baseUrl when provided', () => {
-      const config: SangriaNetConfig = {
+      const config: SangriaConfig = {
         apiKey: 'test-api-key',
         baseUrl: 'https://custom.api.com'
       }
 
-      const sangria = new SangriaNet(config)
-      expect(sangria).toBeInstanceOf(SangriaNet)
+      const sangria = new Sangria(config)
+      expect(sangria).toBeInstanceOf(Sangria)
     })
 
     it('should remove trailing slashes from baseUrl', async () => {
-      const config: SangriaNetConfig = {
+      const config: SangriaConfig = {
         apiKey: 'test-api-key',
         baseUrl: 'https://api.example.com///'
       }
@@ -56,7 +56,7 @@ describe('SangriaNet SDK Core', () => {
         json: () => Promise.resolve({ test: 'data' })
       })
 
-      const sangria = new SangriaNet(config)
+      const sangria = new Sangria(config)
 
       // Trigger a request to see the actual URL used
       const ctx: PaymentContext = {
@@ -78,22 +78,22 @@ describe('SangriaNet SDK Core', () => {
 
     it('should throw error when apiKey is missing', () => {
       expect(() => {
-        new SangriaNet({ apiKey: '' })
-      }).toThrow('SangriaNet: apiKey is required')
+        new Sangria({ apiKey: '' })
+      }).toThrow('Sangria: apiKey is required')
     })
 
     it('should throw error when apiKey is undefined', () => {
       expect(() => {
-        new SangriaNet({} as SangriaNetConfig)
-      }).toThrow('SangriaNet: apiKey is required')
+        new Sangria({} as SangriaConfig)
+      }).toThrow('Sangria: apiKey is required')
     })
   })
 
   describe('Price Validation', () => {
-    let sangria: SangriaNet
+    let sangria: Sangria
 
     beforeEach(() => {
-      sangria = new SangriaNet({ apiKey: 'test-key' })
+      sangria = new Sangria({ apiKey: 'test-key' })
     })
 
     it('should reject zero price', async () => {
@@ -107,7 +107,7 @@ describe('SangriaNet SDK Core', () => {
       }
 
       await expect(sangria.handleFixedPrice(ctx, options)).rejects.toThrow(
-        'SangriaNet: price must be a finite number greater than 0'
+        'Sangria: price must be a finite number greater than 0'
       )
     })
 
@@ -122,7 +122,7 @@ describe('SangriaNet SDK Core', () => {
       }
 
       await expect(sangria.handleFixedPrice(ctx, options)).rejects.toThrow(
-        'SangriaNet: price must be a finite number greater than 0'
+        'Sangria: price must be a finite number greater than 0'
       )
     })
 
@@ -137,7 +137,7 @@ describe('SangriaNet SDK Core', () => {
       }
 
       await expect(sangria.handleFixedPrice(ctx, options)).rejects.toThrow(
-        'SangriaNet: price must be a finite number greater than 0'
+        'Sangria: price must be a finite number greater than 0'
       )
     })
 
@@ -152,7 +152,7 @@ describe('SangriaNet SDK Core', () => {
       }
 
       await expect(sangria.handleFixedPrice(ctx, options)).rejects.toThrow(
-        'SangriaNet: price must be a finite number greater than 0'
+        'Sangria: price must be a finite number greater than 0'
       )
     })
 
@@ -180,10 +180,10 @@ describe('SangriaNet SDK Core', () => {
   })
 
   describe('Payment Generation', () => {
-    let sangria: SangriaNet
+    let sangria: Sangria
 
     beforeEach(() => {
-      sangria = new SangriaNet({ apiKey: 'test-key', baseUrl: 'https://api.test.com' })
+      sangria = new Sangria({ apiKey: 'test-key', baseUrl: 'https://api.test.com' })
     })
 
     it('should generate payment when no payment header provided', async () => {
@@ -313,10 +313,10 @@ describe('SangriaNet SDK Core', () => {
   })
 
   describe('Payment Settlement', () => {
-    let sangria: SangriaNet
+    let sangria: Sangria
 
     beforeEach(() => {
-      sangria = new SangriaNet({ apiKey: 'test-key', baseUrl: 'https://api.test.com' })
+      sangria = new Sangria({ apiKey: 'test-key', baseUrl: 'https://api.test.com' })
     })
 
     it('should settle payment when payment header is provided', async () => {
@@ -469,10 +469,10 @@ describe('SangriaNet SDK Core', () => {
   })
 
   describe('Request Configuration', () => {
-    let sangria: SangriaNet
+    let sangria: Sangria
 
     beforeEach(() => {
-      sangria = new SangriaNet({ apiKey: 'secret-key', baseUrl: 'https://api.example.com' })
+      sangria = new Sangria({ apiKey: 'secret-key', baseUrl: 'https://api.example.com' })
     })
 
     it('should set correct headers for API requests', async () => {
@@ -522,10 +522,10 @@ describe('SangriaNet SDK Core', () => {
   })
 
   describe('Edge Cases and Error Handling', () => {
-    let sangria: SangriaNet
+    let sangria: Sangria
 
     beforeEach(() => {
-      sangria = new SangriaNet({ apiKey: 'test-key' })
+      sangria = new Sangria({ apiKey: 'test-key' })
     })
 
     it('should handle malformed JSON response', async () => {
@@ -652,7 +652,7 @@ describe('SangriaNet SDK Core', () => {
 
   describe('Type Safety', () => {
     it('should ensure PaymentResult discriminated union works correctly', async () => {
-      const sangria = new SangriaNet({ apiKey: 'test-key' })
+      const sangria = new Sangria({ apiKey: 'test-key' })
 
       mockFetch.mockResolvedValueOnce({
         ok: true,
