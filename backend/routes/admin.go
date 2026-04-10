@@ -18,5 +18,6 @@ func RegisterAdminRoutes(app *fiber.App, pool *pgxpool.Pool) {
 	admin.Post("/withdrawals/:id/approve", adminHandlers.ApproveWithdrawal(pool))
 	admin.Post("/withdrawals/:id/reject", adminHandlers.RejectWithdrawal(pool))
 	admin.Post("/withdrawals/:id/complete", adminHandlers.CompleteWithdrawal(pool))
+	admin.Post("/withdrawals/:id/fail", adminHandlers.FailWithdrawal(pool))
 	admin.Get("/withdrawals", adminHandlers.ListAllWithdrawals(pool))
 }

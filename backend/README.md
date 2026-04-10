@@ -82,6 +82,7 @@ Triple-gated: requires WorkOS JWT, `X-Admin-Key` header, and `role = "admin"` in
 | POST | `/admin/withdrawals/:id/approve` | Admin | Approve a pending withdrawal |
 | POST | `/admin/withdrawals/:id/reject` | Admin | Reject and reverse a pending withdrawal |
 | POST | `/admin/withdrawals/:id/complete` | Admin | Mark withdrawal as completed after bank transfer |
+| POST | `/admin/withdrawals/:id/fail` | Admin | Mark withdrawal as failed and reverse balance debit |
 | GET | `/admin/withdrawals` | Admin | List withdrawals (filterable by ?status=) |
 
 ### API key format
@@ -126,7 +127,7 @@ backend/
 │   ├── merchants.go               # CreateMerchantAPIKey
 │   ├── wallets.go                 # CreateWalletPool
 │   ├── treasury.go               # FundTreasury
-│   └── withdrawals.go             # ApproveWithdrawal, RejectWithdrawal, CompleteWithdrawal
+│   └── withdrawals.go             # ApproveWithdrawal, RejectWithdrawal, CompleteWithdrawal, FailWithdrawal
 ├── dbEngine/
 │   ├── models.go                  # All Go types + enums
 │   ├── engine.go                  # DB connection pool
@@ -161,12 +162,57 @@ backend/
 ## How withdrawals work
 
 1. Merchant requests withdrawal from the dashboard (`POST /internal/withdrawals`)
-2. Balance is debited immediately (prevents overdraw)
-3. If amount <= $200: auto-approved. If > $200: goes to `pending_approval`
+2. Balance is debited immediately and held in Withdrawal Clearing (prevents overdraw)
+3. If amount <= auto-approve threshold ($200 default): auto-approved. Otherwise: `pending_approval`
 4. Admin reviews pending withdrawals via `GET /admin/withdrawals?status=pending_approval`
-5. Admin approves or rejects. Rejection reverses the balance debit.
-6. After manual bank transfer, admin marks as completed (`POST /admin/withdrawals/:id/complete`)
-7. Completion ledger entry moves funds from Withdrawal Clearing to USD Merchant Pool
+5. Admin approves (`/approve`) or rejects (`/reject`). Rejection reverses the balance debit.
+6. Admin sends the bank transfer manually (outside Sangria)
+7. If transfer lands: admin marks as completed (`/complete`). Completion splits the ledger — net amount exits the merchant pool, fee goes to platform revenue.
+8. If transfer bounces: admin marks as failed (`/fail`). Failure reverses the balance debit, restoring the merchant's funds.
+
+### Withdrawal lifecycle
+
+```
+                          +-----------+
+                          |  pending  |
+                     +--->| _approval |---+
+                     |    +-----------+   |
+                     |         |          |
+               auto-approve   | approve  | reject
+                     |         v          v
+                     |    +---------+  +----------+
+                     +--->| approved|  | canceled |
+                          +---------+  +----------+
+                               |
+                   bank transfer attempted
+                          /          \
+                    success          failure
+                       v                v
+                 +-----------+    +--------+
+                 | completed |    | failed |
+                 +-----------+    +--------+
+```
+
+| Status | Meaning | Ledger state |
+|---|---|---|
+| `pending_approval` | Awaiting admin review | Merchant debited, clearing credited |
+| `approved` | Approved, ready for bank transfer | Same as above |
+| `processing` | Bank transfer in progress (future use) | Same as above |
+| `completed` | Bank transfer landed | Clearing debited, merchant pool credited (net), fee revenue credited (fee) |
+| `failed` | Bank transfer bounced | Debit reversed — merchant credited back, clearing debited |
+| `canceled` | Rejected by admin | Debit reversed — merchant credited back, clearing debited |
+| `reversed` | Reserved for future use | — |
+
+### Future: automated off-ramp
+
+The current flow requires manual admin action for bank transfers. This is temporary. The target architecture:
+
+1. Merchant requests withdrawal
+2. System auto-approves (or flags for review if above threshold)
+3. System calls Bridge/ACH provider to initiate the bank transfer
+4. Provider sends a webhook — success triggers `CompleteWithdrawal`, failure triggers `FailWithdrawal`
+
+The admin endpoints (approve, reject, complete, fail) remain as manual override controls for when automation breaks, a transfer gets stuck, or compliance needs to intervene.
 
 ## Schema-first workflow
 
