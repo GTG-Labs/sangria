@@ -1,0 +1,7 @@
+[build]
+builder = "RAILPACK"
+watchPatterns = ["/backend/**"]
+
+[deploy]
+startCommand = "./out"
+restartPolicyType = "ON_FAILURE"

@@ -1,0 +1,7 @@
+[build]
+builder = "RAILPACK"
+watchPatterns = ["/frontend/**"]
+
+[deploy]
+startCommand = "node .next/standalone/server.js"
+restartPolicyType = "ON_FAILURE"
