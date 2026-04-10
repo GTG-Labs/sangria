@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build && cp -r public .next/standalone/public && cp -r .next/static .next/standalone/.next/static",
     "start": "next start",
     "lint": "eslint",
     "format": "prettier --write .",
