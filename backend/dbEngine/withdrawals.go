@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -38,6 +39,19 @@ func scanWithdrawal(row interface{ Scan(dest ...any) error }) (Withdrawal, error
 	return w, err
 }
 
+// getWithdrawalByIdempotencyKey returns an existing withdrawal matching the
+// given idempotency key and merchant. Used for idempotent replay.
+func getWithdrawalByIdempotencyKey(ctx context.Context, pool *pgxpool.Pool, idempotencyKey, merchantID string) (Withdrawal, error) {
+	w, err := scanWithdrawal(pool.QueryRow(ctx,
+		fmt.Sprintf(`SELECT %s FROM withdrawals WHERE idempotency_key = $1 AND merchant_id = $2`, withdrawalColumns),
+		idempotencyKey, merchantID,
+	))
+	if err != nil {
+		return Withdrawal{}, fmt.Errorf("fetch existing withdrawal for idempotency replay: %w", err)
+	}
+	return w, nil
+}
+
 // CreateWithdrawal atomically checks the merchant's balance, debits it, and
 // creates a withdrawal record. Auto-approves if the amount is within the
 // threshold. The entire operation runs in a single transaction with a row lock
@@ -47,6 +61,10 @@ func CreateWithdrawal(
 	merchantID string, amount int64, fee int64, idempotencyKey string,
 	autoApprove bool,
 ) (Withdrawal, error) {
+	if err := ValidateAmountAndFee(amount, fee); err != nil {
+		return Withdrawal{}, err
+	}
+
 	netAmount := amount - fee
 
 	tx, err := pool.Begin(ctx)
@@ -54,6 +72,20 @@ func CreateWithdrawal(
 		return Withdrawal{}, fmt.Errorf("begin transaction: %w", err)
 	}
 	defer tx.Rollback(ctx)
+
+	// Idempotency: if a withdrawal with this key already exists for this
+	// merchant, return it immediately without doing any ledger work.
+	existing, idempErr := scanWithdrawal(tx.QueryRow(ctx,
+		fmt.Sprintf(`SELECT %s FROM withdrawals WHERE idempotency_key = $1 AND merchant_id = $2`, withdrawalColumns),
+		idempotencyKey, merchantID,
+	))
+	if idempErr == nil {
+		tx.Rollback(ctx)
+		return existing, nil
+	}
+	if !errors.Is(idempErr, pgx.ErrNoRows) {
+		return Withdrawal{}, fmt.Errorf("check idempotency: %w", idempErr)
+	}
 
 	// Look up merchant's USD LIABILITY account and lock it.
 	var merchantAcctID string
@@ -159,6 +191,13 @@ func CreateWithdrawal(
 		withdrawalID, merchantID, amount, fee, netAmount, status, txnID, idempotencyKey,
 	))
 	if err != nil {
+		// Unique constraint on idempotency_key — concurrent retry slipped past
+		// the early check. Rollback and return the existing row.
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			tx.Rollback(ctx)
+			return getWithdrawalByIdempotencyKey(ctx, pool, idempotencyKey, merchantID)
+		}
 		return Withdrawal{}, fmt.Errorf("insert withdrawal: %w", err)
 	}
 
@@ -390,6 +429,18 @@ func CompleteWithdrawal(ctx context.Context, pool *pgxpool.Pool, withdrawalID st
 		return fmt.Errorf("get merchant pool account: %w", err)
 	}
 
+	// Look up fee revenue account (needed when fee > 0).
+	var feeRevenueAcctID string
+	if w.Fee > 0 {
+		err = tx.QueryRow(ctx,
+			`SELECT id FROM accounts WHERE name = $1 AND currency = 'USD' AND user_id IS NULL`,
+			SystemAccountPlatformFeeRevenue,
+		).Scan(&feeRevenueAcctID)
+		if err != nil {
+			return fmt.Errorf("get fee revenue account: %w", err)
+		}
+	}
+
 	// Write completion ledger entry.
 	completionKey := fmt.Sprintf("withdrawal-complete-%s", withdrawalID)
 	var txnID string
@@ -401,7 +452,7 @@ func CompleteWithdrawal(ctx context.Context, pool *pgxpool.Pool, withdrawalID st
 		return fmt.Errorf("insert completion transaction: %w", err)
 	}
 
-	// DEBIT clearing (funds leave transit).
+	// DEBIT clearing (full gross amount leaves transit).
 	_, err = tx.Exec(ctx,
 		`INSERT INTO ledger_entries (transaction_id, currency, amount, direction, account_id)
 		 VALUES ($1, 'USD', $2, 'DEBIT', $3)`,
@@ -411,14 +462,26 @@ func CompleteWithdrawal(ctx context.Context, pool *pgxpool.Pool, withdrawalID st
 		return fmt.Errorf("insert completion debit: %w", err)
 	}
 
-	// CREDIT merchant pool (cash leaves Sangria's pool).
+	// CREDIT merchant pool (net amount leaves Sangria's pool to the merchant's bank).
 	_, err = tx.Exec(ctx,
 		`INSERT INTO ledger_entries (transaction_id, currency, amount, direction, account_id)
 		 VALUES ($1, 'USD', $2, 'CREDIT', $3)`,
-		txnID, w.Amount, poolAcctID,
+		txnID, w.NetAmount, poolAcctID,
 	)
 	if err != nil {
 		return fmt.Errorf("insert completion credit: %w", err)
+	}
+
+	// CREDIT fee revenue (Sangria keeps the withdrawal fee).
+	if w.Fee > 0 {
+		_, err = tx.Exec(ctx,
+			`INSERT INTO ledger_entries (transaction_id, currency, amount, direction, account_id)
+			 VALUES ($1, 'USD', $2, 'CREDIT', $3)`,
+			txnID, w.Fee, feeRevenueAcctID,
+		)
+		if err != nil {
+			return fmt.Errorf("insert fee revenue credit: %w", err)
+		}
 	}
 
 	// Update withdrawal status.
