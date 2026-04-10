@@ -11,7 +11,7 @@ export default function BlogHeader() {
         <Ballpit
           count={350}
           colors={[0xc74b4b, 0xa51c30, 0xf7a3a3]}
-          lightIntensity={30}
+          lightIntensity={0}
           ambientIntensity={0.4}
           materialParams={{
             metalness: 0.2,
