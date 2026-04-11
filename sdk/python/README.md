@@ -24,7 +24,7 @@ client = SangriaMerchantClient(
 )
 
 @app.get("/premium")
-@require_sangria_payment(client, amount=0.01, description="Premium content")
+@require_sangria_payment(client, amount=10000, description="Premium content")  # 10000 microunits = $0.01
 async def premium(request: Request):
     # request.state.sangria_payment.transaction == "0x..."
     return {"data": "premium content"}
@@ -38,7 +38,7 @@ Skip payment for certain requests. This is useful if you want to let API key use
 @app.get("/premium")
 @require_sangria_payment(
     client,
-    amount=0.01,
+    amount=10000,  # 10000 microunits = $0.01
     bypass_if=lambda req: req.headers.get("x-api-key") is not None,
 )
 async def premium(request: Request):
@@ -58,7 +58,7 @@ The `@require_sangria_payment` decorator handles the x402 negotiation loop:
 
 Request:
 ```json
-{ "amount": 0.01, "resource": "/premium", "description": "Premium content" }
+{ "amount": 10000, "resource": "/premium", "description": "Premium content" }
 ```
 
 Response (402):

@@ -22,8 +22,8 @@ export class Sangria {
   }
 
   private validateFixedPriceOptions(options: FixedPriceOptions): void {
-    if (!Number.isFinite(options.price) || options.price <= 0) {
-      throw new Error("Sangria: price must be a finite number greater than 0");
+    if (!Number.isInteger(options.price) || options.price <= 0) {
+      throw new Error("Sangria: price must be a positive integer (microunits)");
     }
   }
 

@@ -13,12 +13,12 @@ from ..models import FixedPriceOptions, PaymentResponse
 
 # ── Entry point: decorate a FastAPI route to require payment ──
 #
-#   @require_sangria_payment(client, amount=0.01)
+#   @require_sangria_payment(client, amount=10000)  # 10000 microunits = $0.01
 #   async def premium(request: Request): ...
 #
 def require_sangria_payment(
     merchant_client: SangriaMerchantClient,
-    amount: float,
+    amount: int,
     description: str | None = None,
     bypass_if: Callable[[Request], bool] | None = None,
 ) -> Callable[[Callable[..., Awaitable[Any]]], Callable[..., Awaitable[Any]]]:

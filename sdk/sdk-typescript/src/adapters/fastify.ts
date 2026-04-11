@@ -20,7 +20,7 @@ declare module "fastify" {
 
 // ── Entry point: add as preHandler to gate a route behind payment ──
 //
-//   fastify.get("/premium", { preHandler: fixedPrice(sangria, { price: 0.01 }) }, handler)
+//   fastify.get("/premium", { preHandler: fixedPrice(sangria, { price: 10000 }) }, handler)  // 10000 microunits = $0.01
 //
 //   Note: register sangriaPlugin before using fixedPrice().
 //

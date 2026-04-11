@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
-	"math"
 	"strconv"
 
 	"github.com/gofiber/fiber/v3"
@@ -24,19 +23,18 @@ const maxTimeoutSeconds = 60
 func GeneratePayment(pool *pgxpool.Pool) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var req struct {
-			Amount      float64 `json:"amount"`
-			Description string  `json:"description"`
-			Resource    string  `json:"resource"`
+			Amount      int64  `json:"amount"`
+			Description string `json:"description"`
+			Resource    string `json:"resource"`
 		}
 		if err := c.Bind().JSON(&req); err != nil {
 			return c.Status(400).JSON(fiber.Map{"error": "invalid request body"})
 		}
 
-		// Convert dollar amount to microunits (USDC has 6 decimals).
-		if math.IsInf(req.Amount, 0) || math.IsNaN(req.Amount) || req.Amount <= 0 || req.Amount > 9_000_000_000_000 {
-			return c.Status(400).JSON(fiber.Map{"error": "amount must be a positive number within a valid range"})
+		if req.Amount <= 0 {
+			return c.Status(400).JSON(fiber.Map{"error": "amount must be a positive integer (microunits)"})
 		}
-		amountMicro := int64(math.Round(req.Amount * 1e6))
+		amountMicro := req.Amount
 
 		// Hardcoded: USDC on Base (change to "base" for mainnet).
 		const network = "base"

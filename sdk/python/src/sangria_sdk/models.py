@@ -3,17 +3,30 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+MICROUNITS_PER_DOLLAR: int = 1_000_000
+"""Number of microunits in 1 USD."""
+
+
+def to_microunits(dollars: float) -> int:
+    """Convert a dollar amount to microunits. Rounds to nearest integer."""
+    return round(dollars * MICROUNITS_PER_DOLLAR)
+
+
+def from_microunits(microunits: int) -> float:
+    """Convert microunits to dollars (for display purposes only)."""
+    return microunits / MICROUNITS_PER_DOLLAR
+
 
 @dataclass(slots=True)
 class FixedPriceOptions:
-    price: float
+    """Price in microunits (1 USD = 1_000_000 microunits). Must be a positive integer."""
+    price: int
     resource: str
     description: str | None = None
 
     def __post_init__(self) -> None:
-        import math
-        if not isinstance(self.price, (int, float)) or not math.isfinite(self.price) or self.price <= 0:
-            raise ValueError("price must be a finite number greater than 0")
+        if not isinstance(self.price, int) or isinstance(self.price, bool) or self.price <= 0:
+            raise ValueError("price must be a positive integer (microunits)")
 
     def to_generate_dict(self) -> dict[str, Any]:
         payload: dict[str, Any] = {
@@ -37,7 +50,8 @@ class PaymentResponse:
 class PaymentProceeded:
     """Payment succeeded — run the handler."""
     paid: bool
-    amount: float
+    amount: int
+    """Amount charged in microunits (1 USD = 1_000_000 microunits)."""
     transaction: str | None = None
 
 

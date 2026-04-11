@@ -25,7 +25,7 @@ const sangria = new Sangria({
 
 app.get(
   "/premium",
-  fixedPrice(sangria, { price: 0.01, description: "Premium content" }),
+  fixedPrice(sangria, { price: 10000, description: "Premium content" }),
   (req, res) => {
     // req.sangria.paid === true
     // req.sangria.transaction === "0x..."
@@ -50,7 +50,7 @@ await app.register(sangriaPlugin);
 
 app.get(
   "/premium",
-  { preHandler: fixedPrice(sangria, { price: 0.01 }) },
+  { preHandler: fixedPrice(sangria, { price: 10000 }) },
   (request, reply) => {
     // request.sangria.paid === true
     reply.send({ data: "premium content" });
@@ -70,7 +70,7 @@ import { fixedPrice, getSangria } from "@sangria-sdk/core/hono";
 const app = new Hono();
 const sangria = new Sangria({ apiKey: process.env.SANGRIA_SECRET_KEY });
 
-app.get("/premium", fixedPrice(sangria, { price: 0.01 }), (c) => {
+app.get("/premium", fixedPrice(sangria, { price: 10000 }), (c) => {
   const payment = getSangria(c);
   // payment.paid === true
   return c.json({ data: "premium content" });
@@ -86,7 +86,7 @@ All adapters support a `bypassPaymentIf` option to skip payment for certain requ
 ```typescript
 fixedPrice(
   sangria,
-  { price: 0.01 },
+  { price: 10000 },
   {
     bypassPaymentIf: (req) => !!req.headers["x-api-key"],
   }

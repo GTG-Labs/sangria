@@ -54,7 +54,7 @@ app.get("/", (_req, res) => {
 app.get(
   "/premium",
   fixedPrice(sangria, {
-    price: 0.01,
+    price: 10000, // $0.01 in microunits (1 USD = 1_000_000 microunits)
     description: "Access premium content",
   }),
   (_req, res) => {

@@ -16,7 +16,7 @@ declare global {
 
 // ── Entry point: add as middleware to gate a route behind payment ──
 //
-//   app.get("/premium", fixedPrice(sangria, { price: 0.01 }), handler)
+//   app.get("/premium", fixedPrice(sangria, { price: 10000 }), handler)  // 10000 microunits = $0.01
 //
 export function fixedPrice(
   sangria: Sangria,

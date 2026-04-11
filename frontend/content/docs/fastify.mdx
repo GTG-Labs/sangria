@@ -69,7 +69,7 @@ fastify.get(
   "/premium",
   {
     preHandler: fixedPrice(sangria, {
-      price: 0.01,
+      price: 10000, // $0.01 in microunits (1 USD = 1_000_000 microunits)
       description: "Access premium content",
     }),
   },

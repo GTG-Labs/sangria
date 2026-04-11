@@ -53,7 +53,7 @@ async function handler(request: NextRequest) {
 // Wrap it with fixedPrice
 export const GET = fixedPrice(
   sangria,
-  { price: 0.01, description: "Access premium content" },
+  { price: 10000, description: "Access premium content" }, // 10000 microunits = $0.01
   handler
 );
 ```
@@ -65,7 +65,7 @@ If you want to skip Sangria for requests that already have their own API key (e.
 ```ts
 export const GET = fixedPrice(
   sangria,
-  { price: 0.01, description: "Access premium content" },
+  { price: 10000, description: "Access premium content" }, // 10000 microunits = $0.01
   handler,
   {
     bypassPaymentIf: (request) => request.headers.has("x-api-key"),

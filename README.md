@@ -26,7 +26,7 @@ const sangria = new Sangria({ apiKey: process.env.SANGRIA_SECRET_KEY! });
 
 app.get(
   "/premium",
-  fixedPrice(sangria, { price: 0.01, description: "Premium content" }),
+  fixedPrice(sangria, { price: 10000, description: "Premium content" }),  // 10000 microunits = $0.01
   (req, res) => {
     res.json({ data: "premium content", tx: req.sangria?.transaction });
   }
@@ -50,7 +50,7 @@ app = FastAPI()
 client = SangriaMerchantClient(api_key=os.environ["SANGRIA_SECRET_KEY"])
 
 @app.get("/premium")
-@require_sangria_payment(client, amount=0.01, description="Premium content")
+@require_sangria_payment(client, amount=10000, description="Premium content")  # 10000 microunits = $0.01
 async def premium(request: Request):
     return {"data": "premium content"}
 ```
