@@ -97,7 +97,7 @@ type payloadEnvelope struct {
 func SettlePayment(pool *pgxpool.Pool) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		merchant, ok := c.Locals("merchant_api_key").(*dbengine.Merchant)
-		if !ok {
+		if !ok || merchant == nil {
 			return c.Status(500).JSON(fiber.Map{"error": "internal server error"})
 		}
 
