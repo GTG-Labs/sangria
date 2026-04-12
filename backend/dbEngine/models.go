@@ -29,20 +29,28 @@ const (
 	AccountTypeExpense   AccountType = "EXPENSE"
 )
 
+type Organization struct {
+	ID        string    `json:"id"`
+	Name      string    `json:"name"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 type Account struct {
-	ID        string      `json:"id"`
-	Name      string      `json:"name"`
-	Type      AccountType `json:"type"`
-	Currency  Currency    `json:"currency"`
-	UserID    *string     `json:"user_id"`
-	CreatedAt time.Time   `json:"created_at"`
+	ID             string      `json:"id"`
+	Name           string      `json:"name"`
+	Type           AccountType `json:"type"`
+	Currency       Currency    `json:"currency"`
+	OrganizationID *string     `json:"organization_id"`
+	CreatedAt      time.Time   `json:"created_at"`
 }
 
 type User struct {
-	WorkosID  string    `json:"workos_id"`
-	Owner     string    `json:"owner"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	WorkosID           string    `json:"workos_id"`
+	Owner              string    `json:"owner"`
+	OrganizationID     string    `json:"organization_id"`
+	OrganizationAdmin  bool      `json:"organization_admin"`
+	CreatedAt          time.Time `json:"created_at"`
+	UpdatedAt          time.Time `json:"updated_at"`
 }
 
 type TransactionStatus string
@@ -92,26 +100,15 @@ const (
 	NetworkSolanaDevnet Network = "solana-devnet"   // solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1
 )
 
-type Card struct {
-	ID         string     `json:"id"`
-	UserID     string     `json:"user_id"`
-	APIKey     string     `json:"api_key"`
-	KeyID      string     `json:"key_id"`
-	Name       string     `json:"name"`
-	IsActive   bool       `json:"is_active"`
-	LastUsedAt *time.Time `json:"last_used_at"`
-	CreatedAt  time.Time  `json:"created_at"`
-}
-
 type Merchant struct {
-	ID         string     `json:"id"`
-	UserID     string     `json:"user_id"`
-	APIKey     string     `json:"api_key"`
-	KeyID      string     `json:"key_id"`
-	Name       string     `json:"name"`
-	IsActive   bool       `json:"is_active"`
-	LastUsedAt *time.Time `json:"last_used_at"`
-	CreatedAt  time.Time  `json:"created_at"`
+	ID             string     `json:"id"`
+	OrganizationID string     `json:"organization_id"`
+	APIKey         string     `json:"api_key"`
+	KeyID          string     `json:"key_id"`
+	Name           string     `json:"name"`
+	IsActive       bool       `json:"is_active"`
+	LastUsedAt     *time.Time `json:"last_used_at"`
+	CreatedAt      time.Time  `json:"created_at"`
 }
 
 type CryptoWallet struct {

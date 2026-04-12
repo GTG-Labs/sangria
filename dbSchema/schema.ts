@@ -27,17 +27,36 @@ export const accountTypeEnum = pgEnum("account_type", [
   "REVENUE",
   "EXPENSE",
 ]);
+
+// ---------------------------------------------------------------------------
+// Organizations — the main business entities that own accounts and API keys
+// ---------------------------------------------------------------------------
+export const organizations = pgTable("organizations", {
+  id: uuid().primaryKey().defaultRandom(),
+  name: varchar({ length: 255 }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
 // this is the pure WorkOS ID users
 export const users = pgTable("users", {
   workosId: text("workos_id").primaryKey(),
   owner: text().notNull(),
+  organizationId: uuid("organization_id")
+    .notNull()
+    .references(() => organizations.id),
+  organizationAdmin: boolean("organization_admin").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
-});
+},
+(table) => [
+  index("idx_users_organization_id").on(table.organizationId),
+]);
 
 // ---------------------------------------------------------------------------
 // Admins — access control list for Sangria staff
@@ -62,13 +81,13 @@ export const accounts = pgTable(
     name: varchar({ length: 255 }).notNull(),
     type: accountTypeEnum().notNull(),
     currency: currencyEnum().notNull(),
-    userId: text("user_id").references(() => users.workosId),
+    organizationId: uuid("organization_id").references(() => organizations.id),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
   },
   (table) => [
-    index("idx_accounts_user_id").on(table.userId),
+    index("idx_accounts_organization_id").on(table.organizationId),
     index("idx_accounts_type").on(table.type),
   ],
 );
@@ -143,33 +162,6 @@ export const networkEnum = pgEnum("network", [
 ]);
 
 // ---------------------------------------------------------------------------
-// Cards — API keys for companies/developers integrating the Sangria user SDK
-// ---------------------------------------------------------------------------
-
-export const cards = pgTable(
-  "cards",
-  {
-    id: uuid().primaryKey().defaultRandom(),
-    userId: text("user_id")
-      .notNull()
-      .references(() => users.workosId),
-    apiKey: text("api_key").notNull(),
-    keyId: varchar("key_id", { length: 8 }).notNull(),
-    name: varchar({ length: 255 }).notNull(),
-    isActive: boolean("is_active").notNull().default(true),
-    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-  },
-  (table) => [
-    index("idx_cards_user_id").on(table.userId),
-    index("idx_cards_key_id").on(table.keyId),
-    unique("uq_cards_api_key").on(table.apiKey),
-  ],
-);
-
-// ---------------------------------------------------------------------------
 // Merchants — API keys for businesses receiving payments through x402
 // ---------------------------------------------------------------------------
 
@@ -177,9 +169,9 @@ export const merchants = pgTable(
   "merchants",
   {
     id: uuid().primaryKey().defaultRandom(),
-    userId: text("user_id")
+    organizationId: uuid("organization_id")
       .notNull()
-      .references(() => users.workosId),
+      .references(() => organizations.id),
     apiKey: text("api_key").notNull(),
     keyId: varchar("key_id", { length: 8 }).notNull(),
     name: varchar({ length: 255 }).notNull(),
@@ -190,7 +182,7 @@ export const merchants = pgTable(
       .defaultNow(),
   },
   (table) => [
-    index("idx_merchants_user_id").on(table.userId),
+    index("idx_merchants_organization_id").on(table.organizationId),
     index("idx_merchants_key_id").on(table.keyId),
     unique("uq_merchants_api_key").on(table.apiKey),
   ],
