@@ -13,6 +13,18 @@ import (
 // idempotency key has already been committed.
 var ErrDuplicateTransaction = errors.New("duplicate transaction")
 
+// ErrAlreadySettled is returned when a pending transaction insert is attempted
+// but a confirmed transaction with the same idempotency key already exists.
+var ErrAlreadySettled = errors.New("payment already settled")
+
+// ErrPreviouslyFailed is returned when a pending transaction insert is attempted
+// but a failed transaction with the same idempotency key already exists.
+var ErrPreviouslyFailed = errors.New("payment previously failed")
+
+// ErrTransactionNotPending is returned when attempting to confirm or fail a
+// transaction that is not in the pending state.
+var ErrTransactionNotPending = errors.New("transaction is not pending")
+
 // validCurrencies is the set of currencies accepted by the ledger.
 var validCurrencies = map[Currency]bool{
 	USD: true, USDC: true, ETH: true,
@@ -168,6 +180,146 @@ func validateLines(lines []LedgerLine) error {
 	}
 
 	return validateZeroNet(lines)
+}
+
+// InsertPendingTransaction inserts a transaction with status='pending' and its
+// ledger entries. Used by the payment settlement flow to record the ledger
+// BEFORE calling the external facilitator. The caller must subsequently call
+// ConfirmTransaction or FailTransaction to finalise the row.
+//
+// If a transaction with the same idempotency key already exists:
+//   - confirmed → returns ErrAlreadySettled
+//   - failed    → returns ErrPreviouslyFailed
+//   - pending   → returns the existing Transaction and entries (concurrent dup)
+func InsertPendingTransaction(ctx context.Context, pool *pgxpool.Pool, idempotencyKey string, lines []LedgerLine) (Transaction, []LedgerEntry, error) {
+	if idempotencyKey == "" {
+		return Transaction{}, nil, fmt.Errorf("idempotency key must not be empty")
+	}
+	if err := validateLines(lines); err != nil {
+		return Transaction{}, nil, err
+	}
+
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		return Transaction{}, nil, fmt.Errorf("begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	// Attempt to insert with status='pending'.
+	var txn Transaction
+	err = tx.QueryRow(ctx,
+		`INSERT INTO transactions (idempotency_key, status)
+		 VALUES ($1, 'pending')
+		 ON CONFLICT (idempotency_key) DO NOTHING
+		 RETURNING id, idempotency_key, status, tx_hash, created_at`,
+		idempotencyKey,
+	).Scan(&txn.ID, &txn.IdempotencyKey, &txn.Status, &txn.TxHash, &txn.CreatedAt)
+
+	if errors.Is(err, pgx.ErrNoRows) {
+		// Idempotency key already exists — inspect the existing row.
+		tx.Rollback(ctx)
+		return handleExistingTransaction(ctx, pool, idempotencyKey)
+	}
+	if err != nil {
+		return Transaction{}, nil, fmt.Errorf("insert pending transaction: %w", err)
+	}
+
+	// Verify each line's currency matches its referenced account.
+	if err := validateAccountCurrencies(ctx, tx, lines); err != nil {
+		return Transaction{}, nil, err
+	}
+
+	entries := make([]LedgerEntry, len(lines))
+	for i, line := range lines {
+		var e LedgerEntry
+		err := tx.QueryRow(ctx,
+			`INSERT INTO ledger_entries
+			   (transaction_id, currency, amount, direction, account_id)
+			 VALUES ($1, $2, $3, $4, $5)
+			 RETURNING id, transaction_id, currency, amount, direction, account_id`,
+			txn.ID, line.Currency, line.Amount, line.Direction, line.AccountID,
+		).Scan(
+			&e.ID, &e.TransactionID, &e.Currency, &e.Amount, &e.Direction,
+			&e.AccountID,
+		)
+		if err != nil {
+			return Transaction{}, nil, fmt.Errorf("insert ledger entry %d: %w", i, err)
+		}
+		entries[i] = e
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return Transaction{}, nil, fmt.Errorf("commit transaction: %w", err)
+	}
+
+	return txn, entries, nil
+}
+
+// handleExistingTransaction loads a transaction by idempotency key and returns
+// the appropriate sentinel error based on its status.
+func handleExistingTransaction(ctx context.Context, pool *pgxpool.Pool, idempotencyKey string) (Transaction, []LedgerEntry, error) {
+	var txn Transaction
+	err := pool.QueryRow(ctx,
+		`SELECT id, idempotency_key, status, tx_hash, created_at
+		 FROM transactions WHERE idempotency_key = $1`,
+		idempotencyKey,
+	).Scan(&txn.ID, &txn.IdempotencyKey, &txn.Status, &txn.TxHash, &txn.CreatedAt)
+	if err != nil {
+		return Transaction{}, nil, fmt.Errorf("fetch existing transaction: %w", err)
+	}
+
+	switch txn.Status {
+	case TransactionStatusConfirmed:
+		return txn, nil, ErrAlreadySettled
+	case TransactionStatusFailed:
+		return txn, nil, ErrPreviouslyFailed
+	case TransactionStatusPending:
+		// Concurrent duplicate — return existing transaction and its entries.
+		entries, err := getExistingEntries(ctx, pool, idempotencyKey)
+		if err != nil {
+			return Transaction{}, nil, err
+		}
+		return txn, entries, nil
+	default:
+		return Transaction{}, nil, fmt.Errorf("unexpected transaction status: %s", txn.Status)
+	}
+}
+
+// ConfirmTransaction transitions a pending transaction to confirmed and stores
+// the blockchain tx hash. Returns ErrTransactionNotPending if the row is not
+// in pending state (e.g. already confirmed by a concurrent request).
+func ConfirmTransaction(ctx context.Context, pool *pgxpool.Pool, txnID string, txHash string) error {
+	result, err := pool.Exec(ctx,
+		`UPDATE transactions
+		 SET status = 'confirmed', tx_hash = $2
+		 WHERE id = $1 AND status = 'pending'`,
+		txnID, txHash,
+	)
+	if err != nil {
+		return fmt.Errorf("confirm transaction: %w", err)
+	}
+	if result.RowsAffected() == 0 {
+		return ErrTransactionNotPending
+	}
+	return nil
+}
+
+// FailTransaction transitions a pending transaction to failed. Called when the
+// external facilitator settlement fails after the pending ledger was written.
+func FailTransaction(ctx context.Context, pool *pgxpool.Pool, txnID string) error {
+	result, err := pool.Exec(ctx,
+		`UPDATE transactions
+		 SET status = 'failed'
+		 WHERE id = $1 AND status = 'pending'`,
+		txnID,
+	)
+	if err != nil {
+		return fmt.Errorf("fail transaction: %w", err)
+	}
+	if result.RowsAffected() == 0 {
+		return ErrTransactionNotPending
+	}
+	return nil
 }
 
 // validateZeroNet checks that debits and credits balance to zero for each currency.
