@@ -3,13 +3,13 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Menu, X } from "lucide-react";
+import { handleSignIn } from "@/lib/auth-actions";
 
 interface MobileMenuProps {
-  signInUrl: string;
   isLoggedIn: boolean;
 }
 
-export default function MobileMenu({ signInUrl, isLoggedIn }: MobileMenuProps) {
+export default function MobileMenu({ isLoggedIn }: MobileMenuProps) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -45,13 +45,24 @@ export default function MobileMenu({ signInUrl, isLoggedIn }: MobileMenuProps) {
               Blog
             </Link>
             <div className="pt-2 border-t border-zinc-100 dark:border-white/10 mt-1">
-              <Link
-                href={isLoggedIn ? "/dashboard/api-keys" : signInUrl}
-                onClick={() => setOpen(false)}
-                className="py-2.5 text-sm font-medium text-sangria-500 hover:text-sangria-600 transition-colors"
-              >
-                {isLoggedIn ? "Go to Dashboard →" : "Sign In →"}
-              </Link>
+              {isLoggedIn ? (
+                <Link
+                  href="/dashboard/api-keys"
+                  onClick={() => setOpen(false)}
+                  className="py-2.5 text-sm font-medium text-sangria-500 hover:text-sangria-600 transition-colors"
+                >
+                  Go to Dashboard →
+                </Link>
+              ) : (
+                <form action={handleSignIn}>
+                  <button
+                    type="submit"
+                    className="py-2.5 text-sm font-medium text-sangria-500 hover:text-sangria-600 transition-colors"
+                  >
+                    Sign In →
+                  </button>
+                </form>
+              )}
             </div>
           </nav>
         </div>

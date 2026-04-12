@@ -1,12 +1,10 @@
 import Image from "next/image";
 import ArcadeButton from "@/components/ArcadeButton";
-import { getCachedAuth, getCachedSignInUrl } from "@/lib/auth";
+import SignInForm from "@/components/SignInForm";
+import { getCachedAuth } from "@/lib/auth";
 
 export default async function Home() {
-  const [{ user }, signInUrl] = await Promise.all([
-    getCachedAuth(),
-    getCachedSignInUrl(),
-  ]);
+  const { user } = await getCachedAuth();
 
   return (
     <div className="h-screen overflow-hidden">
@@ -38,13 +36,11 @@ export default async function Home() {
                     Go to Dashboard →
                   </ArcadeButton>
                 ) : (
-                  <ArcadeButton
-                    href={signInUrl}
-                    glow
-                    className="[&>span]:w-full sm:[&>span]:w-auto"
-                  >
-                    Sign Up →
-                  </ArcadeButton>
+                  <SignInForm className="btn-raised glow [&>span]:w-full sm:[&>span]:w-auto">
+                    <span className="px-10 py-3 text-sm leading-none">
+                      Sign Up →
+                    </span>
+                  </SignInForm>
                 )}
                 <ArcadeButton
                   href="https://github.com/GTG-Labs/sangria"
