@@ -27,7 +27,15 @@ export async function proxyToBackend(
     const timeoutId = setTimeout(() => controller.abort(), 10000);
 
     try {
-      const response = await fetch(new URL(path, BACKEND_URL), {
+      const target = new URL(path, BACKEND_URL);
+      if (target.origin !== new URL(BACKEND_URL).origin) {
+        return NextResponse.json(
+          { error: "Invalid proxy target" },
+          { status: 400 }
+        );
+      }
+
+      const response = await fetch(target, {
         method,
         headers: {
           Authorization: `Bearer ${accessToken}`,
