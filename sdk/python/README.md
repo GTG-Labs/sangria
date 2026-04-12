@@ -58,7 +58,7 @@ The `@require_sangria_payment` decorator handles the x402 negotiation loop:
 
 Request:
 ```json
-{ "amount": 0.01, "resource": "/premium", "description": "Premium content" }
+{ "amount": 10000, "resource": "/premium", "description": "Premium content" }
 ```
 
 Response (402):

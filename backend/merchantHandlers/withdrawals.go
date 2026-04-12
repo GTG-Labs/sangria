@@ -3,7 +3,6 @@ package merchantHandlers
 import (
 	"errors"
 	"log/slog"
-	"math"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -23,9 +22,9 @@ func RequestWithdrawal(pool *pgxpool.Pool) fiber.Handler {
 		}
 
 		var req struct {
-			MerchantID     string  `json:"merchant_id"`
-			Amount         float64 `json:"amount"`
-			IdempotencyKey string  `json:"idempotency_key"`
+			MerchantID     string `json:"merchant_id"`
+			Amount         int64  `json:"amount"`
+			IdempotencyKey string `json:"idempotency_key"`
 		}
 		if err := c.Bind().JSON(&req); err != nil {
 			return c.Status(400).JSON(fiber.Map{"error": "invalid request body"})
@@ -37,8 +36,8 @@ func RequestWithdrawal(pool *pgxpool.Pool) fiber.Handler {
 		if req.IdempotencyKey == "" {
 			return c.Status(400).JSON(fiber.Map{"error": "idempotency_key is required"})
 		}
-		if math.IsInf(req.Amount, 0) || math.IsNaN(req.Amount) || req.Amount <= 0 {
-			return c.Status(400).JSON(fiber.Map{"error": "amount must be a positive number"})
+		if req.Amount <= 0 {
+			return c.Status(400).JSON(fiber.Map{"error": "amount must be a positive integer (microunits)"})
 		}
 
 		// Verify this merchant belongs to the authenticated user.
@@ -54,15 +53,8 @@ func RequestWithdrawal(pool *pgxpool.Pool) fiber.Handler {
 			return c.Status(403).JSON(fiber.Map{"error": "Forbidden"})
 		}
 
-		// Convert dollars to microunits.
-		rounded := math.Round(req.Amount * 1e6)
-		if rounded <= 0 || rounded > float64(math.MaxInt64) {
-			return c.Status(400).JSON(fiber.Map{"error": "amount out of range"})
-		}
-		amountMicro := int64(rounded)
-
 		// Validate minimum withdrawal.
-		if amountMicro < config.WithdrawalConfig.MinAmount {
+		if req.Amount < config.WithdrawalConfig.MinAmount {
 			return c.Status(400).JSON(fiber.Map{
 				"error":      "below minimum withdrawal amount",
 				"min_amount": config.WithdrawalConfig.MinAmount,
@@ -70,12 +62,12 @@ func RequestWithdrawal(pool *pgxpool.Pool) fiber.Handler {
 		}
 
 		// Calculate fee and auto-approve decision.
-		fee := config.WithdrawalConfig.CalculateWithdrawalFee(amountMicro)
-		autoApprove := config.WithdrawalConfig.ShouldAutoApprove(amountMicro)
+		fee := config.WithdrawalConfig.CalculateWithdrawalFee(req.Amount)
+		autoApprove := config.WithdrawalConfig.ShouldAutoApprove(req.Amount)
 
 		withdrawal, err := dbengine.CreateWithdrawal(
 			c.Context(), pool,
-			merchant.ID, amountMicro, fee, req.IdempotencyKey,
+			merchant.ID, req.Amount, fee, req.IdempotencyKey,
 			autoApprove,
 		)
 		if err != nil {
