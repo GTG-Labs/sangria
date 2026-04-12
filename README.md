@@ -63,9 +63,9 @@ async def premium(request: Request):
 
 | Language   | Framework        | Adapter Import                 |
 | ---------- | ---------------- | ------------------------------ |
-| TypeScript | Express >= 4     | `@sangria-sdk/core/express`        |
-| TypeScript | Fastify >= 4     | `@sangria-sdk/core/fastify`        |
-| TypeScript | Hono >= 4        | `@sangria-sdk/core/hono`           |
+| TypeScript | Express >= 4     | `@sangria-sdk/core/express`    |
+| TypeScript | Fastify >= 4     | `@sangria-sdk/core/fastify`    |
+| TypeScript | Hono >= 4        | `@sangria-sdk/core/hono`       |
 | Python     | FastAPI >= 0.135 | `sangria_sdk.adapters.fastapi` |
 
 ---
@@ -112,7 +112,7 @@ sequenceDiagram
 | [`backend/`](backend/)                       | Orchestration API — accounts, payments, settlement | Go, Fiber, pgx                  |
 | [`dbSchema/`](dbSchema/)                     | Database schema (single source of truth)           | Drizzle ORM                     |
 | [`frontend/`](frontend/)                     | Documentation site                                 | Next.js, Tailwind               |
-| [`sdk/sdk-typescript/`](sdk/sdk-typescript/) | TypeScript merchant SDK (`@sangria-sdk/core`)          | TypeScript                      |
+| [`sdk/sdk-typescript/`](sdk/sdk-typescript/) | TypeScript merchant SDK (`@sangria-sdk/core`)      | TypeScript                      |
 | [`sdk/python/`](sdk/python/)                 | Python merchant SDK (`sangria-merchant-sdk`)       | Python, httpx                   |
 | [`playground/`](playground/)                 | Example merchants + buyer client                   | Express, Fastify, Hono, FastAPI |
 
@@ -125,4 +125,4 @@ sequenceDiagram
 - [Playground](playground/README.md) — run example merchants and test payments locally
 - [Backend API](backend/README.md) — API reference, self-hosting guide
 - [Architecture](Sangria-Architecture.md) — layered architecture deep-dive
-- [Protocol Overview](Sangria-Overview.md) — x402 operations and settlement scenarios
+- [Protocol Overview](Sangria-Overview.md) — x402 operations and settlement flow
