@@ -57,13 +57,13 @@ Frontend (Docs + Merchant dashboard)
 
 ### Layer descriptions
 
-| Layer              | Technology                            | Responsibility                                                                                                         |
-| ------------------ | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| **Client**         | TypeScript/Node, SDK core/adapters    | 402 negotiation, payload forwarding to orchestration layer, SDK integration (Next.js, Hono, Fastify, Express adapters) |
-| **Orchestration**  | Go, CDP SDK                           | Treasury wallets, server-side ERC-3009 authorization signing, mutexes, settlement, ledger management                   |
-| **Persistence**    | PostgreSQL, Drizzle ORM               | User balances, API keys, audit logs                                                                                    |
-| **Infrastructure** | Coinbase Facilitator, Base Blockchain | Gas-free settlement, on-chain USDC transfer                                                                            |
-| **Frontend**       | Next.js 16, React 19, Tailwind CSS 4  | Merchant dashboard, documentation, auth                                                                                |
+| Layer              | Technology                                 | Responsibility                                                                                                                  |
+| ------------------ | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| **Client**         | TypeScript/Node, Python, SDK core/adapters | 402 negotiation, payload forwarding to orchestration layer, SDK integration (Next.js, Hono, Fastify, Express, FastAPI adapters) |
+| **Orchestration**  | Go, CDP SDK                                | Treasury wallets, server-side ERC-3009 authorization signing, mutexes, settlement, ledger management                            |
+| **Persistence**    | PostgreSQL, Drizzle ORM                    | User balances, API keys, audit logs                                                                                             |
+| **Infrastructure** | Coinbase Facilitator, Base Blockchain      | Gas-free settlement, on-chain USDC transfer                                                                                     |
+| **Frontend**       | Next.js 16, React 19, Tailwind CSS 4       | Merchant dashboard, documentation, auth                                                                                         |
 
 ### Component breakdown
 
