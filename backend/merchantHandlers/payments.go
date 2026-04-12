@@ -2,7 +2,9 @@ package merchantHandlers
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"log/slog"
@@ -93,7 +95,9 @@ type payloadEnvelope struct {
 
 // SettlePayment handles POST /v1/settle-payment.
 // Extracts the recipient wallet and amount from the signed payload,
-// verifies and settles via the facilitator, then writes the ledger.
+// writes a pending ledger entry, verifies and settles via the facilitator,
+// then confirms the ledger. This ordering ensures the ledger is never
+// missing a record for an on-chain settlement.
 func SettlePayment(pool *pgxpool.Pool) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		merchant, ok := c.Locals("merchant_api_key").(*dbengine.Merchant)
@@ -108,7 +112,8 @@ func SettlePayment(pool *pgxpool.Pool) fiber.Handler {
 			return c.Status(400).JSON(fiber.Map{"error": "invalid request body"})
 		}
 
-		// Decode base64 payment payload.
+		// ── 1. Parse & validate payload ──────────────────────────────────
+
 		payloadBytes, err := base64.StdEncoding.DecodeString(req.PaymentPayload)
 		if err != nil {
 			return c.Status(400).JSON(fiber.Map{"error": "invalid payment_payload encoding"})
@@ -117,7 +122,6 @@ func SettlePayment(pool *pgxpool.Pool) fiber.Handler {
 			return c.Status(400).JSON(fiber.Map{"error": "invalid payment_payload JSON"})
 		}
 
-		// Extract to address and value from the signed EIP-712 payload.
 		var envelope payloadEnvelope
 		dec := json.NewDecoder(bytes.NewReader(payloadBytes))
 		dec.UseNumber()
@@ -136,7 +140,8 @@ func SettlePayment(pool *pgxpool.Pool) fiber.Handler {
 			return c.Status(400).JSON(fiber.Map{"error": "invalid payment amount"})
 		}
 
-		// Look up the wallet by the signed to address — verify it's ours.
+		// ── 2. Lookup wallet, build requirements ─────────────────────────
+
 		wallet, err := dbengine.GetWalletByAddress(c.Context(), pool, toAddress)
 		if err != nil {
 			if errors.Is(err, dbengine.ErrWalletNotFound) {
@@ -151,7 +156,6 @@ func SettlePayment(pool *pgxpool.Pool) fiber.Handler {
 			return c.Status(500).JSON(fiber.Map{"error": "network config not found for wallet"})
 		}
 
-		// Build canonical requirements from trusted data (wallet + signed value).
 		canonicalRequirements := x402Handlers.PaymentRequirements{
 			Scheme:            "exact",
 			Network:           netConfig.CAIP2,
@@ -168,8 +172,8 @@ func SettlePayment(pool *pgxpool.Pool) fiber.Handler {
 
 		payload := json.RawMessage(payloadBytes)
 
-		// Pre-validate all ledger prerequisites before calling the external facilitator.
-		// This ensures we fail fast on missing accounts rather than after an on-chain settlement.
+		// ── 3. Pre-validate all ledger accounts ──────────────────────────
+
 		merchantAcct, err := dbengine.GetMerchantUSDLiabilityAccount(c.Context(), pool, merchant.ID)
 		if err != nil {
 			slog.Error("get merchant liability account", "merchant_id", merchant.ID, "error", err)
@@ -194,68 +198,16 @@ func SettlePayment(pool *pgxpool.Pool) fiber.Handler {
 			return c.Status(500).JSON(fiber.Map{"error": "system account not found"})
 		}
 
-		// Calculate platform fee.
+		// ── 4. Compute deterministic idempotency key from payload ────────
+
+		hash := sha256.Sum256(payloadBytes)
+		payloadKey := "payment-" + hex.EncodeToString(hash[:])
+
+		// ── 5. Build ledger lines ────────────────────────────────────────
+
 		fee := config.PlatformFee.CalculateFee(amount)
 		merchantAmount := amount - fee
 
-		// Attach stable fields to a child logger for the entire settle flow.
-		// Payer address is intentionally omitted to avoid building a correlation record.
-		logger := slog.With(
-			"merchant_id", merchant.ID,
-			"network", netConfig.CAIP2,
-			"amount_micro", amount,
-			"fee_micro", fee,
-		)
-
-		// Step 1: Verify
-		logger.Info("settle payment: calling verify")
-		verifyResp, err := x402Handlers.Verify(c.Context(), payload, canonicalRequirements)
-		if err != nil {
-			logger.Error("settle payment: verify error", "error", err)
-			return c.Status(502).JSON(fiber.Map{
-				"success":       false,
-				"error_reason":  "verify_failed",
-				"error_message": "facilitator verification failed",
-			})
-		}
-		if !verifyResp.IsValid {
-			logger.Warn("settle payment: verify rejected",
-				"reason", verifyResp.InvalidReason,
-				"message", verifyResp.InvalidMessage)
-			return c.Status(400).JSON(fiber.Map{
-				"success":       false,
-				"error_reason":  verifyResp.InvalidReason,
-				"error_message": verifyResp.InvalidMessage,
-			})
-		}
-		logger.Info("settle payment: verify ok")
-
-		// Step 2: Settle
-		logger.Info("settle payment: calling settle")
-		settleResp, err := x402Handlers.Settle(c.Context(), payload, canonicalRequirements)
-		if err != nil {
-			logger.Error("settle payment: settle error", "error", err)
-			return c.Status(502).JSON(fiber.Map{
-				"success":       false,
-				"error_reason":  "settle_failed",
-				"error_message": "facilitator settlement failed",
-			})
-		}
-		if !settleResp.Success {
-			logger.Warn("settle payment: settle rejected",
-				"reason", settleResp.ErrorReason,
-				"message", settleResp.ErrorMessage)
-			return c.Status(400).JSON(fiber.Map{
-				"success":       false,
-				"error_reason":  settleResp.ErrorReason,
-				"error_message": settleResp.ErrorMessage,
-			})
-		}
-		logger.Info("settle payment: complete", "tx", settleResp.Transaction)
-
-		// Write cross-currency double-entry ledger using the tx hash as idempotency key.
-		// All account lookups and fee calculation were done above (before facilitator calls)
-		// so a missing account never results in an orphaned on-chain settlement.
 		lines := []dbengine.LedgerLine{
 			// USDC side: hot wallet receives, conversion clearing absorbs.
 			{Currency: dbengine.USDC, Amount: amount, Direction: dbengine.Debit, AccountID: wallet.AccountID},
@@ -270,11 +222,119 @@ func SettlePayment(pool *pgxpool.Pool) fiber.Handler {
 			})
 		}
 
-		_, err = dbengine.InsertTransaction(c.Context(), pool, settleResp.Transaction, lines)
-		if err != nil {
-			logger.Error("insert ledger transaction", "tx", settleResp.Transaction, "error", err)
-			return c.Status(500).JSON(fiber.Map{"error": "failed to create ledger entry"})
+		// ── 6. Insert pending ledger transaction ─────────────────────────
+		// Written BEFORE the facilitator call so the ledger is never missing
+		// a record for an on-chain settlement. Deduplicates concurrent/replayed
+		// requests via the payload-hash idempotency key.
+
+		txn, _, err := dbengine.InsertPendingTransaction(c.Context(), pool, payloadKey, lines)
+		if errors.Is(err, dbengine.ErrAlreadySettled) {
+			// This payload was already settled — return the stored result.
+			var storedTxHash string
+			if txn.TxHash != nil {
+				storedTxHash = *txn.TxHash
+			}
+			return c.Status(200).JSON(fiber.Map{
+				"success":     true,
+				"transaction": storedTxHash,
+				"network":     string(wallet.Network),
+			})
 		}
+		if errors.Is(err, dbengine.ErrPreviouslyFailed) {
+			return c.Status(400).JSON(fiber.Map{
+				"success":       false,
+				"error_reason":  "previously_failed",
+				"error_message": "this payment payload was previously attempted and failed",
+			})
+		}
+		if err != nil {
+			slog.Error("insert pending ledger transaction", "error", err)
+			return c.Status(500).JSON(fiber.Map{"error": "failed to create pending ledger entry"})
+		}
+
+		// From here on, txn.ID identifies the pending row. If we return early
+		// due to a facilitator failure we mark it as failed.
+		logger := slog.With(
+			"merchant_id", merchant.ID,
+			"txn_id", txn.ID,
+			"network", netConfig.CAIP2,
+			"amount_micro", amount,
+			"fee_micro", fee,
+		)
+
+		// ── 7. Verify with facilitator ───────────────────────────────────
+
+		logger.Info("settle payment: calling verify")
+		verifyResp, err := x402Handlers.Verify(c.Context(), payload, canonicalRequirements)
+		if err != nil {
+			logger.Error("settle payment: verify error", "error", err)
+			if failErr := dbengine.FailTransaction(c.Context(), pool, txn.ID); failErr != nil {
+				logger.Warn("settle payment: could not mark transaction as failed", "error", failErr)
+			}
+			return c.Status(502).JSON(fiber.Map{
+				"success":       false,
+				"error_reason":  "verify_failed",
+				"error_message": "facilitator verification failed",
+			})
+		}
+		if !verifyResp.IsValid {
+			logger.Warn("settle payment: verify rejected",
+				"reason", verifyResp.InvalidReason,
+				"message", verifyResp.InvalidMessage)
+			if failErr := dbengine.FailTransaction(c.Context(), pool, txn.ID); failErr != nil {
+				logger.Warn("settle payment: could not mark transaction as failed", "error", failErr)
+			}
+			return c.Status(400).JSON(fiber.Map{
+				"success":       false,
+				"error_reason":  verifyResp.InvalidReason,
+				"error_message": verifyResp.InvalidMessage,
+			})
+		}
+		logger.Info("settle payment: verify ok")
+
+		// ── 8. Settle with facilitator ───────────────────────────────────
+
+		logger.Info("settle payment: calling settle")
+		settleResp, err := x402Handlers.Settle(c.Context(), payload, canonicalRequirements)
+		if err != nil {
+			logger.Error("settle payment: settle error", "error", err)
+			if failErr := dbengine.FailTransaction(c.Context(), pool, txn.ID); failErr != nil {
+				logger.Warn("settle payment: could not mark transaction as failed", "error", failErr)
+			}
+			return c.Status(502).JSON(fiber.Map{
+				"success":       false,
+				"error_reason":  "settle_failed",
+				"error_message": "facilitator settlement failed",
+			})
+		}
+		if !settleResp.Success {
+			logger.Warn("settle payment: settle rejected",
+				"reason", settleResp.ErrorReason,
+				"message", settleResp.ErrorMessage)
+			if failErr := dbengine.FailTransaction(c.Context(), pool, txn.ID); failErr != nil {
+				logger.Warn("settle payment: could not mark transaction as failed", "error", failErr)
+			}
+			return c.Status(400).JSON(fiber.Map{
+				"success":       false,
+				"error_reason":  settleResp.ErrorReason,
+				"error_message": settleResp.ErrorMessage,
+			})
+		}
+		logger.Info("settle payment: settled on-chain", "tx", settleResp.Transaction)
+
+		// ── 9. Confirm the pending ledger transaction ────────────────────
+
+		if err := dbengine.ConfirmTransaction(c.Context(), pool, txn.ID, settleResp.Transaction); err != nil {
+			// CRITICAL: on-chain settlement succeeded but we couldn't confirm
+			// the ledger row. The pending row with its idempotency key remains
+			// as a recovery artifact — a retry of the same payload will find it
+			// and re-attempt confirmation.
+			logger.Error("CRITICAL: confirm ledger transaction failed after on-chain settle",
+				"tx_hash", settleResp.Transaction, "error", err)
+			return c.Status(500).JSON(fiber.Map{"error": "settlement succeeded but ledger confirmation failed — safe to retry"})
+		}
+
+		// ── 10. Return success ───────────────────────────────────────────
 
 		return c.Status(200).JSON(fiber.Map{
 			"success":     true,

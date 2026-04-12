@@ -100,17 +100,20 @@ func CreateWithdrawal(
 		return Withdrawal{}, fmt.Errorf("lock merchant account: %w", err)
 	}
 
-	// Compute balance under the lock.
+	// Compute balance under the lock. Only count confirmed transactions
+	// so that pending (unsettled) payment credits cannot be withdrawn.
 	var balance int64
 	err = tx.QueryRow(ctx,
 		`SELECT COALESCE(SUM(
-			CASE direction
-				WHEN 'CREDIT' THEN amount
-				WHEN 'DEBIT'  THEN -amount
+			CASE le.direction
+				WHEN 'CREDIT' THEN le.amount
+				WHEN 'DEBIT'  THEN -le.amount
 			END
 		), 0)
-		FROM ledger_entries
-		WHERE account_id = $1 AND currency = 'USD'`,
+		FROM ledger_entries le
+		JOIN transactions t ON t.id = le.transaction_id
+		WHERE le.account_id = $1 AND le.currency = 'USD'
+		  AND t.status = 'confirmed'`,
 		merchantAcctID,
 	).Scan(&balance)
 	if err != nil {
