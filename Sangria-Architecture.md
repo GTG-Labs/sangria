@@ -75,7 +75,7 @@ A TypeScript (and Python) **merchant-side** SDK for protecting API endpoints wit
 - On an incoming request **without** a payment header, the SDK calls the Sangria backend to generate payment requirements and returns a `402 Payment Required` response to the caller.
 - On a retry **with** a `PAYMENT-SIGNATURE` header, the SDK forwards the signed payload to the Sangria backend's settle endpoint and, on success, passes the request through to the protected handler.
 - Supports both `exact` (fixed price) and `upto` (variable price) schemes.
-- Credit verification and client-side ERC-3009 signing (for Scenarios 2 & 3) are planned future capabilities, not part of the current SDK.
+- Credit verification and client-side ERC-3009 signing are planned future capabilities, not part of the current SDK.
 
 **Key files:** `sdk/sdk-typescript/src/core.ts`, `sdk/sdk-typescript/src/adapters/`
 
