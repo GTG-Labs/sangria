@@ -51,7 +51,6 @@ Defined in `schema.ts`. All tables use UUID primary keys with `defaultRandom()`.
 | `direction` | DEBIT, CREDIT |
 | `currency` | USD, USDC, ETH |
 | `account_type` | ASSET, LIABILITY, EQUITY, REVENUE, EXPENSE |
-| `user_role` | member, admin |
 | `network` | base, base-sepolia, polygon, solana, solana-devnet |
 | `withdrawal_status` | pending_approval, approved, processing, completed, failed, reversed, canceled |
 
@@ -63,9 +62,15 @@ Defined in `schema.ts`. All tables use UUID primary keys with `defaultRandom()`.
 |---|---|---|
 | workos_id | text | Primary key |
 | owner | text | Display name or email |
-| role | user_role | Default "member" |
 | created_at | timestamp (tz) | Default now() |
 | updated_at | timestamp (tz) | Default now() |
+
+**admins** — access control list for Sangria staff
+
+| Column | Type | Notes |
+|---|---|---|
+| user_id | text | Primary key, FK → users.workos_id |
+| created_at | timestamp (tz) | Default now() |
 
 **accounts** — double-entry ledger accounts
 

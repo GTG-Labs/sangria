@@ -30,7 +30,6 @@ The server starts on the port specified by the `PORT` environment variable (requ
 | `CDP_API_KEY` | Yes | Coinbase Developer Platform API key |
 | `CDP_API_SECRET` | Yes | CDP API secret |
 | `CDP_WALLET_SECRET` | Yes | Encryption key for CDP wallet keys |
-| `ADMIN_API_KEY` | Yes | Shared secret for admin endpoints (generate with `openssl rand -hex 32`) |
 | `X402_FACILITATOR_URL` | Yes | Facilitator URL (testnet: `https://x402.org/facilitator`) |
 | `PLATFORM_FEE_PERCENT` | No | Fee percentage per payment (default: `0`, recommended: `0.5`) |
 | `PLATFORM_FEE_MIN_MICROUNITS` | No | Minimum fee in microunits (default: `0`, recommended: `1000` = $0.001) |
@@ -72,9 +71,9 @@ These are called by merchant servers using the Sangria SDK. Authenticated via me
 | POST | `/v1/generate-payment` | API key | Generate x402 PaymentRequired |
 | POST | `/v1/settle-payment` | API key | Verify + settle payment, credit merchant |
 
-### Admin endpoints — `/admin/*` (WorkOS JWT + admin key + admin role)
+### Admin endpoints — `/admin/*` (WorkOS JWT + admins table)
 
-Triple-gated: requires WorkOS JWT, `X-Admin-Key` header, and `role = "admin"` in the database.
+Requires WorkOS JWT and the user must exist in the `admins` table.
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
@@ -92,10 +91,9 @@ Merchant API keys follow the format `sg_live_<key_id>_<random>` or `sg_test_<key
 
 ### Admin authentication
 
-Admin endpoints require all three:
+Admin endpoints require both:
 1. `Authorization: Bearer <workos-jwt>` header
-2. `X-Admin-Key: <admin-api-key>` header
-3. User's `role = "admin"` in the database
+2. User must exist in the `admins` table
 
 All admin auth failures return a generic `403 Forbidden`.
 

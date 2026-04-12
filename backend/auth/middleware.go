@@ -1,11 +1,8 @@
 package auth
 
 import (
-	"crypto/subtle"
 	"log/slog"
-	"os"
 	"strings"
-	"sync"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -103,44 +100,21 @@ func APIKeyAuthMiddleware(pool *pgxpool.Pool) fiber.Handler {
 
 // RequireAdmin is a middleware that enforces admin access.
 // Must run AFTER WorkosAuthMiddleware (needs workos_user in locals).
-// Requires both:
-//  1. A valid X-Admin-Key header matching the ADMIN_API_KEY env var
-//  2. The user's role == "admin" in the database
-var adminWarnOnce sync.Once
-
+// Checks that the authenticated user exists in the admins table.
 func RequireAdmin(pool *pgxpool.Pool) fiber.Handler {
-	adminKey := os.Getenv("ADMIN_API_KEY")
-
 	return func(c fiber.Ctx) error {
-		// Check admin API key header.
-		if adminKey == "" {
-			adminWarnOnce.Do(func() {
-				slog.Warn("ADMIN_API_KEY not set, admin endpoints are disabled")
-			})
-			return c.Status(503).JSON(fiber.Map{"error": "Admin access not configured"})
-		}
-
-		providedKey := c.Get("X-Admin-Key")
-		if providedKey == "" || subtle.ConstantTimeCompare([]byte(providedKey), []byte(adminKey)) != 1 {
-			return c.Status(403).JSON(fiber.Map{"error": "Forbidden"})
-		}
-
-		// Check user role in database.
 		user, ok := c.Locals("workos_user").(WorkOSUser)
 		if !ok {
 			return c.Status(500).JSON(fiber.Map{"error": "Internal server error"})
 		}
-		dbUser, err := dbengine.GetUserByWorkosID(c.Context(), pool, user.ID)
+		isAdmin, err := dbengine.IsAdmin(c.Context(), pool, user.ID)
 		if err != nil {
-			slog.Error("admin role check: database lookup failed", "user_id", user.ID, "error", err)
+			slog.Error("admin check: database lookup failed", "user_id", user.ID, "error", err)
 			return c.Status(500).JSON(fiber.Map{"error": "Internal server error"})
 		}
-		if dbUser.Role != "admin" {
+		if !isAdmin {
 			return c.Status(403).JSON(fiber.Map{"error": "Forbidden"})
 		}
-
-		// Store the full DB user in locals for handlers to use.
-		c.Locals("db_user", dbUser)
 
 		return c.Next()
 	}

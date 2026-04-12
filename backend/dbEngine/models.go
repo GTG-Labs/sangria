@@ -41,7 +41,6 @@ type Account struct {
 type User struct {
 	WorkosID  string    `json:"workos_id"`
 	Owner     string    `json:"owner"`
-	Role      string    `json:"role"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
