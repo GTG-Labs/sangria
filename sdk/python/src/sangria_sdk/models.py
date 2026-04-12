@@ -14,6 +14,8 @@ def to_microunits(dollars: float) -> int:
     """Convert a dollar amount to microunits. Rounds half-up to match JS Math.round."""
     from decimal import Decimal, ROUND_HALF_UP
     microunits = int((Decimal(str(dollars)) * Decimal(MICROUNITS_PER_DOLLAR)).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+    if microunits <= 0:
+        raise ValueError("amount must be a positive integer (microunits)")
     if microunits > _MAX_SAFE_MICROUNITS:
         raise ValueError(
             "amount exceeds safe integer range for JSON transport and cannot be represented safely"
@@ -35,7 +37,7 @@ class FixedPriceOptions:
 
     def __post_init__(self) -> None:
         import math
-        if not isinstance(self.price, (int, float)) or not math.isfinite(self.price) or self.price <= 0:
+        if isinstance(self.price, bool) or not isinstance(self.price, (int, float)) or not math.isfinite(self.price) or self.price <= 0:
             raise ValueError("price must be a positive number (dollars)")
 
     def to_generate_dict(self) -> dict[str, Any]:

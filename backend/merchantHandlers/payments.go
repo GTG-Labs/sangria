@@ -194,6 +194,10 @@ func SettlePayment(pool *pgxpool.Pool) fiber.Handler {
 		// Calculate platform fee.
 		fee := config.PlatformFee.CalculateFee(amount)
 		merchantAmount := amount - fee
+		if merchantAmount <= 0 {
+			slog.Error("settle payment: fee exceeds payment amount", "amount_micro", amount, "fee_micro", fee)
+			return c.Status(400).JSON(fiber.Map{"error": "payment amount too small to cover platform fee"})
+		}
 
 		// Attach stable fields to a child logger for the entire settle flow.
 		// Payer address is intentionally omitted to avoid building a correlation record.
