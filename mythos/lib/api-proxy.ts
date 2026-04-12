@@ -4,6 +4,10 @@ import { withAuth } from "@workos-inc/authkit-nextjs";
 
 const BACKEND_URL = process.env.BACKEND_URL;
 
+if (!BACKEND_URL) {
+  throw new Error("BACKEND_URL is not configured");
+}
+
 export async function proxyToBackend(
   method: string,
   path: string,
@@ -23,7 +27,7 @@ export async function proxyToBackend(
     const timeoutId = setTimeout(() => controller.abort(), 10000);
 
     try {
-      const response = await fetch(`${BACKEND_URL}${path}`, {
+      const response = await fetch(new URL(path, BACKEND_URL), {
         method,
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -50,15 +54,23 @@ export async function proxyToBackend(
       }
 
       if (options?.rawResponse) {
-        return new NextResponse(null, { status: response.status });
+        return new NextResponse(response.body, {
+          status: response.status,
+          headers: response.headers,
+        });
+      }
+
+      const contentType = response.headers.get("content-type") ?? "";
+      if (contentType.includes("application/json")) {
+        const data = await response.json();
+        return NextResponse.json(data, { status: response.status });
       }
 
       const text = await response.text();
       if (!text) {
         return new NextResponse(null, { status: response.status });
       }
-      const data = JSON.parse(text);
-      return NextResponse.json(data, { status: response.status });
+      return new NextResponse(text, { status: response.status });
     } catch (fetchError: any) {
       clearTimeout(timeoutId);
 
@@ -72,7 +84,6 @@ export async function proxyToBackend(
       throw fetchError;
     }
   } catch (error) {
-    console.error(`API proxy ${method} ${path} error:`, error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

@@ -13,6 +13,7 @@ export async function verifyAdmin(accessToken: string): Promise<boolean> {
   try {
     const res = await fetch(`${BACKEND_URL}/admin/me`, {
       headers: { Authorization: `Bearer ${accessToken}` },
+      cache: "no-store",
       signal: controller.signal,
     });
     clearTimeout(timeoutId);
