@@ -19,18 +19,19 @@ def from_microunits(microunits: int) -> float:
 
 @dataclass(slots=True)
 class FixedPriceOptions:
-    """Price in microunits (1 USD = 1_000_000 microunits). Must be a positive integer."""
-    price: int
+    """Price in dollars (e.g. 0.01 for one cent). Converted to microunits internally before sending to the backend."""
+    price: float
     resource: str
     description: str | None = None
 
     def __post_init__(self) -> None:
-        if not isinstance(self.price, int) or isinstance(self.price, bool) or self.price <= 0:
-            raise ValueError("price must be a positive integer (microunits)")
+        import math
+        if not isinstance(self.price, (int, float)) or not math.isfinite(self.price) or self.price <= 0:
+            raise ValueError("price must be a positive number (dollars)")
 
     def to_generate_dict(self) -> dict[str, Any]:
         payload: dict[str, Any] = {
-            "amount": self.price,
+            "amount": to_microunits(self.price),
             "resource": self.resource,
         }
         if self.description:
@@ -50,8 +51,8 @@ class PaymentResponse:
 class PaymentProceeded:
     """Payment succeeded — run the handler."""
     paid: bool
-    amount: int
-    """Amount charged in microunits (1 USD = 1_000_000 microunits)."""
+    amount: float
+    """Amount charged in dollars."""
     transaction: str | None = None
 
 

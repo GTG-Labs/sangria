@@ -4,14 +4,14 @@ export interface SangriaConfig {
 }
 
 export interface FixedPriceOptions {
-  /** Price in microunits (1 USD = 1_000_000 microunits). Must be a positive integer. */
+  /** Price in dollars (e.g. 0.01 for one cent). Converted to microunits internally before sending to the backend. */
   price: number;
   description?: string;
 }
 
 export interface SangriaRequestData {
   paid: boolean;
-  /** Amount charged in microunits (1 USD = 1_000_000 microunits). */
+  /** Amount charged in dollars. */
   amount: number;
   transaction?: string;
 }

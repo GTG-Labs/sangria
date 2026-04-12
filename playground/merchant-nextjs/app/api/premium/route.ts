@@ -10,7 +10,7 @@ const sangria = new Sangria({
 // GET /api/premium → $0.01 (fixed)
 export const GET = fixedPrice(
   sangria,
-  { price: 10000, description: "Access premium content" },  // 10000 microunits = $0.01
+  { price: 0.01, description: "Access premium content" },
   async (_request: NextRequest) => {
     return NextResponse.json({
       message: "You accessed the premium endpoint!",

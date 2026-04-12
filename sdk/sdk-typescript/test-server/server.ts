@@ -19,7 +19,7 @@ app.get("/", (_req, res) => {
 // ── Fixed-price endpoint ──
 app.get(
   "/premium",
-  fixedPrice(sangria, { price: 10000, description: "Access premium content" }),  // 10000 microunits = $0.01
+  fixedPrice(sangria, { price: 0.01, description: "Access premium content" }),
   (_req, res) => {
     res.json({ message: "You accessed the premium endpoint!" });
   }

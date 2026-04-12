@@ -29,8 +29,8 @@ export interface NextJSConfig {
 //
 //   import { fixedPrice } from "@sangria-sdk/core/nextjs";
 //
-//   export const GET = fixedPrice(sangria, { price: 10000 }, handler);   // 10000 microunits = $0.01
-//   export const POST = fixedPrice(sangria, { price: 10000 }, handler, config);
+//   export const GET = fixedPrice(sangria, { price: 0.01 }, handler);
+//   export const POST = fixedPrice(sangria, { price: 0.01 }, handler, config);
 //
 export function fixedPrice(
   sangria: Sangria,

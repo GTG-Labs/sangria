@@ -5,6 +5,7 @@ import type {
   PaymentResult,
   X402ChallengePayload,
 } from "./types.js";
+import { toMicrounits } from "./types.js";
 
 const DEFAULT_BASE_URL = "https://api.getsangria.com";
 
@@ -22,8 +23,8 @@ export class Sangria {
   }
 
   private validateFixedPriceOptions(options: FixedPriceOptions): void {
-    if (!Number.isInteger(options.price) || options.price <= 0) {
-      throw new Error("Sangria: price must be a positive integer (microunits)");
+    if (!Number.isFinite(options.price) || options.price <= 0) {
+      throw new Error("Sangria: price must be a positive number (dollars)");
     }
   }
 
@@ -50,7 +51,7 @@ export class Sangria {
       const x402_responsePayload = (await this.postToSangriaBackend(
         "/v1/generate-payment",
         {
-          amount: options.price,
+          amount: toMicrounits(options.price),
           resource: ctx.resourceUrl,
           description: options.description,
         }

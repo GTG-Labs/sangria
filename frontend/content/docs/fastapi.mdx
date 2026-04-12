@@ -54,7 +54,7 @@ async def health():
 
 # This endpoint costs $0.01 per request
 @app.get("/premium")
-@require_sangria_payment(client, amount=10000, description="Access premium content")  # 10000 microunits = $0.01
+@require_sangria_payment(client, amount=0.01, description="Access premium content")
 async def premium(request: Request):
     return {"message": "You accessed the premium endpoint!"}
 ```
