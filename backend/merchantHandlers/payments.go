@@ -328,13 +328,19 @@ func SettlePayment(pool *pgxpool.Pool) fiber.Handler {
 		// ── 9. Confirm the pending ledger transaction ────────────────────
 
 		if err := dbengine.ConfirmTransaction(c.Context(), pool, txn.ID, settleResp.Transaction); err != nil {
-			// CRITICAL: on-chain settlement succeeded but we couldn't confirm
-			// the ledger row. The pending row with its idempotency key remains
-			// as a recovery artifact — a retry of the same payload will find it
-			// and re-attempt confirmation.
-			logger.Error("CRITICAL: confirm ledger transaction failed after on-chain settle",
-				"tx_hash", settleResp.Transaction, "error", err)
-			return c.Status(500).JSON(fiber.Map{"error": "settlement succeeded but ledger confirmation failed — safe to retry"})
+			if errors.Is(err, dbengine.ErrTransactionNotPending) {
+				// A concurrent request already confirmed this transaction — that's a success.
+				logger.Info("settle payment: transaction already confirmed by concurrent request",
+					"tx_hash", settleResp.Transaction)
+			} else {
+				// CRITICAL: on-chain settlement succeeded but we couldn't confirm
+				// the ledger row. The pending row with its idempotency key remains
+				// as a recovery artifact — a retry of the same payload will find it
+				// and re-attempt confirmation.
+				logger.Error("CRITICAL: confirm ledger transaction failed after on-chain settle",
+					"tx_hash", settleResp.Transaction, "error", err)
+				return c.Status(500).JSON(fiber.Map{"error": "settlement succeeded but ledger confirmation failed — safe to retry"})
+			}
 		}
 
 		// ── 10. Return success ───────────────────────────────────────────
