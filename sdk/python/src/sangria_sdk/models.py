@@ -8,8 +8,9 @@ MICROUNITS_PER_DOLLAR: int = 1_000_000
 
 
 def to_microunits(dollars: float) -> int:
-    """Convert a dollar amount to microunits. Rounds to nearest integer."""
-    return round(dollars * MICROUNITS_PER_DOLLAR)
+    """Convert a dollar amount to microunits. Rounds half-up to match JS Math.round."""
+    from decimal import Decimal, ROUND_HALF_UP
+    return int((Decimal(str(dollars)) * Decimal(MICROUNITS_PER_DOLLAR)).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
 
 
 def from_microunits(microunits: int) -> float:
