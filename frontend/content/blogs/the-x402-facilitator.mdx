@@ -44,12 +44,12 @@ Here's how a facilitator-backed x402 transaction works, step by step:
 4. The client retries the request with a `PAYMENT-SIGNATURE` header containing the signed payload
 5. The server POSTs the payload and payment details to the facilitator's **`/verify`** endpoint
 6. The facilitator validates the payload based on the `scheme` and `networkId`, then returns a **Verification Response**
-7. If valid, the server fulfills the request. If invalid, it returns another 402
-8. The server POSTs to the facilitator's **`/settle`** endpoint
+7. If invalid, the server returns another 402 immediately — no settlement is attempted
+8. If valid, the server POSTs to the facilitator's **`/settle`** endpoint
 9. The facilitator submits the transaction to the blockchain
 10. The facilitator waits for on-chain confirmation
 11. The facilitator returns a **Payment Execution Response** with the transaction hash
-12. The server responds to the client with a `PAYMENT-RESPONSE` header — **200 OK** on success, **402** on failure
+12. The server checks the Payment Execution Response — if successful, it fulfills the request and responds with **200 OK**; if settlement failed, it returns **402**
 
 The key insight: the resource server never touches the blockchain directly. It delegates all on-chain complexity to the facilitator and focuses on what it does best — serving content.
 

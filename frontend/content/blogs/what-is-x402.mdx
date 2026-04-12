@@ -50,15 +50,15 @@ x402 enables pricing at request granularity: per API call, per data lookup, per 
 
 x402 defines **payment negotiation and transport**. Sangria focuses on **execution, merchant usability, and operational reliability** for real-world deployments.
 
-Based on Sangria's architecture, we support three practical payment scenarios:
+Based on Sangria's architecture, we support one payment scenario today, with two more planned:
 
-1. **Client external, merchant on Sangria** _(supported)_
+1. **Client external, merchant on Sangria** _(supported now)_
    An external client (AI agent or raw wallet) pays USDC on-chain; Sangria credits the merchant's fiat balance.
 
-2. **Client on Sangria, merchant external** _(coming soon)_
+2. **Client on Sangria, merchant external** _(planned)_
    The client pays in Sangria Credits; Sangria's treasury handles USDC settlement to the external merchant over x402-compatible flows.
 
-3. **Client and merchant both on Sangria** _(coming soon)_
+3. **Client and merchant both on Sangria** _(planned)_
    Settlement happens as an internal ledger transfer for speed and cost efficiency, with no on-chain hop needed.
 
 This model gives merchants better interoperability while insulating end users from unnecessary crypto complexity.
