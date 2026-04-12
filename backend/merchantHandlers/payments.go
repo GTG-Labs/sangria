@@ -231,9 +231,13 @@ func SettlePayment(pool *pgxpool.Pool) fiber.Handler {
 		txn, _, err := dbengine.InsertPendingTransaction(c.Context(), pool, payloadKey, lines)
 		if errors.Is(err, dbengine.ErrAlreadySettled) {
 			// This payload was already settled — return the stored result.
+			var storedTxHash string
+			if txn.TxHash != nil {
+				storedTxHash = *txn.TxHash
+			}
 			return c.Status(200).JSON(fiber.Map{
 				"success":     true,
-				"transaction": txn.TxHash,
+				"transaction": storedTxHash,
 				"network":     string(wallet.Network),
 			})
 		}
