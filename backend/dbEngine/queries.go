@@ -128,3 +128,97 @@ func GetMerchantTransactionsPaginated(
 
 	return transactions, nextCursor, total, nil
 }
+
+// GetAllTransactionsPaginated returns paginated transactions across all merchants.
+// Same cursor-based pagination as GetMerchantTransactionsPaginated but without user scoping.
+func GetAllTransactionsPaginated(
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	limit int,
+	cursor *time.Time,
+) ([]MerchantTransaction, *time.Time, int, error) {
+	baseWhere := `
+		WHERE a.type = 'LIABILITY'
+		  AND le.direction = 'CREDIT'
+	`
+	var args []interface{}
+
+	cursorWhere := ""
+	if cursor != nil {
+		cursorWhere = ` AND t.created_at < $1`
+		args = append(args, *cursor)
+	}
+
+	// Fetch limit+1 to determine if more results exist
+	limitParam := len(args) + 1
+	dataQuery := fmt.Sprintf(`
+		SELECT
+			t.id,
+			t.idempotency_key,
+			t.created_at,
+			le.amount,
+			le.currency
+		FROM transactions t
+		JOIN ledger_entries le ON le.transaction_id = t.id
+		JOIN accounts a ON a.id = le.account_id
+		%s%s
+		ORDER BY t.created_at DESC
+		LIMIT $%d
+	`, baseWhere, cursorWhere, limitParam)
+
+	// Get total count
+	countQuery := fmt.Sprintf(`
+		SELECT COUNT(DISTINCT t.id)
+		FROM transactions t
+		JOIN ledger_entries le ON le.transaction_id = t.id
+		JOIN accounts a ON a.id = le.account_id
+		%s
+	`, baseWhere)
+
+	var total int
+	err := pool.QueryRow(ctx, countQuery).Scan(&total)
+	if err != nil {
+		return nil, nil, 0, fmt.Errorf("count query failed: %w", err)
+	}
+
+	dataArgs := append(args, limit+1)
+	rows, err := pool.Query(ctx, dataQuery, dataArgs...)
+	if err != nil {
+		return nil, nil, 0, err
+	}
+	defer rows.Close()
+
+	var transactions []MerchantTransaction
+	for rows.Next() {
+		var tx MerchantTransaction
+		err := rows.Scan(
+			&tx.ID,
+			&tx.IdempotencyKey,
+			&tx.CreatedAt,
+			&tx.Amount,
+			&tx.Currency,
+		)
+		if err != nil {
+			return nil, nil, 0, err
+		}
+		tx.Type = "payment_received"
+		transactions = append(transactions, tx)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, nil, 0, err
+	}
+
+	if len(transactions) == 0 {
+		return []MerchantTransaction{}, nil, total, nil
+	}
+
+	var nextCursor *time.Time
+	if len(transactions) > limit {
+		transactions = transactions[:limit]
+		lastTimestamp := transactions[len(transactions)-1].CreatedAt
+		nextCursor = &lastTimestamp
+	}
+
+	return transactions, nextCursor, total, nil
+}
