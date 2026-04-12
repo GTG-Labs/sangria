@@ -53,10 +53,8 @@ func RequestWithdrawal(pool *pgxpool.Pool) fiber.Handler {
 			return c.Status(403).JSON(fiber.Map{"error": "Forbidden"})
 		}
 
-		amountMicro := req.Amount
-
 		// Validate minimum withdrawal.
-		if amountMicro < config.WithdrawalConfig.MinAmount {
+		if req.Amount < config.WithdrawalConfig.MinAmount {
 			return c.Status(400).JSON(fiber.Map{
 				"error":      "below minimum withdrawal amount",
 				"min_amount": config.WithdrawalConfig.MinAmount,
@@ -64,12 +62,12 @@ func RequestWithdrawal(pool *pgxpool.Pool) fiber.Handler {
 		}
 
 		// Calculate fee and auto-approve decision.
-		fee := config.WithdrawalConfig.CalculateWithdrawalFee(amountMicro)
-		autoApprove := config.WithdrawalConfig.ShouldAutoApprove(amountMicro)
+		fee := config.WithdrawalConfig.CalculateWithdrawalFee(req.Amount)
+		autoApprove := config.WithdrawalConfig.ShouldAutoApprove(req.Amount)
 
 		withdrawal, err := dbengine.CreateWithdrawal(
 			c.Context(), pool,
-			merchant.ID, amountMicro, fee, req.IdempotencyKey,
+			merchant.ID, req.Amount, fee, req.IdempotencyKey,
 			autoApprove,
 		)
 		if err != nil {

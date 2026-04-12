@@ -34,7 +34,6 @@ func FundTreasury(pool *pgxpool.Pool) fiber.Handler {
 		if req.Amount <= 0 {
 			return c.Status(400).JSON(fiber.Map{"error": "amount must be a positive integer (microunits)"})
 		}
-		amountMicro := req.Amount
 
 		// Look up system accounts.
 		merchantPool, err := dbengine.GetSystemAccount(c.Context(), pool, dbengine.SystemAccountUSDMerchantPool, dbengine.USD)
@@ -53,19 +52,19 @@ func FundTreasury(pool *pgxpool.Pool) fiber.Handler {
 		idempotencyKey := fmt.Sprintf("treasury-fund-%s", uuid.New().String())
 
 		entries, err := dbengine.InsertTransaction(c.Context(), pool, idempotencyKey, []dbengine.LedgerLine{
-			{Currency: dbengine.USD, Amount: amountMicro, Direction: dbengine.Debit, AccountID: merchantPool.ID},
-			{Currency: dbengine.USD, Amount: amountMicro, Direction: dbengine.Credit, AccountID: ownerEquity.ID},
+			{Currency: dbengine.USD, Amount: req.Amount, Direction: dbengine.Debit, AccountID: merchantPool.ID},
+			{Currency: dbengine.USD, Amount: req.Amount, Direction: dbengine.Credit, AccountID: ownerEquity.ID},
 		})
 		if err != nil {
 			slog.Error("insert treasury funding transaction", "idempotency_key", idempotencyKey, "error", err)
 			return c.Status(500).JSON(fiber.Map{"error": "failed to record funding"})
 		}
 
-		slog.Info("treasury funded", "amount_micro", amountMicro, "idempotency_key", idempotencyKey)
+		slog.Info("treasury funded", "amount_micro", req.Amount, "idempotency_key", idempotencyKey)
 
 		return c.Status(201).JSON(fiber.Map{
 			"success":         true,
-			"amount_micro":    amountMicro,
+			"amount_micro":    req.Amount,
 			"note":            req.Note,
 			"ledger_entries":  len(entries),
 			"idempotency_key": idempotencyKey,

@@ -34,7 +34,6 @@ func GeneratePayment(pool *pgxpool.Pool) fiber.Handler {
 		if req.Amount <= 0 {
 			return c.Status(400).JSON(fiber.Map{"error": "amount must be a positive integer (microunits)"})
 		}
-		amountMicro := req.Amount
 
 		// Hardcoded: USDC on Base (change to "base" for mainnet).
 		const network = "base"
@@ -50,7 +49,7 @@ func GeneratePayment(pool *pgxpool.Pool) fiber.Handler {
 			return c.Status(500).JSON(fiber.Map{"error": "no wallet available for this network"})
 		}
 
-		slog.Info("generate payment: terms issued", "network", netConfig.CAIP2, "amount_micro", amountMicro)
+		slog.Info("generate payment: terms issued", "network", netConfig.CAIP2, "amount_micro", req.Amount)
 
 		return c.Status(200).JSON(fiber.Map{
 			"x402Version": 2,
@@ -58,7 +57,7 @@ func GeneratePayment(pool *pgxpool.Pool) fiber.Handler {
 				{
 					Scheme:            "exact",
 					Network:           netConfig.CAIP2,
-					Amount:            strconv.FormatInt(amountMicro, 10),
+					Amount:            strconv.FormatInt(req.Amount, 10),
 					Asset:             netConfig.USDCAddress,
 					PayTo:             wallet.Address,
 					MaxTimeoutSeconds: maxTimeoutSeconds,
