@@ -231,6 +231,7 @@ func SettlePayment(pool *pgxpool.Pool) fiber.Handler {
 		txn, _, err := dbengine.InsertPendingTransaction(c.Context(), pool, payloadKey, lines)
 		if errors.Is(err, dbengine.ErrAlreadySettled) {
 			// This payload was already settled — return the stored result.
+			// Payer address is not stored (privacy by design) so it's empty on replay.
 			var storedTxHash string
 			if txn.TxHash != nil {
 				storedTxHash = *txn.TxHash
@@ -239,6 +240,7 @@ func SettlePayment(pool *pgxpool.Pool) fiber.Handler {
 				"success":     true,
 				"transaction": storedTxHash,
 				"network":     string(wallet.Network),
+				"payer":       "",
 			})
 		}
 		if errors.Is(err, dbengine.ErrPreviouslyFailed) {
