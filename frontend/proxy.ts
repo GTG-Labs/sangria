@@ -1,6 +1,6 @@
-import { authkitProxy } from "@workos-inc/authkit-nextjs";
+import { authkitMiddleware } from "@workos-inc/authkit-nextjs";
 
-export default authkitProxy({
+export default authkitMiddleware({
   redirectUri: process.env.NEXT_PUBLIC_WORKOS_REDIRECT_URI,
 });
 
