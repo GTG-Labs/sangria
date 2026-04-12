@@ -95,7 +95,7 @@ Admin endpoints require both:
 1. `Authorization: Bearer <workos-jwt>` header
 2. User must exist in the `admins` table
 
-All admin auth failures return a generic `403 Forbidden`.
+Status codes: `401` (missing/invalid JWT), `403` (authenticated but not in admins table), `500` (internal lookup failure).
 
 ## Project structure
 
