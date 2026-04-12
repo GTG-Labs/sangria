@@ -269,7 +269,9 @@ func SettlePayment(pool *pgxpool.Pool) fiber.Handler {
 		verifyResp, err := x402Handlers.Verify(c.Context(), payload, canonicalRequirements)
 		if err != nil {
 			logger.Error("settle payment: verify error", "error", err)
-			_ = dbengine.FailTransaction(c.Context(), pool, txn.ID)
+			if failErr := dbengine.FailTransaction(c.Context(), pool, txn.ID); failErr != nil {
+				logger.Warn("settle payment: could not mark transaction as failed", "error", failErr)
+			}
 			return c.Status(502).JSON(fiber.Map{
 				"success":       false,
 				"error_reason":  "verify_failed",
@@ -280,7 +282,9 @@ func SettlePayment(pool *pgxpool.Pool) fiber.Handler {
 			logger.Warn("settle payment: verify rejected",
 				"reason", verifyResp.InvalidReason,
 				"message", verifyResp.InvalidMessage)
-			_ = dbengine.FailTransaction(c.Context(), pool, txn.ID)
+			if failErr := dbengine.FailTransaction(c.Context(), pool, txn.ID); failErr != nil {
+				logger.Warn("settle payment: could not mark transaction as failed", "error", failErr)
+			}
 			return c.Status(400).JSON(fiber.Map{
 				"success":       false,
 				"error_reason":  verifyResp.InvalidReason,
@@ -295,7 +299,9 @@ func SettlePayment(pool *pgxpool.Pool) fiber.Handler {
 		settleResp, err := x402Handlers.Settle(c.Context(), payload, canonicalRequirements)
 		if err != nil {
 			logger.Error("settle payment: settle error", "error", err)
-			_ = dbengine.FailTransaction(c.Context(), pool, txn.ID)
+			if failErr := dbengine.FailTransaction(c.Context(), pool, txn.ID); failErr != nil {
+				logger.Warn("settle payment: could not mark transaction as failed", "error", failErr)
+			}
 			return c.Status(502).JSON(fiber.Map{
 				"success":       false,
 				"error_reason":  "settle_failed",
@@ -306,7 +312,9 @@ func SettlePayment(pool *pgxpool.Pool) fiber.Handler {
 			logger.Warn("settle payment: settle rejected",
 				"reason", settleResp.ErrorReason,
 				"message", settleResp.ErrorMessage)
-			_ = dbengine.FailTransaction(c.Context(), pool, txn.ID)
+			if failErr := dbengine.FailTransaction(c.Context(), pool, txn.ID); failErr != nil {
+				logger.Warn("settle payment: could not mark transaction as failed", "error", failErr)
+			}
 			return c.Status(400).JSON(fiber.Map{
 				"success":       false,
 				"error_reason":  settleResp.ErrorReason,
