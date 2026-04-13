@@ -259,10 +259,14 @@ export const withdrawals = pgTable(
     failureCode: varchar("failure_code", { length: 100 }),
     failureMessage: text("failure_message"),
 
-    // Admin review
+    // Admin review (set during approve/reject — immutable after that step)
     reviewedBy: text("reviewed_by"),
     reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
     reviewNote: text("review_note"),
+
+    // Completion/failure actor attribution
+    completedBy: text("completed_by"),
+    failedBy: text("failed_by"),
 
     // Idempotency
     idempotencyKey: varchar("idempotency_key", { length: 255 }).notNull(),

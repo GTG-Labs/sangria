@@ -175,6 +175,8 @@ type Withdrawal struct {
 	ReviewedBy              *string          `json:"reviewed_by"`
 	ReviewedAt              *time.Time       `json:"reviewed_at"`
 	ReviewNote              *string          `json:"review_note"`
+	CompletedBy             *string          `json:"completed_by"`
+	FailedBy                *string          `json:"failed_by"`
 	IdempotencyKey          string           `json:"idempotency_key"`
 	CreatedAt               time.Time        `json:"created_at"`
 	ApprovedAt              *time.Time       `json:"approved_at"`

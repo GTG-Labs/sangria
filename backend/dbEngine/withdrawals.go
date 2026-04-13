@@ -22,6 +22,7 @@ const withdrawalColumns = `id, merchant_id, amount, fee, net_amount, status,
 	debit_transaction_id, completion_transaction_id, reversal_transaction_id,
 	failure_code, failure_message,
 	reviewed_by, reviewed_at, review_note,
+	completed_by, failed_by,
 	idempotency_key,
 	created_at, approved_at, processed_at, completed_at, failed_at, reversed_at, canceled_at`
 
@@ -33,6 +34,7 @@ func scanWithdrawal(row interface{ Scan(dest ...any) error }) (Withdrawal, error
 		&w.DebitTransactionID, &w.CompletionTransactionID, &w.ReversalTransactionID,
 		&w.FailureCode, &w.FailureMessage,
 		&w.ReviewedBy, &w.ReviewedAt, &w.ReviewNote,
+		&w.CompletedBy, &w.FailedBy,
 		&w.IdempotencyKey,
 		&w.CreatedAt, &w.ApprovedAt, &w.ProcessedAt, &w.CompletedAt, &w.FailedAt, &w.ReversedAt, &w.CanceledAt,
 	)
@@ -538,7 +540,7 @@ func CompleteWithdrawal(ctx context.Context, pool *pgxpool.Pool, withdrawalID, a
 	_, err = tx.Exec(ctx,
 		`UPDATE withdrawals
 		 SET status = $1, completed_at = NOW(), completion_transaction_id = $2,
-		     reviewed_by = $3, reviewed_at = NOW()
+		     completed_by = $3
 		 WHERE id = $4`,
 		WithdrawalStatusCompleted, txnID, adminUserID, withdrawalID,
 	)
@@ -577,7 +579,7 @@ func FailWithdrawal(ctx context.Context, pool *pgxpool.Pool, withdrawalID, admin
 	_, err = tx.Exec(ctx,
 		`UPDATE withdrawals
 		 SET status = $1, failed_at = NOW(), failure_code = $2, failure_message = $3,
-		     reversal_transaction_id = $4, reviewed_by = $5, reviewed_at = NOW()
+		     reversal_transaction_id = $4, failed_by = $5
 		 WHERE id = $6`,
 		WithdrawalStatusFailed, failureCode, failureMessage, txnID, adminUserID, withdrawalID,
 	)
