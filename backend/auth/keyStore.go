@@ -180,7 +180,7 @@ func RevokeAPIKey(ctx context.Context, pool *pgxpool.Pool, merchantID, adminUser
 	).Scan(&organizationID)
 
 	if errors.Is(err, pgx.ErrNoRows) {
-		return fmt.Errorf("API key not found or user is not an admin of the organization")
+		return ErrAPIKeyNotFound
 	}
 	if err != nil {
 		return fmt.Errorf("failed to verify admin permissions: %w", err)

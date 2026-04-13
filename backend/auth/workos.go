@@ -186,6 +186,16 @@ func ensureUserPersonalOrganization(ctx context.Context, pool *pgxpool.Pool, use
 	}
 	defer tx.Rollback(ctx)
 
+	// Acquire a row lock on the user to serialize concurrent flows
+	var lockCheck bool
+	err = tx.QueryRow(ctx, `
+		SELECT true FROM users WHERE workos_id = $1 FOR UPDATE`,
+		userWorkosID,
+	).Scan(&lockCheck)
+	if err != nil {
+		return fmt.Errorf("failed to acquire user lock: %w", err)
+	}
+
 	// Re-query user memberships inside the transaction to detect concurrent creations
 	rows, err := tx.Query(ctx, `
 		SELECT user_id, organization_id, is_admin, joined_at

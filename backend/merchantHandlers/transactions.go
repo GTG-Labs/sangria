@@ -65,8 +65,43 @@ func GetMerchantTransactions(pool *pgxpool.Pool) fiber.Handler {
 			return c.Status(400).JSON(fiber.Map{"error": "user must belong to an organization"})
 		}
 
-		// Use the first organization (usually personal org for merchant)
-		selectedOrgID := memberships[0].OrganizationID
+		// Derive selectedOrgID from request or user's active selection
+		var selectedOrgID string
+
+		// Check for organization_id in request query params
+		if orgID := c.Query("org_id"); orgID != "" {
+			// Validate that user is a member of this organization
+			found := false
+			for _, membership := range memberships {
+				if membership.OrganizationID == orgID {
+					selectedOrgID = orgID
+					found = true
+					break
+				}
+			}
+			if !found {
+				return c.Status(400).JSON(fiber.Map{"error": "user is not a member of the specified organization"})
+			}
+		} else if orgID := c.Query("organization_id"); orgID != "" {
+			// Also check for organization_id parameter
+			found := false
+			for _, membership := range memberships {
+				if membership.OrganizationID == orgID {
+					selectedOrgID = orgID
+					found = true
+					break
+				}
+			}
+			if !found {
+				return c.Status(400).JSON(fiber.Map{"error": "user is not a member of the specified organization"})
+			}
+		} else if len(memberships) == 1 {
+			// If only one membership exists, use that
+			selectedOrgID = memberships[0].OrganizationID
+		} else {
+			// Multiple memberships exist, prompt for specification
+			return c.Status(400).JSON(fiber.Map{"error": "multiple organizations found, please specify org_id or organization_id parameter"})
+		}
 
 		// Fetch paginated transactions with total count
 		transactions, nextCursor, total, err := dbengine.GetMerchantTransactionsPaginated(

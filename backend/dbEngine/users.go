@@ -37,11 +37,10 @@ func GetUserByWorkosID(ctx context.Context, pool *pgxpool.Pool, workosID string)
 // AddUserToOrganization adds a user to an organization with specified admin status
 func AddUserToOrganization(ctx context.Context, pool *pgxpool.Pool, userID, organizationID string, isAdmin bool) error {
 	_, err := pool.Exec(ctx,
-		`INSERT INTO organization_members (user_id, organization_id, is_admin)
-		 VALUES ($1, $2, $3)
+		`INSERT INTO organization_members (user_id, organization_id, is_admin, joined_at)
+		 VALUES ($1, $2, $3, NOW())
 		 ON CONFLICT (user_id, organization_id) DO UPDATE
-		 	SET is_admin = EXCLUDED.is_admin,
-		 	    joined_at = NOW()`,
+		 	SET is_admin = EXCLUDED.is_admin`,
 		userID, organizationID, isAdmin,
 	)
 	return err
