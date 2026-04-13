@@ -6,6 +6,8 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	dbengine "sangria/backend/dbEngine"
 )
 
 // ListAPIKeys handles GET /api-keys
@@ -16,21 +18,54 @@ func ListAPIKeys(pool *pgxpool.Pool) fiber.Handler {
 			return c.Status(500).JSON(fiber.Map{"error": "internal server error"})
 		}
 
-		// TODO: Get current organization context from user session/header
-		// For now, this will need to be updated when organization selection is implemented
-		// organizationID := getSelectedOrganizationID(c, user.ID)
-		// apiKeys, err := GetAPIKeysByOrganizationID(c.Context(), pool, organizationID)
+		memberships, err := dbengine.GetUserOrganizations(c.Context(), pool, user.ID)
+		if err != nil {
+			slog.Error("get user organizations", "user_id", user.ID, "error", err)
+			return c.Status(500).JSON(fiber.Map{"error": "failed to get user organizations"})
+		}
+		if len(memberships) == 0 {
+			return c.Status(400).JSON(fiber.Map{"error": "user must belong to an organization"})
+		}
 
-		// TEMPORARY: Explicitly fail until organization context is implemented
-		slog.Warn("ListAPIKeys: organization context not implemented", "user_id", user.ID)
-		return c.Status(501).JSON(fiber.Map{"error": "organization context not implemented yet"})
+		var selectedOrgID string
 
-		// Remove sensitive data before returning (when implemented)
-		// for i := range apiKeys {
-		// 	apiKeys[i].APIKey = "" // Never expose the hash
-		// }
+		if orgID := c.Query("org_id"); orgID != "" {
+			found := false
+			for _, membership := range memberships {
+				if membership.OrganizationID == orgID {
+					selectedOrgID = orgID
+					found = true
+					break
+				}
+			}
+			if !found {
+				return c.Status(400).JSON(fiber.Map{"error": "user is not a member of the specified organization"})
+			}
+		} else if orgID := c.Query("organization_id"); orgID != "" {
+			found := false
+			for _, membership := range memberships {
+				if membership.OrganizationID == orgID {
+					selectedOrgID = orgID
+					found = true
+					break
+				}
+			}
+			if !found {
+				return c.Status(400).JSON(fiber.Map{"error": "user is not a member of the specified organization"})
+			}
+		} else if len(memberships) == 1 {
+			selectedOrgID = memberships[0].OrganizationID
+		} else {
+			return c.Status(400).JSON(fiber.Map{"error": "multiple organizations found, please specify org_id or organization_id parameter"})
+		}
 
-		// return c.JSON(apiKeys)
+		apiKeys, err := GetAPIKeysByOrganizationID(c.Context(), pool, selectedOrgID)
+		if err != nil {
+			slog.Error("list API keys: query failed", "user_id", user.ID, "org_id", selectedOrgID, "error", err)
+			return c.Status(500).JSON(fiber.Map{"error": "Failed to retrieve API keys"})
+		}
+
+		return c.JSON(apiKeys)
 	}
 }
 
@@ -47,29 +82,15 @@ func DeleteAPIKey(pool *pgxpool.Pool) fiber.Handler {
 			return c.Status(400).JSON(fiber.Map{"error": "API key ID is required"})
 		}
 
-		// Feature flag to control organization context behavior
-		useOrganizationContext := false // TODO: Replace with actual feature flag
-
-		if useOrganizationContext {
-			// TODO: Get current organization context from user session/header
-			// organizationID := getSelectedOrganizationID(c, user.ID)
-			// err := RevokeAPIKey(c.Context(), pool, keyID, organizationID)
-
-			// TEMPORARY: Organization context not implemented yet
-			slog.Warn("DeleteAPIKey: organization context not implemented yet", "user_id", user.ID, "key_id", keyID)
-			return c.Status(501).JSON(fiber.Map{"error": "organization context not implemented yet"})
-		} else {
-			// Current admin-only deletion flow
-			err := RevokeAPIKey(c.Context(), pool, keyID, user.ID)
-			if err != nil {
-				if errors.Is(err, ErrAPIKeyNotFound) {
-					return c.Status(404).JSON(fiber.Map{"error": "API key not found or not owned by user"})
-				}
-				slog.Error("revoke API key: failed", "key_id", keyID, "user_id", user.ID, "error", err)
-				return c.Status(500).JSON(fiber.Map{"error": "failed to revoke API key"})
+		err := RevokeAPIKey(c.Context(), pool, keyID, user.ID)
+		if err != nil {
+			if errors.Is(err, ErrAPIKeyNotFound) {
+				return c.Status(404).JSON(fiber.Map{"error": "API key not found or not owned by user"})
 			}
-
-			return c.Status(204).Send(nil)
+			slog.Error("revoke API key: failed", "key_id", keyID, "user_id", user.ID, "error", err)
+			return c.Status(500).JSON(fiber.Map{"error": "failed to revoke API key"})
 		}
+
+		return c.Status(204).Send(nil)
 	}
 }
