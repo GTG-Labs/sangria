@@ -121,6 +121,10 @@ async function main() {
   if (!chainIdStr)
     throw new Error(`Unexpected network format: ${accepts.network}`);
   const chainId = parseInt(chainIdStr, 10);
+  if (Number.isNaN(chainId))
+    throw new Error(
+      `Invalid chainId "${chainIdStr}" in network: ${accepts.network}`
+    );
 
   // ------------------------------------------------------------------
   // Step 2: Sign EIP-3009 TransferWithAuthorization via CDP
@@ -195,7 +199,7 @@ async function main() {
       authorization: {
         from: BUYER_ADDRESS,
         to: accepts.payTo,
-        value: accepts.amount,
+        value: Number(accepts.amount),
         validAfter: "0",
         validBefore: validBefore.toString(),
         nonce,
