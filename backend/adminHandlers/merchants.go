@@ -1,7 +1,6 @@
 package adminHandlers
 
 import (
-	"errors"
 	"log/slog"
 
 	"github.com/gofiber/fiber/v3"
