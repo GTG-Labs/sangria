@@ -1,0 +1,147 @@
+name: Publish Python SDK
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_mode:
+        description: 'Dry run — no publish, no commit'
+        required: false
+        default: false
+        type: boolean
+  workflow_call:
+    inputs:
+      test_mode:
+        description: 'Dry run — no publish, no commit'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  publish:
+    name: Build & Publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install build twine
+
+      - name: Install package dependencies
+        working-directory: sdk/python
+        run: pip install -e .
+
+      - name: Get version from SDK_VERSIONS.md
+        id: version
+        working-directory: sdk/python
+        run: |
+          # Extract version from deployment/SDK_VERSIONS.md
+          VERSION=$(grep -A 2 "## Python SDK" ../../deployment/SDK_VERSIONS.md | grep "VERSION:" | sed 's/VERSION: //')
+          echo "📖 Version from SDK_VERSIONS.md: $VERSION"
+
+          # Verify VERSION is non-empty
+          if [ -z "$VERSION" ]; then
+            echo "❌ ERROR: Failed to extract VERSION from ../../deployment/SDK_VERSIONS.md"
+            echo "Expected pattern: '## Python SDK' section with 'VERSION: X.Y.Z' line"
+            exit 1
+          fi
+
+          # Extract current version from pyproject.toml with error handling
+          CURRENT_VERSION=$(python -c "
+          try:
+              import tomllib
+              with open('pyproject.toml', 'rb') as f:
+                  data = tomllib.load(f)
+              print(data['project']['version'])
+          except Exception as e:
+              print(f'ERROR: {e}', file=__import__('sys').stderr)
+              exit(1)
+          " 2>&1)
+
+          # Check if CURRENT_VERSION extraction failed
+          if echo "$CURRENT_VERSION" | grep -q "ERROR:"; then
+            echo "❌ ERROR: Failed to extract CURRENT_VERSION from pyproject.toml: $CURRENT_VERSION"
+            exit 1
+          fi
+
+          if [ -z "$CURRENT_VERSION" ]; then
+            echo "❌ ERROR: CURRENT_VERSION is empty after extraction from pyproject.toml"
+            exit 1
+          fi
+
+          echo "📖 Current version in pyproject.toml: $CURRENT_VERSION"
+
+          # Check that target pattern exists in pyproject.toml before replacing
+          if ! grep -q "version = \"$CURRENT_VERSION\"" pyproject.toml; then
+            echo "❌ ERROR: Pattern 'version = \"$CURRENT_VERSION\"' not found in pyproject.toml"
+            echo "Cannot safely update version. Current pyproject.toml content:"
+            grep "version =" pyproject.toml || echo "No version = lines found"
+            exit 1
+          fi
+
+          # Update pyproject.toml to match
+          sed -i "s/version = \"$CURRENT_VERSION\"/version = \"$VERSION\"/" pyproject.toml
+
+          # Verify sed replacement succeeded
+          if ! grep -q "version = \"$VERSION\"" pyproject.toml; then
+            echo "❌ ERROR: sed replacement failed - VERSION '$VERSION' not found in pyproject.toml after update"
+            echo "Expected: version = \"$VERSION\""
+            echo "Current pyproject.toml version lines:"
+            grep "version =" pyproject.toml || echo "No version = lines found"
+            exit 1
+          fi
+
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "📦 Publishing sangria-core@$VERSION"
+
+      - name: Build package
+        working-directory: sdk/python
+        run: python -m build
+
+      - name: Publish (dry run)
+        if: ${{ inputs.test_mode }}
+        working-directory: sdk/python
+        run: |
+          echo "Dry run - would publish:"
+          ls -la dist/
+
+      - name: Publish to PyPI
+        if: ${{ !inputs.test_mode }}
+        working-directory: sdk/python
+        run: python -m twine upload dist/*
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
+
+      - name: Commit version bump
+        if: ${{ !inputs.test_mode }}
+        run: |
+          git config user.email "action@github.com"
+          git config user.name "GitHub Action"
+          git add sdk/python/pyproject.toml
+
+          # Only commit if there are changes to avoid no-op failures
+          if ! git diff --quiet --cached sdk/python/pyproject.toml; then
+            git commit -m "chore: release sangria-core@${{ steps.version.outputs.version }}"
+            echo "✅ Committed version bump for sdk/python/pyproject.toml"
+          else
+            echo "ℹ️ No changes to sdk/python/pyproject.toml, skipping commit"
+          fi
+
+          # Create tag (will fail if tag already exists, but that's OK)
+          git tag "py-sdk@${{ steps.version.outputs.version }}" || echo "ℹ️ Tag py-sdk@${{ steps.version.outputs.version }} already exists"
+
+          # Push with tolerance for failures to avoid job failure if remote push fails
+          git push && git push --tags || echo "⚠️ Push/tag failed but continuing (PyPI release already succeeded)"
