@@ -51,11 +51,57 @@ jobs:
           VERSION=$(grep -A 2 "## Python SDK" ../../deployment/SDK_VERSIONS.md | grep "VERSION:" | sed 's/VERSION: //')
           echo "📖 Version from SDK_VERSIONS.md: $VERSION"
 
-          # Extract current version from pyproject.toml
-          CURRENT_VERSION=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
+          # Verify VERSION is non-empty
+          if [ -z "$VERSION" ]; then
+            echo "❌ ERROR: Failed to extract VERSION from ../../deployment/SDK_VERSIONS.md"
+            echo "Expected pattern: '## Python SDK' section with 'VERSION: X.Y.Z' line"
+            exit 1
+          fi
+
+          # Extract current version from pyproject.toml with error handling
+          CURRENT_VERSION=$(python -c "
+          try:
+              import tomllib
+              with open('pyproject.toml', 'rb') as f:
+                  data = tomllib.load(f)
+              print(data['project']['version'])
+          except Exception as e:
+              print(f'ERROR: {e}', file=__import__('sys').stderr)
+              exit(1)
+          " 2>&1)
+
+          # Check if CURRENT_VERSION extraction failed
+          if echo "$CURRENT_VERSION" | grep -q "ERROR:"; then
+            echo "❌ ERROR: Failed to extract CURRENT_VERSION from pyproject.toml: $CURRENT_VERSION"
+            exit 1
+          fi
+
+          if [ -z "$CURRENT_VERSION" ]; then
+            echo "❌ ERROR: CURRENT_VERSION is empty after extraction from pyproject.toml"
+            exit 1
+          fi
+
+          echo "📖 Current version in pyproject.toml: $CURRENT_VERSION"
+
+          # Check that target pattern exists in pyproject.toml before replacing
+          if ! grep -q "version = \"$CURRENT_VERSION\"" pyproject.toml; then
+            echo "❌ ERROR: Pattern 'version = \"$CURRENT_VERSION\"' not found in pyproject.toml"
+            echo "Cannot safely update version. Current pyproject.toml content:"
+            grep "version =" pyproject.toml || echo "No version = lines found"
+            exit 1
+          fi
 
           # Update pyproject.toml to match
           sed -i "s/version = \"$CURRENT_VERSION\"/version = \"$VERSION\"/" pyproject.toml
+
+          # Verify sed replacement succeeded
+          if ! grep -q "version = \"$VERSION\"" pyproject.toml; then
+            echo "❌ ERROR: sed replacement failed - VERSION '$VERSION' not found in pyproject.toml after update"
+            echo "Expected: version = \"$VERSION\""
+            echo "Current pyproject.toml version lines:"
+            grep "version =" pyproject.toml || echo "No version = lines found"
+            exit 1
+          fi
 
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "📦 Publishing sangria-core@$VERSION"
@@ -85,6 +131,17 @@ jobs:
           git config user.email "action@github.com"
           git config user.name "GitHub Action"
           git add sdk/python/pyproject.toml
-          git commit -m "chore: release sangria-core@${{ steps.version.outputs.version }}"
-          git tag "py-sdk@${{ steps.version.outputs.version }}"
-          git push && git push --tags
+
+          # Only commit if there are changes to avoid no-op failures
+          if ! git diff --quiet --cached sdk/python/pyproject.toml; then
+            git commit -m "chore: release sangria-core@${{ steps.version.outputs.version }}"
+            echo "✅ Committed version bump for sdk/python/pyproject.toml"
+          else
+            echo "ℹ️ No changes to sdk/python/pyproject.toml, skipping commit"
+          fi
+
+          # Create tag (will fail if tag already exists, but that's OK)
+          git tag "py-sdk@${{ steps.version.outputs.version }}" || echo "ℹ️ Tag py-sdk@${{ steps.version.outputs.version }} already exists"
+
+          # Push with tolerance for failures to avoid job failure if remote push fails
+          git push && git push --tags || echo "⚠️ Push/tag failed but continuing (PyPI release already succeeded)"

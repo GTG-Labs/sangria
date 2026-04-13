@@ -50,9 +50,36 @@ jobs:
         id: version
         working-directory: sdk/sdk-typescript
         run: |
-          # Extract version from deployment/SDK_VERSIONS.md
-          VERSION=$(grep -A 2 "## TypeScript SDK" ../../deployment/SDK_VERSIONS.md | grep "VERSION:" | sed 's/VERSION: //')
+          # Extract TypeScript SDK section from deployment/SDK_VERSIONS.md in a section-aware way
+          VERSION=$(awk '
+            /^## TypeScript SDK/ { in_section=1; next }
+            /^##/ && in_section { exit }
+            in_section && /^VERSION:/ {
+              gsub(/^VERSION:[ \t]*/, "");
+              print;
+              exit
+            }
+          ' ../../deployment/SDK_VERSIONS.md)
+
           echo "📖 Version from SDK_VERSIONS.md: $VERSION"
+
+          # Validate VERSION is non-empty
+          if [ -z "$VERSION" ]; then
+            echo "❌ ERROR: Failed to extract VERSION from ../../deployment/SDK_VERSIONS.md"
+            echo "Expected: '## TypeScript SDK' section with 'VERSION: X.Y.Z' line"
+            echo "Current SDK_VERSIONS.md content:"
+            cat ../../deployment/SDK_VERSIONS.md
+            exit 1
+          fi
+
+          # Validate VERSION matches semver pattern (major.minor.patch with optional prerelease/build)
+          if ! echo "$VERSION" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$'; then
+            echo "❌ ERROR: VERSION '$VERSION' does not match semver pattern (major.minor.patch)"
+            echo "Expected format: X.Y.Z or X.Y.Z-prerelease or X.Y.Z+build"
+            exit 1
+          fi
+
+          echo "✅ Validated VERSION: $VERSION"
 
           # Update package.json to match
           node -e "

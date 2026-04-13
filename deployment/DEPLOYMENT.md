@@ -164,7 +164,7 @@ Both individual workflows support:
 
 ## 📊 Monitor Progress
 
-Watch at: `https://github.com/{your-org}/sangria-net/actions`
+Watch at: `https://github.com/GTG-Labs/sangria-net/actions`
 
 ## 🛠️ Troubleshooting
 
