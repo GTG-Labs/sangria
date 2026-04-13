@@ -132,6 +132,7 @@ func Verify(ctx context.Context, payload json.RawMessage, requirements PaymentRe
 	if err != nil {
 		return nil, fmt.Errorf("facilitator verify: %w", err)
 	}
+<<<<<<< Updated upstream
 	defer resp.Body.Close()
 
 	respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxFacilitatorBody))
@@ -141,6 +142,11 @@ func Verify(ctx context.Context, payload json.RawMessage, requirements PaymentRe
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("facilitator verify returned %d: %s", resp.StatusCode, string(respBody))
+=======
+	if statusCode != http.StatusOK {
+		slog.Debug("facilitator verify non-200 response", "status", statusCode, "body", string(respBody))
+		return nil, fmt.Errorf("facilitator verify returned status %d", statusCode)
+>>>>>>> Stashed changes
 	}
 
 	var result VerifyResponse
@@ -178,6 +184,7 @@ func Settle(ctx context.Context, payload json.RawMessage, requirements PaymentRe
 	if err != nil {
 		return nil, fmt.Errorf("facilitator settle: %w", err)
 	}
+<<<<<<< Updated upstream
 	defer resp.Body.Close()
 
 	respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxFacilitatorBody))
@@ -187,6 +194,11 @@ func Settle(ctx context.Context, payload json.RawMessage, requirements PaymentRe
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("facilitator settle returned %d: %s", resp.StatusCode, string(respBody))
+=======
+	if statusCode != http.StatusOK {
+		slog.Debug("facilitator settle non-200 response", "status", statusCode, "body", string(respBody))
+		return nil, fmt.Errorf("facilitator settle returned status %d", statusCode)
+>>>>>>> Stashed changes
 	}
 
 	var result SettleResponse
