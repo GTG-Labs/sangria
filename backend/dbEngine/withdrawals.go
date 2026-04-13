@@ -452,7 +452,7 @@ func CancelWithdrawal(ctx context.Context, pool *pgxpool.Pool, withdrawalID, mer
 // CompleteWithdrawal transitions a withdrawal to completed after the admin
 // has manually sent the bank transfer. Writes a completion ledger entry
 // moving funds from Withdrawal Clearing to USD Merchant Pool.
-func CompleteWithdrawal(ctx context.Context, pool *pgxpool.Pool, withdrawalID string) error {
+func CompleteWithdrawal(ctx context.Context, pool *pgxpool.Pool, withdrawalID, adminUserID string) error {
 	tx, err := pool.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("begin transaction: %w", err)
@@ -537,9 +537,10 @@ func CompleteWithdrawal(ctx context.Context, pool *pgxpool.Pool, withdrawalID st
 	// Update withdrawal status.
 	_, err = tx.Exec(ctx,
 		`UPDATE withdrawals
-		 SET status = $1, completed_at = NOW(), completion_transaction_id = $2
-		 WHERE id = $3`,
-		WithdrawalStatusCompleted, txnID, withdrawalID,
+		 SET status = $1, completed_at = NOW(), completion_transaction_id = $2,
+		     reviewed_by = $3, reviewed_at = NOW()
+		 WHERE id = $4`,
+		WithdrawalStatusCompleted, txnID, adminUserID, withdrawalID,
 	)
 	if err != nil {
 		return fmt.Errorf("update withdrawal: %w", err)
@@ -549,7 +550,7 @@ func CompleteWithdrawal(ctx context.Context, pool *pgxpool.Pool, withdrawalID st
 }
 
 // FailWithdrawal transitions a withdrawal to failed and reverses the balance debit.
-func FailWithdrawal(ctx context.Context, pool *pgxpool.Pool, withdrawalID, failureCode, failureMessage string) error {
+func FailWithdrawal(ctx context.Context, pool *pgxpool.Pool, withdrawalID, adminUserID, failureCode, failureMessage string) error {
 	tx, err := pool.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("begin transaction: %w", err)
@@ -576,9 +577,9 @@ func FailWithdrawal(ctx context.Context, pool *pgxpool.Pool, withdrawalID, failu
 	_, err = tx.Exec(ctx,
 		`UPDATE withdrawals
 		 SET status = $1, failed_at = NOW(), failure_code = $2, failure_message = $3,
-		     reversal_transaction_id = $4
-		 WHERE id = $5`,
-		WithdrawalStatusFailed, failureCode, failureMessage, txnID, withdrawalID,
+		     reversal_transaction_id = $4, reviewed_by = $5, reviewed_at = NOW()
+		 WHERE id = $6`,
+		WithdrawalStatusFailed, failureCode, failureMessage, txnID, adminUserID, withdrawalID,
 	)
 	if err != nil {
 		return fmt.Errorf("update withdrawal: %w", err)
