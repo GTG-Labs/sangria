@@ -171,15 +171,8 @@ export const withdrawalStatusEnum = pgEnum("withdrawal_status", [
 ]);
 
 // ---------------------------------------------------------------------------
-// Request Management Enums
+// Invitation Management Enums
 // ---------------------------------------------------------------------------
-
-export const requestStatusEnum = pgEnum("request_status", [
-  "pending", // awaiting admin review
-  "approved", // admin approved the request
-  "rejected", // admin rejected the request
-  "canceled", // requester canceled before review
-]);
 
 export const invitationStatusEnum = pgEnum("invitation_status", [
   "pending", // invitation sent, awaiting user response
@@ -367,46 +360,4 @@ export const organizationInvitations = pgTable(
   ],
 );
 
-// ---------------------------------------------------------------------------
-// API Key Creation Requests — organization members requesting API key creation
-// ---------------------------------------------------------------------------
-
-export const apiKeyCreationRequests = pgTable(
-  "api_key_creation_requests",
-  {
-    id: uuid().primaryKey().defaultRandom(),
-    requesterUserId: text("requester_user_id")
-      .notNull()
-      .references(() => users.workosId),
-    organizationId: uuid("organization_id")
-      .notNull()
-      .references(() => organizations.id),
-    requestedKeyName: varchar("requested_key_name", { length: 255 }).notNull(),
-    justification: text().notNull(), // why they need the API key
-    status: requestStatusEnum().notNull().default("pending"),
-
-    // Admin review fields
-    reviewedBy: text("reviewed_by").references(() => users.workosId),
-    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
-    reviewNote: text("review_note"), // admin's response/reason
-
-    // Created merchant (when approved)
-    merchantId: uuid("merchant_id").references(() => merchants.id),
-
-    // Timestamps
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-    approvedAt: timestamp("approved_at", { withTimezone: true }),
-    rejectedAt: timestamp("rejected_at", { withTimezone: true }),
-    canceledAt: timestamp("canceled_at", { withTimezone: true }),
-  },
-  (table) => [
-    index("idx_api_key_requests_requester").on(table.requesterUserId),
-    index("idx_api_key_requests_org").on(table.organizationId),
-    index("idx_api_key_requests_status").on(table.status),
-    index("idx_api_key_requests_created_at").on(table.createdAt.desc()),
-    unique("uq_api_key_requests_merchant").on(table.merchantId), // one request per merchant
-  ],
-);
 

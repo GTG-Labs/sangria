@@ -59,38 +59,30 @@ func CreateMerchantAPIKey(pool *pgxpool.Pool) fiber.Handler {
 		if orgID := c.Query("org_id"); orgID != "" {
 			found := false
 			for _, membership := range memberships {
-				if membership.OrganizationID == orgID && membership.IsAdmin {
+				if membership.OrganizationID == orgID {
 					selectedOrgID = orgID
 					found = true
 					break
 				}
 			}
 			if !found {
-				return c.Status(403).JSON(fiber.Map{"error": "user is not an admin of the specified organization"})
+				return c.Status(403).JSON(fiber.Map{"error": "user is not a member of the specified organization"})
 			}
 		} else if orgID := c.Query("organization_id"); orgID != "" {
 			found := false
 			for _, membership := range memberships {
-				if membership.OrganizationID == orgID && membership.IsAdmin {
+				if membership.OrganizationID == orgID {
 					selectedOrgID = orgID
 					found = true
 					break
 				}
 			}
 			if !found {
-				return c.Status(403).JSON(fiber.Map{"error": "user is not an admin of the specified organization"})
+				return c.Status(403).JSON(fiber.Map{"error": "user is not a member of the specified organization"})
 			}
 		} else {
-			// Find first admin membership
-			for _, membership := range memberships {
-				if membership.IsAdmin {
-					selectedOrgID = membership.OrganizationID
-					break
-				}
-			}
-			if selectedOrgID == "" {
-				return c.Status(400).JSON(fiber.Map{"error": "user must be an admin of an organization to create API keys. Please specify organization_id for which you are an admin"})
-			}
+			// Use first available organization
+			selectedOrgID = memberships[0].OrganizationID
 		}
 
 		// Ensure the organization has a USD LIABILITY account before creating the API key,
@@ -100,8 +92,22 @@ func CreateMerchantAPIKey(pool *pgxpool.Pool) fiber.Handler {
 			return c.Status(500).JSON(fiber.Map{"error": "failed to create liability account"})
 		}
 
-		// Admin keys are immediately active since we already verified admin status
-		keyStatus := dbengine.APIKeyStatusActive
+		// Determine if user is admin for this organization
+		isAdmin := false
+		for _, membership := range memberships {
+			if membership.OrganizationID == selectedOrgID && membership.IsAdmin {
+				isAdmin = true
+				break
+			}
+		}
+
+		// Set status based on admin status
+		var keyStatus dbengine.APIKeyStatus
+		if isAdmin {
+			keyStatus = dbengine.APIKeyStatusActive // Admin keys are immediately active
+		} else {
+			keyStatus = dbengine.APIKeyStatusPending // Non-admin keys need approval
+		}
 
 		merchant, fullKey, err := auth.CreateAPIKey(c.Context(), pool, selectedOrgID, req.Name, keyStatus)
 		if err != nil {
@@ -110,6 +116,20 @@ func CreateMerchantAPIKey(pool *pgxpool.Pool) fiber.Handler {
 			}
 			slog.Error("create merchant API key", "org_id", selectedOrgID, "user_id", user.ID, "error", err)
 			return c.Status(500).JSON(fiber.Map{"error": "failed to create merchant"})
+		}
+
+		// Different response based on status
+		if keyStatus == dbengine.APIKeyStatusPending {
+			return c.Status(202).JSON(fiber.Map{
+				"message":         "API key created but pending admin approval",
+				"id":              merchant.ID,
+				"organization_id": merchant.OrganizationID,
+				"name":            merchant.Name,
+				"key_id":          merchant.KeyID,
+				"api_key":         fullKey, // User sees the key immediately but it's not active yet
+				"status":          merchant.Status,
+				"created_at":      merchant.CreatedAt,
+			})
 		}
 
 		return c.Status(201).JSON(fiber.Map{
