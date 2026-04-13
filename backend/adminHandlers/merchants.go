@@ -53,13 +53,7 @@ func CreateMerchantAPIKey(pool *pgxpool.Pool) fiber.Handler {
 			return c.Status(status).JSON(fiber.Map{"error": orgResult.Error})
 		}
 		selectedOrgID := orgResult.OrganizationID
-
-		// Get memberships for admin check
-		memberships, err := dbengine.GetUserOrganizations(c.Context(), pool, user.ID)
-		if err != nil {
-			slog.Error("get user organizations", "user_id", user.ID, "error", err)
-			return c.Status(500).JSON(fiber.Map{"error": "failed to get user organizations"})
-		}
+		memberships := orgResult.Memberships
 
 		// Ensure the organization has a USD LIABILITY account before creating the API key,
 		// so we don't end up with an active key but no liability account.

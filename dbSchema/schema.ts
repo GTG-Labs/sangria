@@ -9,6 +9,7 @@ import {
   check,
   index,
   unique,
+  uniqueIndex,
   text,
   primaryKey,
 } from "drizzle-orm/pg-core";
@@ -361,8 +362,7 @@ export const organizationInvitations = pgTable(
     // Unique secure token for invitation links
     unique("uq_org_invitations_token").on(table.invitationToken),
     // Prevent duplicate pending invitations to same email for same org
-    unique("uq_org_invitations_pending").on(table.organizationId, table.inviteeEmail)
-      .where(sql`status = 'pending'`),
+    uniqueIndex("uq_org_invitations_pending").on(table.organizationId, table.inviteeEmail).where(sql`status = 'pending'`),
   ],
 );
 

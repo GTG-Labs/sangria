@@ -2,9 +2,11 @@ package auth
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	dbengine "sangria/backend/dbEngine"
@@ -15,6 +17,7 @@ type OrganizationResolutionResult struct {
 	OrganizationID string
 	HTTPStatus     int
 	Error          string
+	Memberships    []dbengine.OrganizationMember
 }
 
 // ResolveOrganizationContext resolves the organization context for a request.
@@ -45,7 +48,7 @@ func ResolveOrganizationContext(ctx context.Context, c fiber.Ctx, pool *pgxpool.
 	var selectedOrgID string
 
 	// Helper function to validate organization membership
-	validateAndSelectOrg := func(queryVal string, memberships []dbengine.Membership) (selected string, ok bool) {
+	validateAndSelectOrg := func(queryVal string, memberships []dbengine.OrganizationMember) (selected string, ok bool) {
 		for _, membership := range memberships {
 			if membership.OrganizationID == queryVal {
 				return queryVal, true
@@ -81,9 +84,16 @@ func ResolveOrganizationContext(ctx context.Context, c fiber.Ctx, pool *pgxpool.
 		// Multiple organizations, try to get personal org ID
 		personalOrgID, err := dbengine.GetUserPersonalOrgID(ctx, pool, user.ID)
 		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return OrganizationResolutionResult{
+					HTTPStatus: 400,
+					Error:      "multiple organizations found, please specify org_id or organization_id parameter",
+				}
+			}
+			slog.Error("get user personal org ID", "user_id", user.ID, "error", err)
 			return OrganizationResolutionResult{
-				HTTPStatus: 400,
-				Error:      "multiple organizations found, please specify org_id or organization_id parameter",
+				HTTPStatus: 500,
+				Error:      "failed to get user personal organization: " + err.Error(),
 			}
 		}
 		selectedOrgID = personalOrgID
@@ -93,5 +103,6 @@ func ResolveOrganizationContext(ctx context.Context, c fiber.Ctx, pool *pgxpool.
 		OrganizationID: selectedOrgID,
 		HTTPStatus:     200,
 		Error:          "",
+		Memberships:    memberships,
 	}
 }
