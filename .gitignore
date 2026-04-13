@@ -10,3 +10,4 @@ node_modules
 guides-and-knowledge/
 *.egg-info/
 .next/
+next-env.d.ts
