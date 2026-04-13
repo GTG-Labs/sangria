@@ -20,9 +20,11 @@ func GetAccountBalance(ctx context.Context, pool *pgxpool.Pool, userID string) (
 		), 0)
 		FROM ledger_entries le
 		JOIN accounts a ON a.id = le.account_id
+		JOIN transactions t ON t.id = le.transaction_id
 		WHERE a.user_id = $1
 		  AND a.type = 'LIABILITY'
 		  AND a.currency = 'USD'
+		  AND t.status = 'confirmed'
 	`, userID).Scan(&balance)
 	return balance, err
 }
@@ -42,6 +44,7 @@ func GetMerchantTransactionsPaginated(
 		WHERE a.user_id = $1
 		  AND a.type = 'LIABILITY'
 		  AND le.direction = 'CREDIT'
+		  AND t.status = 'confirmed'
 	`
 	args := []interface{}{userID}
 

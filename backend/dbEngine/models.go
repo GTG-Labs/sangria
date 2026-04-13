@@ -45,10 +45,20 @@ type User struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+type TransactionStatus string
+
+const (
+	TransactionStatusPending   TransactionStatus = "pending"
+	TransactionStatusConfirmed TransactionStatus = "confirmed"
+	TransactionStatusFailed    TransactionStatus = "failed"
+)
+
 type Transaction struct {
-	ID             string    `json:"id"`
-	IdempotencyKey string    `json:"idempotency_key"`
-	CreatedAt      time.Time `json:"created_at"`
+	ID             string            `json:"id"`
+	IdempotencyKey string            `json:"idempotency_key"`
+	Status         TransactionStatus `json:"status"`
+	TxHash         *string           `json:"tx_hash"`
+	CreatedAt      time.Time         `json:"created_at"`
 }
 
 type LedgerEntry struct {
