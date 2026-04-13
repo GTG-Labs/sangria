@@ -10,12 +10,13 @@ import (
 func UpsertUser(ctx context.Context, pool *pgxpool.Pool, owner, workosID string) (User, error) {
 	var u User
 	err := pool.QueryRow(ctx,
-		`INSERT INTO users (owner, workos_id)
+		`INSERT INTO users (workos_id, owner)
 		 VALUES ($1, $2)
 		 ON CONFLICT (workos_id) DO UPDATE
-		 	SET owner = EXCLUDED.owner
+		 	SET owner = EXCLUDED.owner,
+		 	    updated_at = NOW()
 		 RETURNING workos_id, owner, created_at, updated_at`,
-		owner, workosID,
+		workosID, owner,
 	).Scan(&u.WorkosID, &u.Owner, &u.CreatedAt, &u.UpdatedAt)
 	return u, err
 }
@@ -29,6 +30,44 @@ func GetUserByWorkosID(ctx context.Context, pool *pgxpool.Pool, workosID string)
 		workosID,
 	).Scan(&u.WorkosID, &u.Owner, &u.CreatedAt, &u.UpdatedAt)
 	return u, err
+}
+
+// AddUserToOrganization adds a user to an organization with specified admin status
+func AddUserToOrganization(ctx context.Context, pool *pgxpool.Pool, userID, organizationID string, isAdmin bool) error {
+	_, err := pool.Exec(ctx,
+		`INSERT INTO organization_members (user_id, organization_id, is_admin)
+		 VALUES ($1, $2, $3)
+		 ON CONFLICT (user_id, organization_id) DO UPDATE
+		 	SET is_admin = EXCLUDED.is_admin,
+		 	    joined_at = NOW()`,
+		userID, organizationID, isAdmin,
+	)
+	return err
+}
+
+// GetUserOrganizations returns all organizations for a user with their admin status
+func GetUserOrganizations(ctx context.Context, pool *pgxpool.Pool, userID string) ([]OrganizationMember, error) {
+	rows, err := pool.Query(ctx,
+		`SELECT user_id, organization_id, is_admin, joined_at
+		 FROM organization_members
+		 WHERE user_id = $1
+		 ORDER BY joined_at ASC`,
+		userID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var memberships []OrganizationMember
+	for rows.Next() {
+		var m OrganizationMember
+		if err := rows.Scan(&m.UserID, &m.OrganizationID, &m.IsAdmin, &m.JoinedAt); err != nil {
+			return nil, err
+		}
+		memberships = append(memberships, m)
+	}
+	return memberships, rows.Err()
 }
 
 // IsAdmin returns true if the given WorkOS user ID has an entry in the admins table.

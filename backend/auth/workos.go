@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/lestrrat-go/jwx/v2/jwk"
@@ -158,12 +159,57 @@ func CreateUser(pool *pgxpool.Pool) fiber.Handler {
 			owner = fmt.Sprintf("%s %s", user.FirstName, user.LastName)
 		}
 
+		// Step 1: Create/update user
 		u, err := dbengine.UpsertUser(c.Context(), pool, owner, user.ID)
 		if err != nil {
 			slog.Error("upsert user", "error", err)
 			return c.Status(500).JSON(fiber.Map{"error": "failed to create user"})
 		}
 
+		// Step 2: Ensure user has a personal organization
+		err = ensureUserPersonalOrganization(c.Context(), pool, user.ID, owner)
+		if err != nil {
+			slog.Error("ensure personal organization", "error", err)
+			return c.Status(500).JSON(fiber.Map{"error": "failed to setup personal organization"})
+		}
+
 		return c.Status(201).JSON(u)
 	}
+}
+
+// ensureUserPersonalOrganization creates a personal organization for the user if they don't have one
+// Each user gets their own personal organization where they are the admin
+func ensureUserPersonalOrganization(ctx context.Context, pool *pgxpool.Pool, userWorkosID, userName string) error {
+	// Check if user already has a personal organization
+	memberships, err := dbengine.GetUserOrganizations(ctx, pool, userWorkosID)
+	if err != nil {
+		return fmt.Errorf("failed to get user organizations: %w", err)
+	}
+
+	// If user already has organizations, skip creating personal org
+	// (they might be returning users or have been invited to orgs)
+	if len(memberships) > 0 {
+		return nil
+	}
+
+	// Create personal organization
+	var personalOrgID string
+	personalOrgName := fmt.Sprintf("%s's Personal Organization", userName)
+
+	err = pool.QueryRow(ctx, `
+		INSERT INTO organizations (name, created_at)
+		VALUES ($1, NOW())
+		RETURNING id`,
+		personalOrgName).Scan(&personalOrgID)
+	if err != nil {
+		return fmt.Errorf("failed to create personal organization: %w", err)
+	}
+
+	// Add user to their personal organization as admin
+	err = dbengine.AddUserToOrganization(ctx, pool, userWorkosID, personalOrgID, true)
+	if err != nil {
+		return fmt.Errorf("failed to add user to personal organization: %w", err)
+	}
+
+	return nil
 }

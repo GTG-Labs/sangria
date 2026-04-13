@@ -8,9 +8,9 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// GetAccountBalance returns the net balance (in microunits) of a user's USD
+// GetAccountBalance returns the net balance (in microunits) of an organization's USD
 // LIABILITY account by summing all ledger entries: credits minus debits.
-func GetAccountBalance(ctx context.Context, pool *pgxpool.Pool, userID string) (int64, error) {
+func GetAccountBalance(ctx context.Context, pool *pgxpool.Pool, organizationID string) (int64, error) {
 	var balance int64
 	err := pool.QueryRow(ctx, `
 		SELECT COALESCE(SUM(
@@ -20,10 +20,10 @@ func GetAccountBalance(ctx context.Context, pool *pgxpool.Pool, userID string) (
 		), 0)
 		FROM ledger_entries le
 		JOIN accounts a ON a.id = le.account_id
-		WHERE a.user_id = $1
+		WHERE a.organization_id = $1
 		  AND a.type = 'LIABILITY'
 		  AND a.currency = 'USD'
-	`, userID).Scan(&balance)
+	`, organizationID).Scan(&balance)
 	return balance, err
 }
 
@@ -33,17 +33,17 @@ func GetAccountBalance(ctx context.Context, pool *pgxpool.Pool, userID string) (
 func GetMerchantTransactionsPaginated(
 	ctx context.Context,
 	pool *pgxpool.Pool,
-	userID string,
+	organizationID string,
 	limit int,
 	cursor *time.Time,
 ) ([]MerchantTransaction, *time.Time, int, error) {
 	// Build WHERE clause with cursor condition
 	baseWhere := `
-		WHERE a.user_id = $1
+		WHERE a.organization_id = $1
 		  AND a.type = 'LIABILITY'
 		  AND le.direction = 'CREDIT'
 	`
-	args := []interface{}{userID}
+	args := []interface{}{organizationID}
 
 	cursorWhere := ""
 	if cursor != nil {
@@ -78,7 +78,7 @@ func GetMerchantTransactionsPaginated(
 	`, baseWhere)
 
 	var total int
-	err := pool.QueryRow(ctx, countQuery, userID).Scan(&total)
+	err := pool.QueryRow(ctx, countQuery, organizationID).Scan(&total)
 	if err != nil {
 		return nil, nil, 0, fmt.Errorf("count query failed: %w", err)
 	}

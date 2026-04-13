@@ -6,6 +6,8 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	dbengine "sangria/backend/dbEngine"
 )
 
 // ListAPIKeys handles GET /api-keys
@@ -16,16 +18,19 @@ func ListAPIKeys(pool *pgxpool.Pool) fiber.Handler {
 			return c.Status(500).JSON(fiber.Map{"error": "internal server error"})
 		}
 
-		apiKeys, err := GetAPIKeysByUserID(c.Context(), pool, user.ID)
-		if err != nil {
-			slog.Error("list API keys: query failed", "user_id", user.ID, "error", err)
-			return c.Status(500).JSON(fiber.Map{"error": "Failed to retrieve API keys"})
-		}
+		// TODO: Get current organization context from user session/header
+		// For now, this will need to be updated when organization selection is implemented
+		// organizationID := getSelectedOrganizationID(c, user.ID)
+		// apiKeys, err := GetAPIKeysByOrganizationID(c.Context(), pool, organizationID)
 
-		// Remove sensitive data before returning
-		for i := range apiKeys {
-			apiKeys[i].APIKey = "" // Never expose the hash
-		}
+		// TEMPORARY: Return empty list until organization context is implemented
+		apiKeys := []dbengine.Merchant{}
+		slog.Warn("ListAPIKeys: organization context not implemented", "user_id", user.ID)
+
+		// Remove sensitive data before returning (when implemented)
+		// for i := range apiKeys {
+		// 	apiKeys[i].APIKey = "" // Never expose the hash
+		// }
 
 		return c.JSON(apiKeys)
 	}
@@ -44,15 +49,13 @@ func DeleteAPIKey(pool *pgxpool.Pool) fiber.Handler {
 			return c.Status(400).JSON(fiber.Map{"error": "API key ID is required"})
 		}
 
-		err := RevokeAPIKey(c.Context(), pool, keyID, user.ID)
-		if err != nil {
-			if errors.Is(err, ErrAPIKeyNotFound) {
-				return c.Status(404).JSON(fiber.Map{"error": "API key not found or not owned by user"})
-			}
-			slog.Error("revoke API key: failed", "key_id", keyID, "user_id", user.ID, "error", err)
-			return c.Status(500).JSON(fiber.Map{"error": "failed to revoke API key"})
-		}
+		// TODO: Get current organization context from user session/header
+		// For now, this will need to be updated when organization selection is implemented
+		// organizationID := getSelectedOrganizationID(c, user.ID)
+		// err := RevokeAPIKey(c.Context(), pool, keyID, organizationID)
 
-		return c.Status(204).Send(nil)
+		// TEMPORARY: Return not implemented until organization context is implemented
+		slog.Warn("DeleteAPIKey: organization context not implemented", "user_id", user.ID, "key_id", keyID)
+		return c.Status(501).JSON(fiber.Map{"error": "organization context not implemented yet"})
 	}
 }

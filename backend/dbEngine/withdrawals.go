@@ -91,7 +91,7 @@ func CreateWithdrawal(
 	var merchantAcctID string
 	err = tx.QueryRow(ctx,
 		`SELECT a.id FROM accounts a
-		 JOIN merchants m ON m.user_id = a.user_id
+		 JOIN merchants m ON m.organization_id = a.organization_id
 		 WHERE m.id = $1 AND a.type = 'LIABILITY' AND a.currency = 'USD'
 		 FOR UPDATE`,
 		merchantID,
@@ -296,7 +296,7 @@ func ApproveWithdrawal(ctx context.Context, pool *pgxpool.Pool, withdrawalID, ad
 func getSystemAccountIDTx(ctx context.Context, tx pgx.Tx, name string) (string, error) {
 	var id string
 	err := tx.QueryRow(ctx,
-		`SELECT id FROM accounts WHERE name = $1 AND currency = 'USD' AND user_id IS NULL`,
+		`SELECT id FROM accounts WHERE name = $1 AND currency = 'USD' AND organization_id IS NULL`,
 		name,
 	).Scan(&id)
 	if err != nil {
@@ -310,7 +310,7 @@ func getMerchantLiabilityAccountIDTx(ctx context.Context, tx pgx.Tx, merchantID 
 	var id string
 	err := tx.QueryRow(ctx,
 		`SELECT a.id FROM accounts a
-		 JOIN merchants m ON m.user_id = a.user_id
+		 JOIN merchants m ON m.organization_id = a.organization_id
 		 WHERE m.id = $1 AND a.type = 'LIABILITY' AND a.currency = 'USD'`,
 		merchantID,
 	).Scan(&id)

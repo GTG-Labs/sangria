@@ -45,12 +45,17 @@ type Account struct {
 }
 
 type User struct {
-	WorkosID           string    `json:"workos_id"`
-	Owner              string    `json:"owner"`
-	OrganizationID     string    `json:"organization_id"`
-	OrganizationAdmin  bool      `json:"organization_admin"`
-	CreatedAt          time.Time `json:"created_at"`
-	UpdatedAt          time.Time `json:"updated_at"`
+	WorkosID  string    `json:"workos_id"`
+	Owner     string    `json:"owner"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+type OrganizationMember struct {
+	UserID         string    `json:"user_id"`
+	OrganizationID string    `json:"organization_id"`
+	IsAdmin        bool      `json:"is_admin"`
+	JoinedAt       time.Time `json:"joined_at"`
 }
 
 type Transaction struct {
@@ -170,5 +175,50 @@ type Withdrawal struct {
 	FailedAt                *time.Time       `json:"failed_at"`
 	ReversedAt              *time.Time       `json:"reversed_at"`
 	CanceledAt              *time.Time       `json:"canceled_at"`
+}
+
+// ---------------------------------------------------------------------------
+// Request Management Types
+// ---------------------------------------------------------------------------
+
+type RequestStatus string
+
+const (
+	RequestStatusPending  RequestStatus = "pending"
+	RequestStatusApproved RequestStatus = "approved"
+	RequestStatusRejected RequestStatus = "rejected"
+	RequestStatusCanceled RequestStatus = "canceled"
+)
+
+type OrganizationJoiningRequest struct {
+	ID                    string        `json:"id"`
+	RequesterUserID       string        `json:"requester_user_id"`
+	TargetOrganizationID  string        `json:"target_organization_id"`
+	Message               *string       `json:"message"`
+	Status                RequestStatus `json:"status"`
+	ReviewedBy            *string       `json:"reviewed_by"`
+	ReviewedAt            *time.Time    `json:"reviewed_at"`
+	ReviewNote            *string       `json:"review_note"`
+	CreatedAt             time.Time     `json:"created_at"`
+	ApprovedAt            *time.Time    `json:"approved_at"`
+	RejectedAt            *time.Time    `json:"rejected_at"`
+	CanceledAt            *time.Time    `json:"canceled_at"`
+}
+
+type APIKeyCreationRequest struct {
+	ID                string        `json:"id"`
+	RequesterUserID   string        `json:"requester_user_id"`
+	OrganizationID    string        `json:"organization_id"`
+	RequestedKeyName  string        `json:"requested_key_name"`
+	Justification     string        `json:"justification"`
+	Status            RequestStatus `json:"status"`
+	ReviewedBy        *string       `json:"reviewed_by"`
+	ReviewedAt        *time.Time    `json:"reviewed_at"`
+	ReviewNote        *string       `json:"review_note"`
+	MerchantID        *string       `json:"merchant_id"`
+	CreatedAt         time.Time     `json:"created_at"`
+	ApprovedAt        *time.Time    `json:"approved_at"`
+	RejectedAt        *time.Time    `json:"rejected_at"`
+	CanceledAt        *time.Time    `json:"canceled_at"`
 }
 
