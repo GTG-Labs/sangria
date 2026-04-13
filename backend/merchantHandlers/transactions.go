@@ -19,9 +19,57 @@ func GetMerchantBalance(pool *pgxpool.Pool) fiber.Handler {
 			return c.Status(500).JSON(fiber.Map{"error": "internal server error"})
 		}
 
-		balance, err := dbengine.GetAccountBalance(c.Context(), pool, user.ID)
+		// Get user's organizations to determine organization context
+		memberships, err := dbengine.GetUserOrganizations(c.Context(), pool, user.ID)
 		if err != nil {
-			slog.Error("fetch balance: query failed", "user_id", user.ID, "error", err)
+			slog.Error("get user organizations", "user_id", user.ID, "error", err)
+			return c.Status(500).JSON(fiber.Map{"error": "failed to get user organizations"})
+		}
+		if len(memberships) == 0 {
+			slog.Error("user has no organizations", "user_id", user.ID)
+			return c.Status(400).JSON(fiber.Map{"error": "user must belong to an organization"})
+		}
+
+		// Derive selectedOrgID from request or user's active selection
+		var selectedOrgID string
+
+		if orgID := c.Query("org_id"); orgID != "" {
+			found := false
+			for _, membership := range memberships {
+				if membership.OrganizationID == orgID {
+					selectedOrgID = orgID
+					found = true
+					break
+				}
+			}
+			if !found {
+				return c.Status(400).JSON(fiber.Map{"error": "user is not a member of the specified organization"})
+			}
+		} else if orgID := c.Query("organization_id"); orgID != "" {
+			found := false
+			for _, membership := range memberships {
+				if membership.OrganizationID == orgID {
+					selectedOrgID = orgID
+					found = true
+					break
+				}
+			}
+			if !found {
+				return c.Status(400).JSON(fiber.Map{"error": "user is not a member of the specified organization"})
+			}
+		} else if len(memberships) == 1 {
+			selectedOrgID = memberships[0].OrganizationID
+		} else {
+			personalOrgID, err := dbengine.GetUserPersonalOrgID(c.Context(), pool, user.ID)
+			if err != nil {
+				return c.Status(400).JSON(fiber.Map{"error": "multiple organizations found, please specify org_id or organization_id parameter"})
+			}
+			selectedOrgID = personalOrgID
+		}
+
+		balance, err := dbengine.GetAccountBalance(c.Context(), pool, selectedOrgID)
+		if err != nil {
+			slog.Error("fetch balance: query failed", "user_id", user.ID, "org_id", selectedOrgID, "error", err)
 			return c.Status(500).JSON(fiber.Map{
 				"error": "Failed to retrieve balance",
 			})
@@ -99,8 +147,11 @@ func GetMerchantTransactions(pool *pgxpool.Pool) fiber.Handler {
 			// If only one membership exists, use that
 			selectedOrgID = memberships[0].OrganizationID
 		} else {
-			// Multiple memberships exist, prompt for specification
-			return c.Status(400).JSON(fiber.Map{"error": "multiple organizations found, please specify org_id or organization_id parameter"})
+			personalOrgID, err := dbengine.GetUserPersonalOrgID(c.Context(), pool, user.ID)
+			if err != nil {
+				return c.Status(400).JSON(fiber.Map{"error": "multiple organizations found, please specify org_id or organization_id parameter"})
+			}
+			selectedOrgID = personalOrgID
 		}
 
 		// Fetch paginated transactions with total count

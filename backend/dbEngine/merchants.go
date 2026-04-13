@@ -16,10 +16,10 @@ var ErrMerchantNotFound = errors.New("merchant not found")
 func GetMerchantByID(ctx context.Context, pool *pgxpool.Pool, id string) (Merchant, error) {
 	var m Merchant
 	err := pool.QueryRow(ctx,
-		`SELECT id, organization_id, api_key, key_id, name, is_active, last_used_at, created_at
+		`SELECT id, organization_id, api_key, key_id, name, status, last_used_at, created_at
 		 FROM merchants WHERE id = $1`,
 		id,
-	).Scan(&m.ID, &m.OrganizationID, &m.APIKey, &m.KeyID, &m.Name, &m.IsActive, &m.LastUsedAt, &m.CreatedAt)
+	).Scan(&m.ID, &m.OrganizationID, &m.APIKey, &m.KeyID, &m.Name, &m.Status, &m.LastUsedAt, &m.CreatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return m, ErrMerchantNotFound
 	}

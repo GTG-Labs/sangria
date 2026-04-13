@@ -3,7 +3,6 @@ package dbengine
 import (
 	"context"
 	"errors"
-	"fmt"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -62,7 +61,7 @@ func AddUserToOrganization(ctx context.Context, pool *pgxpool.Pool, userID, orga
 	return err
 }
 
-// GetUserOrganizations returns all organizations for a user with their admin status
+// GetUserOrganizations returns all organizations for a user with their admin status.
 func GetUserOrganizations(ctx context.Context, pool *pgxpool.Pool, userID string) ([]OrganizationMember, error) {
 	rows, err := pool.Query(ctx,
 		`SELECT user_id, organization_id, is_admin, joined_at
@@ -85,6 +84,20 @@ func GetUserOrganizations(ctx context.Context, pool *pgxpool.Pool, userID string
 		memberships = append(memberships, m)
 	}
 	return memberships, rows.Err()
+}
+
+// GetUserPersonalOrgID returns the organization ID of the user's personal org, if one exists.
+func GetUserPersonalOrgID(ctx context.Context, pool *pgxpool.Pool, userID string) (string, error) {
+	var orgID string
+	err := pool.QueryRow(ctx,
+		`SELECT o.id
+		 FROM organizations o
+		 JOIN organization_members om ON om.organization_id = o.id
+		 WHERE om.user_id = $1 AND o.is_personal = true
+		 LIMIT 1`,
+		userID,
+	).Scan(&orgID)
+	return orgID, err
 }
 
 // IsAdmin returns true if the given WorkOS user ID has an entry in the admins table.
@@ -112,116 +125,4 @@ func IsOrganizationAdmin(ctx context.Context, pool *pgxpool.Pool, userID, organi
 		return false, err
 	}
 	return isAdmin, nil
-}
-
-// IsOrganizationMember returns true if the given user is a member of the specified organization.
-func IsOrganizationMember(ctx context.Context, pool *pgxpool.Pool, userID, organizationID string) (bool, error) {
-	var exists bool
-	err := pool.QueryRow(ctx,
-		`SELECT EXISTS(SELECT 1 FROM organization_members WHERE user_id = $1 AND organization_id = $2)`,
-		userID, organizationID,
-	).Scan(&exists)
-	return exists, err
-}
-
-// CreateOrganization creates a new organization and makes the creator an admin.
-func CreateOrganization(ctx context.Context, pool *pgxpool.Pool, name, creatorUserID string) (Organization, error) {
-	tx, err := pool.Begin(ctx)
-	if err != nil {
-		return Organization{}, fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer tx.Rollback(ctx)
-
-	// Create the organization
-	var org Organization
-	err = tx.QueryRow(ctx, `
-		INSERT INTO organizations (name, created_at)
-		VALUES ($1, NOW())
-		RETURNING id, name, created_at`,
-		name,
-	).Scan(&org.ID, &org.Name, &org.CreatedAt)
-	if err != nil {
-		return Organization{}, fmt.Errorf("failed to create organization: %w", err)
-	}
-
-	// Add the creator as an admin
-	err = AddUserToOrganizationTx(ctx, tx, creatorUserID, org.ID, true)
-	if err != nil {
-		return Organization{}, fmt.Errorf("failed to add creator as admin: %w", err)
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		return Organization{}, fmt.Errorf("failed to commit transaction: %w", err)
-	}
-
-	return org, nil
-}
-
-// GetOrganizationByID returns an organization by its ID.
-func GetOrganizationByID(ctx context.Context, pool *pgxpool.Pool, organizationID string) (Organization, error) {
-	var org Organization
-	err := pool.QueryRow(ctx,
-		`SELECT id, name, created_at FROM organizations WHERE id = $1`,
-		organizationID,
-	).Scan(&org.ID, &org.Name, &org.CreatedAt)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return org, fmt.Errorf("organization not found")
-	}
-	return org, err
-}
-
-// GetOrganizationsByMemberships returns organization details for a list of memberships.
-func GetOrganizationsByMemberships(ctx context.Context, pool *pgxpool.Pool, memberships []OrganizationMember) ([]OrganizationWithMembership, error) {
-	if len(memberships) == 0 {
-		return []OrganizationWithMembership{}, nil
-	}
-
-	// Build query with organization IDs
-	orgIDs := make([]string, len(memberships))
-	for i, m := range memberships {
-		orgIDs[i] = m.OrganizationID
-	}
-
-	// Create placeholders for the IN clause
-	placeholders := ""
-	args := make([]interface{}, len(orgIDs))
-	for i, id := range orgIDs {
-		if i > 0 {
-			placeholders += ", "
-		}
-		placeholders += fmt.Sprintf("$%d", i+1)
-		args[i] = id
-	}
-
-	rows, err := pool.Query(ctx,
-		fmt.Sprintf(`SELECT id, name, created_at FROM organizations WHERE id IN (%s) ORDER BY name`, placeholders),
-		args...,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query organizations: %w", err)
-	}
-	defer rows.Close()
-
-	// Create map for quick membership lookup
-	membershipMap := make(map[string]OrganizationMember)
-	for _, m := range memberships {
-		membershipMap[m.OrganizationID] = m
-	}
-
-	var results []OrganizationWithMembership
-	for rows.Next() {
-		var org Organization
-		if err := rows.Scan(&org.ID, &org.Name, &org.CreatedAt); err != nil {
-			return nil, fmt.Errorf("failed to scan organization: %w", err)
-		}
-
-		membership := membershipMap[org.ID]
-		results = append(results, OrganizationWithMembership{
-			Organization: org,
-			IsAdmin:      membership.IsAdmin,
-			JoinedAt:     membership.JoinedAt,
-		})
-	}
-
-	return results, rows.Err()
 }

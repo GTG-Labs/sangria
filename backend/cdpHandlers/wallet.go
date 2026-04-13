@@ -5,6 +5,7 @@ package cdpHandlers
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"sync"
 
@@ -52,7 +53,8 @@ func CreateEvmAccount(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("create evm account: %w", err)
 	}
 	if resp.StatusCode() != 201 {
-		return "", fmt.Errorf("create evm account: unexpected status %d: %s", resp.StatusCode(), string(resp.Body))
+		slog.Debug("CDP create evm account non-201 response", "status", resp.StatusCode(), "body", string(resp.Body))
+		return "", fmt.Errorf("create evm account: unexpected status %d", resp.StatusCode())
 	}
 	if resp.JSON201 == nil {
 		return "", fmt.Errorf("create evm account: empty or malformed 201 response")
@@ -77,7 +79,8 @@ func requestFaucet(ctx context.Context, address, network, token string) error {
 		return fmt.Errorf("fund %s: %w", token, err)
 	}
 	if resp.StatusCode() != 200 {
-		return fmt.Errorf("fund %s: unexpected status %d: %s", token, resp.StatusCode(), string(resp.Body))
+		slog.Debug("CDP faucet non-200 response", "token", token, "status", resp.StatusCode(), "body", string(resp.Body))
+		return fmt.Errorf("fund %s: unexpected status %d", token, resp.StatusCode())
 	}
 
 	return nil

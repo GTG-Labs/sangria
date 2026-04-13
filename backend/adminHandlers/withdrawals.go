@@ -93,9 +93,13 @@ func RejectWithdrawal(pool *pgxpool.Pool) fiber.Handler {
 // Admin marks a withdrawal as completed after manually sending the bank transfer.
 func CompleteWithdrawal(pool *pgxpool.Pool) fiber.Handler {
 	return func(c fiber.Ctx) error {
+		admin, ok := c.Locals("workos_user").(auth.WorkOSUser)
+		if !ok {
+			return c.Status(500).JSON(fiber.Map{"error": "internal server error"})
+		}
 		withdrawalID := c.Params("id")
 
-		if err := dbengine.CompleteWithdrawal(c.Context(), pool, withdrawalID); err != nil {
+		if err := dbengine.CompleteWithdrawal(c.Context(), pool, withdrawalID, admin.ID); err != nil {
 			if errors.Is(err, dbengine.ErrWithdrawalNotFound) {
 				return c.Status(400).JSON(fiber.Map{"error": "withdrawal not found or not in approved/processing state"})
 			}
@@ -116,6 +120,10 @@ func CompleteWithdrawal(pool *pgxpool.Pool) fiber.Handler {
 // Admin marks a withdrawal as failed (e.g., bank transfer bounced) and reverses the balance debit.
 func FailWithdrawal(pool *pgxpool.Pool) fiber.Handler {
 	return func(c fiber.Ctx) error {
+		admin, ok := c.Locals("workos_user").(auth.WorkOSUser)
+		if !ok {
+			return c.Status(500).JSON(fiber.Map{"error": "internal server error"})
+		}
 		withdrawalID := c.Params("id")
 
 		var req struct {
@@ -130,7 +138,7 @@ func FailWithdrawal(pool *pgxpool.Pool) fiber.Handler {
 			return c.Status(400).JSON(fiber.Map{"error": "failure_code is required"})
 		}
 
-		if err := dbengine.FailWithdrawal(c.Context(), pool, withdrawalID, req.FailureCode, req.FailureMessage); err != nil {
+		if err := dbengine.FailWithdrawal(c.Context(), pool, withdrawalID, admin.ID, req.FailureCode, req.FailureMessage); err != nil {
 			if errors.Is(err, dbengine.ErrWithdrawalNotFound) {
 				return c.Status(400).JSON(fiber.Map{"error": "withdrawal not found or not in approved/processing state"})
 			}

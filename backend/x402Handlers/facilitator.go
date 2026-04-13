@@ -24,6 +24,75 @@ var httpClient = &http.Client{Timeout: 30 * time.Second}
 // maxFacilitatorBody caps the size of facilitator responses to prevent OOM.
 const maxFacilitatorBody = 1 << 20 // 1 MB
 
+// maxRetries is the number of additional attempts after the first failure
+// for transient HTTP errors (timeouts, connection refused, 5xx).
+const maxRetries = 1
+
+// retryDelay is the wait time between retry attempts.
+const retryDelay = 2 * time.Second
+
+// isRetryable returns true if the error or HTTP status code indicates a
+// transient failure that may succeed on retry.
+func isRetryable(err error, statusCode int) bool {
+	if err != nil {
+		// Timeout, connection refused, DNS failure, etc.
+		return true
+	}
+	// 5xx = server error on facilitator side, worth retrying.
+	// 4xx = client error (bad payload), not retryable.
+	return statusCode >= 500
+}
+
+// doFacilitatorRequest executes an HTTP request against the facilitator with
+// a single retry on transient failures. Returns the response body and status
+// code on success, or an error if all attempts fail.
+func doFacilitatorRequest(ctx context.Context, method, url, authPath, facilitatorURL string, body []byte) ([]byte, int, error) {
+	var lastErr error
+
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		if attempt > 0 {
+			slog.Info("retrying facilitator request", "url", url, "attempt", attempt+1)
+			time.Sleep(retryDelay)
+		}
+
+		req, err := http.NewRequestWithContext(ctx, method, url, bytes.NewReader(body))
+		if err != nil {
+			return nil, 0, fmt.Errorf("create request: %w", err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+
+		if err := addCDPAuth(req, facilitatorURL, authPath); err != nil {
+			return nil, 0, fmt.Errorf("facilitator auth: %w", err)
+		}
+
+		resp, err := httpClient.Do(req)
+		if err != nil {
+			lastErr = fmt.Errorf("http request: %w", err)
+			if isRetryable(err, 0) {
+				continue
+			}
+			return nil, 0, lastErr
+		}
+
+		respBody, readErr := io.ReadAll(io.LimitReader(resp.Body, maxFacilitatorBody))
+		resp.Body.Close()
+		if readErr != nil {
+			lastErr = fmt.Errorf("read response: %w", readErr)
+			continue
+		}
+
+		if isRetryable(nil, resp.StatusCode) {
+			slog.Debug("facilitator returned retryable status", "status", resp.StatusCode, "body", string(respBody))
+			lastErr = fmt.Errorf("returned status %d", resp.StatusCode)
+			continue
+		}
+
+		return respBody, resp.StatusCode, nil
+	}
+
+	return nil, 0, fmt.Errorf("all attempts failed: %w", lastErr)
+}
+
 // FacilitatorURL returns the configured facilitator URL from the
 // X402_FACILITATOR_URL environment variable. Returns an error if unset.
 func FacilitatorURL() (string, error) {
@@ -118,29 +187,17 @@ func Verify(ctx context.Context, payload json.RawMessage, requirements PaymentRe
 
 	slog.Debug("calling facilitator verify", "url", facilitatorURL)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, facilitatorURL+"/verify", bytes.NewReader(body))
-	if err != nil {
-		return nil, fmt.Errorf("create verify request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	if err := addCDPAuth(req, facilitatorURL, "/platform/v2/x402/verify"); err != nil {
-		return nil, fmt.Errorf("facilitator auth: %w", err)
-	}
-
-	resp, err := httpClient.Do(req)
+	respBody, statusCode, err := doFacilitatorRequest(
+		ctx, http.MethodPost, facilitatorURL+"/verify",
+		"/platform/v2/x402/verify", facilitatorURL, body,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("facilitator verify: %w", err)
 	}
-	defer resp.Body.Close()
 
-	respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxFacilitatorBody))
-	if err != nil {
-		return nil, fmt.Errorf("read verify response: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("facilitator verify returned %d: %s", resp.StatusCode, string(respBody))
+	if statusCode != http.StatusOK {
+		slog.Debug("facilitator verify non-200 response", "status", statusCode, "body", string(respBody))
+		return nil, fmt.Errorf("facilitator verify returned status %d", statusCode)
 	}
 
 	var result VerifyResponse
@@ -164,29 +221,16 @@ func Settle(ctx context.Context, payload json.RawMessage, requirements PaymentRe
 		return nil, fmt.Errorf("build settle request: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, facilitatorURL+"/settle", bytes.NewReader(body))
-	if err != nil {
-		return nil, fmt.Errorf("create settle request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	if err := addCDPAuth(req, facilitatorURL, "/platform/v2/x402/settle"); err != nil {
-		return nil, fmt.Errorf("facilitator auth: %w", err)
-	}
-
-	resp, err := httpClient.Do(req)
+	respBody, statusCode, err := doFacilitatorRequest(
+		ctx, http.MethodPost, facilitatorURL+"/settle",
+		"/platform/v2/x402/settle", facilitatorURL, body,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("facilitator settle: %w", err)
 	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxFacilitatorBody))
-	if err != nil {
-		return nil, fmt.Errorf("read settle response: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("facilitator settle returned %d: %s", resp.StatusCode, string(respBody))
+	if statusCode != http.StatusOK {
+		slog.Debug("facilitator settle non-200 response", "status", statusCode, "body", string(respBody))
+		return nil, fmt.Errorf("facilitator settle returned status %d", statusCode)
 	}
 
 	var result SettleResponse

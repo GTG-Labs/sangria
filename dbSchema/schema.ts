@@ -14,6 +14,11 @@ import {
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
+export const transactionStatusEnum = pgEnum("transaction_status", [
+  "pending",
+  "confirmed",
+  "failed",
+]);
 export const directionEnum = pgEnum("direction", ["DEBIT", "CREDIT"]);
 export const currencyEnum = pgEnum("currency", ["USD", "USDC", "ETH"]);
 export const accountTypeEnum = pgEnum("account_type", [
@@ -30,6 +35,7 @@ export const accountTypeEnum = pgEnum("account_type", [
 export const organizations = pgTable("organizations", {
   id: uuid().primaryKey().defaultRandom(),
   name: varchar({ length: 255 }).notNull(),
+  isPersonal: boolean("is_personal").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -116,6 +122,8 @@ export const transactions = pgTable(
   {
     id: uuid().primaryKey().defaultRandom(),
     idempotencyKey: varchar("idempotency_key", { length: 255 }).notNull(),
+    status: transactionStatusEnum().notNull().default("confirmed"),
+    txHash: varchar("tx_hash", { length: 255 }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -123,6 +131,7 @@ export const transactions = pgTable(
   (table) => [
     unique("uq_idempotency_key").on(table.idempotencyKey),
     index("idx_transactions_created_at").on(table.createdAt.desc()),
+    index("idx_transactions_status").on(table.status),
   ],
 );
 
@@ -195,6 +204,8 @@ export const networkEnum = pgEnum("network", [
 // Merchants — API keys for businesses receiving payments through x402
 // ---------------------------------------------------------------------------
 
+export const apiKeyStatusEnum = pgEnum("api_key_status", ["active", "pending", "inactive"]);
+
 export const merchants = pgTable(
   "merchants",
   {
@@ -205,7 +216,7 @@ export const merchants = pgTable(
     apiKey: text("api_key").notNull(),
     keyId: varchar("key_id", { length: 8 }).notNull(),
     name: varchar({ length: 255 }).notNull(),
-    isActive: boolean("is_active").notNull().default(true),
+    status: apiKeyStatusEnum().notNull().default("active"),
     lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -281,10 +292,14 @@ export const withdrawals = pgTable(
     failureCode: varchar("failure_code", { length: 100 }),
     failureMessage: text("failure_message"),
 
-    // Admin review
+    // Admin review (set during approve/reject — immutable after that step)
     reviewedBy: text("reviewed_by"),
     reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
     reviewNote: text("review_note"),
+
+    // Completion/failure actor attribution
+    completedBy: text("completed_by"),
+    failedBy: text("failed_by"),
 
     // Idempotency
     idempotencyKey: varchar("idempotency_key", { length: 255 }).notNull(),

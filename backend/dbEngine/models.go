@@ -30,9 +30,10 @@ const (
 )
 
 type Organization struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	CreatedAt time.Time `json:"created_at"`
+	ID         string    `json:"id"`
+	Name       string    `json:"name"`
+	IsPersonal bool      `json:"is_personal"`
+	CreatedAt  time.Time `json:"created_at"`
 }
 
 type Account struct {
@@ -58,16 +59,20 @@ type OrganizationMember struct {
 	JoinedAt       time.Time `json:"joined_at"`
 }
 
-type OrganizationWithMembership struct {
-	Organization
-	IsAdmin  bool      `json:"is_admin"`
-	JoinedAt time.Time `json:"joined_at"`
-}
+type TransactionStatus string
+
+const (
+	TransactionStatusPending   TransactionStatus = "pending"
+	TransactionStatusConfirmed TransactionStatus = "confirmed"
+	TransactionStatusFailed    TransactionStatus = "failed"
+)
 
 type Transaction struct {
-	ID             string    `json:"id"`
-	IdempotencyKey string    `json:"idempotency_key"`
-	CreatedAt      time.Time `json:"created_at"`
+	ID             string            `json:"id"`
+	IdempotencyKey string            `json:"idempotency_key"`
+	Status         TransactionStatus `json:"status"`
+	TxHash         *string           `json:"tx_hash"`
+	CreatedAt      time.Time         `json:"created_at"`
 }
 
 type LedgerEntry struct {
@@ -101,26 +106,34 @@ const (
 	NetworkSolanaDevnet Network = "solana-devnet"   // solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1
 )
 
+type APIKeyStatus string
+
+const (
+	APIKeyStatusActive   APIKeyStatus = "active"   // Approved and working
+	APIKeyStatusPending  APIKeyStatus = "pending"  // Awaiting admin approval
+	APIKeyStatusInactive APIKeyStatus = "inactive" // Rejected or revoked
+)
+
 type Merchant struct {
-	ID             string     `json:"id"`
-	OrganizationID string     `json:"organization_id"`
-	APIKey         string     `json:"api_key"`
-	KeyID          string     `json:"key_id"`
-	Name           string     `json:"name"`
-	IsActive       bool       `json:"is_active"`
-	LastUsedAt     *time.Time `json:"last_used_at"`
-	CreatedAt      time.Time  `json:"created_at"`
+	ID             string       `json:"id"`
+	OrganizationID string       `json:"organization_id"`
+	APIKey         string       `json:"api_key"`
+	KeyID          string       `json:"key_id"`
+	Name           string       `json:"name"`
+	Status         APIKeyStatus `json:"status"`
+	LastUsedAt     *time.Time   `json:"last_used_at"`
+	CreatedAt      time.Time    `json:"created_at"`
 }
 
 // MerchantPublic represents a merchant API key without exposing the hashed key
 type MerchantPublic struct {
-	ID             string     `json:"id"`
-	OrganizationID string     `json:"organization_id"`
-	KeyID          string     `json:"key_id"`
-	Name           string     `json:"name"`
-	IsActive       bool       `json:"is_active"`
-	LastUsedAt     *time.Time `json:"last_used_at"`
-	CreatedAt      time.Time  `json:"created_at"`
+	ID             string       `json:"id"`
+	OrganizationID string       `json:"organization_id"`
+	KeyID          string       `json:"key_id"`
+	Name           string       `json:"name"`
+	Status         APIKeyStatus `json:"status"`
+	LastUsedAt     *time.Time   `json:"last_used_at"`
+	CreatedAt      time.Time    `json:"created_at"`
 }
 
 type CryptoWallet struct {
@@ -184,6 +197,8 @@ type Withdrawal struct {
 	ReviewedBy              *string          `json:"reviewed_by"`
 	ReviewedAt              *time.Time       `json:"reviewed_at"`
 	ReviewNote              *string          `json:"review_note"`
+	CompletedBy             *string          `json:"completed_by"`
+	FailedBy                *string          `json:"failed_by"`
 	IdempotencyKey          string           `json:"idempotency_key"`
 	CreatedAt               time.Time        `json:"created_at"`
 	ApprovedAt              *time.Time       `json:"approved_at"`
@@ -229,22 +244,5 @@ type OrganizationInvitation struct {
 	CreatedAt        time.Time        `json:"created_at"`
 	AcceptedAt       *time.Time       `json:"accepted_at"`
 	DeclinedAt       *time.Time       `json:"declined_at"`
-}
-
-type APIKeyCreationRequest struct {
-	ID                string        `json:"id"`
-	RequesterUserID   string        `json:"requester_user_id"`
-	OrganizationID    string        `json:"organization_id"`
-	RequestedKeyName  string        `json:"requested_key_name"`
-	Justification     string        `json:"justification"`
-	Status            RequestStatus `json:"status"`
-	ReviewedBy        *string       `json:"reviewed_by"`
-	ReviewedAt        *time.Time    `json:"reviewed_at"`
-	ReviewNote        *string       `json:"review_note"`
-	MerchantID        *string       `json:"merchant_id"`
-	CreatedAt         time.Time     `json:"created_at"`
-	ApprovedAt        *time.Time    `json:"approved_at"`
-	RejectedAt        *time.Time    `json:"rejected_at"`
-	CanceledAt        *time.Time    `json:"canceled_at"`
 }
 

@@ -3,15 +3,13 @@ name: Publish TypeScript SDK
 on:
   workflow_dispatch:
     inputs:
-      release_type:
-        description: 'Release type'
-        required: true
-        default: 'patch'
-        type: choice
-        options:
-          - patch
-          - minor
-          - major
+      test_mode:
+        description: 'Dry run — no publish, no commit'
+        required: false
+        default: false
+        type: boolean
+  workflow_call:
+    inputs:
       test_mode:
         description: 'Dry run — no publish, no commit'
         required: false
@@ -48,14 +46,50 @@ jobs:
         working-directory: sdk/sdk-typescript
         run: pnpm install
 
-      - name: Bump version
+      - name: Get version from SDK_VERSIONS.md
         id: version
         working-directory: sdk/sdk-typescript
         run: |
-          npm version ${{ inputs.release_type }} --no-git-tag-version
-          VERSION=$(node -p "require('./package.json').version")
+          # Extract TypeScript SDK section from deployment/SDK_VERSIONS.md in a section-aware way
+          VERSION=$(awk '
+            /^## TypeScript SDK/ { in_section=1; next }
+            /^##/ && in_section { exit }
+            in_section && /^VERSION:/ {
+              gsub(/^VERSION:[ \t]*/, "");
+              print;
+              exit
+            }
+          ' ../../deployment/SDK_VERSIONS.md)
+
+          echo "📖 Version from SDK_VERSIONS.md: $VERSION"
+
+          # Validate VERSION is non-empty
+          if [ -z "$VERSION" ]; then
+            echo "❌ ERROR: Failed to extract VERSION from ../../deployment/SDK_VERSIONS.md"
+            echo "Expected: '## TypeScript SDK' section with 'VERSION: X.Y.Z' line"
+            echo "Current SDK_VERSIONS.md content:"
+            cat ../../deployment/SDK_VERSIONS.md
+            exit 1
+          fi
+
+          # Validate VERSION matches semver pattern (major.minor.patch with optional prerelease/build)
+          if ! echo "$VERSION" | grep -E '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$'; then
+            echo "❌ ERROR: VERSION '$VERSION' does not match semver pattern (major.minor.patch)"
+            echo "Expected format: X.Y.Z or X.Y.Z-prerelease or X.Y.Z+build"
+            exit 1
+          fi
+
+          echo "✅ Validated VERSION: $VERSION"
+
+          # Update package.json to match
+          node -e "
+            const pkg = require('./package.json');
+            pkg.version = '$VERSION';
+            require('fs').writeFileSync('./package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Publishing @sangria-sdk/core@$VERSION"
+          echo "📦 Publishing @sangria-sdk/core@$VERSION"
 
       - name: Build
         working-directory: sdk/sdk-typescript

@@ -9,4 +9,6 @@ node_modules
 
 guides-and-knowledge/
 *.egg-info/
-.worktrees/ó
+.next/
+next-env.d.ts
+.worktrees/

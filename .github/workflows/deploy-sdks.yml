@@ -1,0 +1,109 @@
+name: Deploy SDKs
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'sdk/**'
+      - 'deployment/SDK_VERSIONS.md'
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  detect-changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      typescript-changed: ${{ steps.changes.outputs.typescript }}
+      python-changed: ${{ steps.changes.outputs.python }}
+      versions-changed: ${{ steps.changes.outputs.versions }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            typescript:
+              - 'sdk/sdk-typescript/**'
+            python:
+              - 'sdk/python/**'
+            versions:
+              - 'deployment/SDK_VERSIONS.md'
+
+  auto-bump-versions:
+    name: Auto-bump Versions if Needed
+    needs: detect-changes
+    if: |
+      (needs.detect-changes.outputs.typescript-changed == 'true' || needs.detect-changes.outputs.python-changed == 'true') &&
+      needs.detect-changes.outputs.versions-changed == 'false'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Auto-bump patch versions
+        run: |
+          echo "🔄 SDK changes detected without version update - auto-bumping patch versions"
+
+          # Function to increment patch version
+          bump_patch() {
+            local version=$1
+            local parts=(${version//./ })
+            parts[2]=$((parts[2] + 1))
+            echo "${parts[0]}.${parts[1]}.${parts[2]}"
+          }
+
+          # Read current versions
+          if [ "${{ needs.detect-changes.outputs.typescript-changed }}" == "true" ]; then
+            TS_VERSION=$(grep -A 2 "## TypeScript SDK" deployment/SDK_VERSIONS.md | grep "VERSION:" | sed 's/VERSION: //')
+            NEW_TS_VERSION=$(bump_patch $TS_VERSION)
+            echo "📦 TypeScript SDK: $TS_VERSION → $NEW_TS_VERSION"
+            sed -i "s/VERSION: $TS_VERSION/VERSION: $NEW_TS_VERSION/" deployment/SDK_VERSIONS.md
+          fi
+
+          if [ "${{ needs.detect-changes.outputs.python-changed }}" == "true" ]; then
+            PY_VERSION=$(grep -A 2 "## Python SDK" deployment/SDK_VERSIONS.md | grep "VERSION:" | sed 's/VERSION: //')
+            NEW_PY_VERSION=$(bump_patch $PY_VERSION)
+            echo "📦 Python SDK: $PY_VERSION → $NEW_PY_VERSION"
+            sed -i "s/VERSION: $PY_VERSION/VERSION: $NEW_PY_VERSION/" deployment/SDK_VERSIONS.md
+          fi
+
+      - name: Commit auto-bumped versions
+        run: |
+          git config user.email "action@github.com"
+          git config user.name "GitHub Action"
+          git add deployment/SDK_VERSIONS.md
+          git commit -m "chore: auto-bump patch versions for SDK changes
+
+          🤖 Auto-generated patch version bump"
+          git push origin main
+
+  deploy-typescript:
+    name: Deploy TypeScript SDK
+    needs: [detect-changes, auto-bump-versions]
+    if: |
+      always() &&
+      needs.detect-changes.outputs.typescript-changed == 'true' &&
+      (needs.auto-bump-versions.result == 'success' || needs.auto-bump-versions.result == 'skipped')
+    uses: ./.github/workflows/publish-ts-sdk.yml
+    with:
+      test_mode: false
+    secrets: inherit
+
+  deploy-python:
+    name: Deploy Python SDK
+    needs: [detect-changes, auto-bump-versions]
+    if: |
+      always() &&
+      needs.detect-changes.outputs.python-changed == 'true' &&
+      (needs.auto-bump-versions.result == 'success' || needs.auto-bump-versions.result == 'skipped')
+    uses: ./.github/workflows/publish-python-sdk.yml
+    with:
+      test_mode: false
+    secrets: inherit

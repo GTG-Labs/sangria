@@ -42,8 +42,7 @@ func CreateMerchantAPIKey(pool *pgxpool.Pool) fiber.Handler {
 			return c.Status(500).JSON(fiber.Map{"error": "failed to create user"})
 		}
 
-		// Organization context is now implemented, proceed with API key creation
-		// Get user organizations and derive selectedOrgID appropriately
+		// Get user organizations and derive selectedOrgID
 		memberships, err := dbengine.GetUserOrganizations(c.Context(), pool, user.ID)
 		if err != nil {
 			slog.Error("get user organizations", "user_id", user.ID, "error", err)
@@ -54,12 +53,10 @@ func CreateMerchantAPIKey(pool *pgxpool.Pool) fiber.Handler {
 			return c.Status(400).JSON(fiber.Map{"error": "user must belong to an organization"})
 		}
 
-		// Derive selectedOrgID from request or admin membership
+		// Derive selectedOrgID from request or membership
 		var selectedOrgID string
 
-		// Check for organization_id in request query params
 		if orgID := c.Query("organization_id"); orgID != "" {
-			// Validate that user is a member of this organization
 			found := false
 			for _, membership := range memberships {
 				if membership.OrganizationID == orgID {
@@ -69,24 +66,11 @@ func CreateMerchantAPIKey(pool *pgxpool.Pool) fiber.Handler {
 				}
 			}
 			if !found {
-				return c.Status(400).JSON(fiber.Map{"error": "user is not a member of the specified organization"})
+				return c.Status(403).JSON(fiber.Map{"error": "user is not a member of the specified organization"})
 			}
 		} else {
-			// Find an admin membership
-			for _, membership := range memberships {
-				if membership.IsAdmin {
-					selectedOrgID = membership.OrganizationID
-					break
-				}
-			}
-			// If no admin membership found and only one membership exists, use that
-			if selectedOrgID == "" && len(memberships) == 1 {
-				selectedOrgID = memberships[0].OrganizationID
-			}
-			// If still no org selected and multiple memberships exist, prompt for specification
-			if selectedOrgID == "" {
-				return c.Status(400).JSON(fiber.Map{"error": "multiple organizations found, please specify organization_id parameter"})
-			}
+			// Use first available organization
+			selectedOrgID = memberships[0].OrganizationID
 		}
 
 		// Ensure the organization has a USD LIABILITY account before creating the API key,
@@ -96,24 +80,53 @@ func CreateMerchantAPIKey(pool *pgxpool.Pool) fiber.Handler {
 			return c.Status(500).JSON(fiber.Map{"error": "failed to create liability account"})
 		}
 
-		// Create API key for the selected organization
-		merchant, fullKey, err := auth.CreateAPIKey(c.Context(), pool, selectedOrgID, req.Name)
+		// Determine if user is admin for this organization
+		isAdmin := false
+		for _, membership := range memberships {
+			if membership.OrganizationID == selectedOrgID && membership.IsAdmin {
+				isAdmin = true
+				break
+			}
+		}
+
+		// Set status based on admin status
+		var keyStatus dbengine.APIKeyStatus
+		if isAdmin {
+			keyStatus = dbengine.APIKeyStatusActive // Admin keys are immediately active
+		} else {
+			keyStatus = dbengine.APIKeyStatusPending // Non-admin keys need approval
+		}
+
+		merchant, fullKey, err := auth.CreateAPIKey(c.Context(), pool, selectedOrgID, req.Name, keyStatus)
 		if err != nil {
 			if errors.Is(err, auth.ErrMaxAPIKeysReached) {
 				return c.Status(400).JSON(fiber.Map{"error": "maximum number of API keys reached (10)"})
 			}
-			slog.Error("create merchant API key", "user_id", user.ID, "error", err)
+			slog.Error("create merchant API key", "org_id", selectedOrgID, "user_id", user.ID, "error", err)
 			return c.Status(500).JSON(fiber.Map{"error": "failed to create merchant"})
 		}
 
-		// Return merchant record + raw key (only shown once)
+		// Different response based on status
+		if keyStatus == dbengine.APIKeyStatusPending {
+			return c.Status(202).JSON(fiber.Map{
+				"message":         "API key created but pending admin approval",
+				"id":              merchant.ID,
+				"organization_id": merchant.OrganizationID,
+				"name":            merchant.Name,
+				"key_id":          merchant.KeyID,
+				"api_key":         fullKey, // User sees the key immediately but it's not active yet
+				"status":          merchant.Status,
+				"created_at":      merchant.CreatedAt,
+			})
+		}
+
 		return c.Status(201).JSON(fiber.Map{
 			"id":              merchant.ID,
 			"organization_id": merchant.OrganizationID,
 			"name":            merchant.Name,
 			"key_id":          merchant.KeyID,
 			"api_key":         fullKey,
-			"is_active":       merchant.IsActive,
+			"status":          merchant.Status,
 			"created_at":      merchant.CreatedAt,
 		})
 	}

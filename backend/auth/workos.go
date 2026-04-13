@@ -257,8 +257,8 @@ func ensureUserPersonalOrganizationTx(ctx context.Context, tx pgx.Tx, userWorkos
 	personalOrgName := fmt.Sprintf("%s's Personal Organization", userName)
 
 	err = tx.QueryRow(ctx, `
-		INSERT INTO organizations (name, created_at)
-		VALUES ($1, NOW())
+		INSERT INTO organizations (name, is_personal, created_at)
+		VALUES ($1, true, NOW())
 		RETURNING id`,
 		personalOrgName).Scan(&personalOrgID)
 	if err != nil {
