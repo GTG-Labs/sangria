@@ -16,7 +16,10 @@ import (
 func CreateMerchantAPIKey(pool *pgxpool.Pool) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		// Get authenticated user from middleware context
-		user := c.Locals("workos_user").(auth.WorkOSUser)
+		user, ok := c.Locals("workos_user").(auth.WorkOSUser)
+		if !ok {
+			return c.Status(500).JSON(fiber.Map{"error": "internal server error"})
+		}
 
 		var req struct {
 			Name string `json:"name"`
@@ -30,7 +33,11 @@ func CreateMerchantAPIKey(pool *pgxpool.Pool) fiber.Handler {
 		}
 
 		// Ensure the user exists in the database first
-		if _, err := dbengine.UpsertUser(c.Context(), pool, "Admin Created", user.ID); err != nil {
+		owner := user.Email
+		if user.FirstName != "" && user.LastName != "" {
+			owner = user.FirstName + " " + user.LastName
+		}
+		if _, err := dbengine.UpsertUser(c.Context(), pool, owner, user.ID); err != nil {
 			slog.Error("upsert user", "user_id", user.ID, "error", err)
 			return c.Status(500).JSON(fiber.Map{"error": "failed to create user"})
 		}

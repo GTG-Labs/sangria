@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
-	"math"
 	"strconv"
 
 	"github.com/gofiber/fiber/v3"
@@ -24,19 +23,17 @@ const maxTimeoutSeconds = 60
 func GeneratePayment(pool *pgxpool.Pool) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var req struct {
-			Amount      float64 `json:"amount"`
-			Description string  `json:"description"`
-			Resource    string  `json:"resource"`
+			Amount      int64  `json:"amount"`
+			Description string `json:"description"`
+			Resource    string `json:"resource"`
 		}
 		if err := c.Bind().JSON(&req); err != nil {
 			return c.Status(400).JSON(fiber.Map{"error": "invalid request body"})
 		}
 
-		// Convert dollar amount to microunits (USDC has 6 decimals).
-		if math.IsInf(req.Amount, 0) || math.IsNaN(req.Amount) || req.Amount <= 0 || req.Amount > 9_000_000_000_000 {
-			return c.Status(400).JSON(fiber.Map{"error": "amount must be a positive number within a valid range"})
+		if req.Amount <= 0 {
+			return c.Status(400).JSON(fiber.Map{"error": "amount must be a positive integer (microunits)"})
 		}
-		amountMicro := int64(math.Round(req.Amount * 1e6))
 
 		// Hardcoded: USDC on Base (change to "base" for mainnet).
 		const network = "base"
@@ -52,7 +49,7 @@ func GeneratePayment(pool *pgxpool.Pool) fiber.Handler {
 			return c.Status(500).JSON(fiber.Map{"error": "no wallet available for this network"})
 		}
 
-		slog.Info("generate payment: terms issued", "network", netConfig.CAIP2, "amount_micro", amountMicro)
+		slog.Info("generate payment: terms issued", "network", netConfig.CAIP2, "amount_micro", req.Amount)
 
 		return c.Status(200).JSON(fiber.Map{
 			"x402Version": 2,
@@ -60,7 +57,7 @@ func GeneratePayment(pool *pgxpool.Pool) fiber.Handler {
 				{
 					Scheme:            "exact",
 					Network:           netConfig.CAIP2,
-					Amount:            strconv.FormatInt(amountMicro, 10),
+					Amount:            strconv.FormatInt(req.Amount, 10),
 					Asset:             netConfig.USDCAddress,
 					PayTo:             wallet.Address,
 					MaxTimeoutSeconds: maxTimeoutSeconds,
@@ -96,7 +93,10 @@ type payloadEnvelope struct {
 // verifies and settles via the facilitator, then writes the ledger.
 func SettlePayment(pool *pgxpool.Pool) fiber.Handler {
 	return func(c fiber.Ctx) error {
-		merchant := c.Locals("merchant_api_key").(*dbengine.Merchant)
+		merchant, ok := c.Locals("merchant_api_key").(*dbengine.Merchant)
+		if !ok || merchant == nil {
+			return c.Status(500).JSON(fiber.Map{"error": "internal server error"})
+		}
 
 		var req struct {
 			PaymentPayload string `json:"payment_payload"`
@@ -194,6 +194,10 @@ func SettlePayment(pool *pgxpool.Pool) fiber.Handler {
 		// Calculate platform fee.
 		fee := config.PlatformFee.CalculateFee(amount)
 		merchantAmount := amount - fee
+		if merchantAmount <= 0 {
+			slog.Error("settle payment: fee exceeds payment amount", "amount_micro", amount, "fee_micro", fee)
+			return c.Status(400).JSON(fiber.Map{"error": "payment amount too small to cover platform fee"})
+		}
 
 		// Attach stable fields to a child logger for the entire settle flow.
 		// Payer address is intentionally omitted to avoid building a correlation record.

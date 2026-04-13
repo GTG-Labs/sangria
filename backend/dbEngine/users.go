@@ -7,8 +7,6 @@ import (
 )
 
 // UpsertUser creates or updates a user (WorkOS identity) and returns the full row.
-// Note: role is NOT updated on conflict — it's only set at creation time (defaults to "member").
-// To change a user's role, use a direct UPDATE query.
 func UpsertUser(ctx context.Context, pool *pgxpool.Pool, owner, workosID string) (User, error) {
 	var u User
 	err := pool.QueryRow(ctx,
@@ -16,9 +14,9 @@ func UpsertUser(ctx context.Context, pool *pgxpool.Pool, owner, workosID string)
 		 VALUES ($1, $2)
 		 ON CONFLICT (workos_id) DO UPDATE
 		 	SET owner = EXCLUDED.owner
-		 RETURNING workos_id, owner, role, created_at, updated_at`,
+		 RETURNING workos_id, owner, created_at, updated_at`,
 		owner, workosID,
-	).Scan(&u.WorkosID, &u.Owner, &u.Role, &u.CreatedAt, &u.UpdatedAt)
+	).Scan(&u.WorkosID, &u.Owner, &u.CreatedAt, &u.UpdatedAt)
 	return u, err
 }
 
@@ -26,9 +24,19 @@ func UpsertUser(ctx context.Context, pool *pgxpool.Pool, owner, workosID string)
 func GetUserByWorkosID(ctx context.Context, pool *pgxpool.Pool, workosID string) (User, error) {
 	var u User
 	err := pool.QueryRow(ctx,
-		`SELECT workos_id, owner, role, created_at, updated_at
+		`SELECT workos_id, owner, created_at, updated_at
 		 FROM users WHERE workos_id = $1`,
 		workosID,
-	).Scan(&u.WorkosID, &u.Owner, &u.Role, &u.CreatedAt, &u.UpdatedAt)
+	).Scan(&u.WorkosID, &u.Owner, &u.CreatedAt, &u.UpdatedAt)
 	return u, err
+}
+
+// IsAdmin returns true if the given WorkOS user ID has an entry in the admins table.
+func IsAdmin(ctx context.Context, pool *pgxpool.Pool, workosID string) (bool, error) {
+	var exists bool
+	err := pool.QueryRow(ctx,
+		`SELECT EXISTS(SELECT 1 FROM admins WHERE user_id = $1)`,
+		workosID,
+	).Scan(&exists)
+	return exists, err
 }

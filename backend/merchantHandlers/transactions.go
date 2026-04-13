@@ -14,7 +14,10 @@ import (
 // GetMerchantBalance handles GET /balance and returns the merchant's USD balance.
 func GetMerchantBalance(pool *pgxpool.Pool) fiber.Handler {
 	return func(c fiber.Ctx) error {
-		user := c.Locals("workos_user").(auth.WorkOSUser)
+		user, ok := c.Locals("workos_user").(auth.WorkOSUser)
+		if !ok {
+			return c.Status(500).JSON(fiber.Map{"error": "internal server error"})
+		}
 
 		balance, err := dbengine.GetAccountBalance(c.Context(), pool, user.ID)
 		if err != nil {
@@ -35,7 +38,10 @@ func GetMerchantBalance(pool *pgxpool.Pool) fiber.Handler {
 // Query params: ?limit=20&cursor=base64_encoded_timestamp
 func GetMerchantTransactions(pool *pgxpool.Pool) fiber.Handler {
 	return func(c fiber.Ctx) error {
-		user := c.Locals("workos_user").(auth.WorkOSUser)
+		user, ok := c.Locals("workos_user").(auth.WorkOSUser)
+		if !ok {
+			return c.Status(500).JSON(fiber.Map{"error": "internal server error"})
+		}
 
 		// Parse pagination params from query string
 		limit, cursor, err := utils.ParsePaginationParams(

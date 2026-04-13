@@ -11,7 +11,10 @@ import (
 // ListAPIKeys handles GET /api-keys
 func ListAPIKeys(pool *pgxpool.Pool) fiber.Handler {
 	return func(c fiber.Ctx) error {
-		user := c.Locals("workos_user").(WorkOSUser)
+		user, ok := c.Locals("workos_user").(WorkOSUser)
+		if !ok {
+			return c.Status(500).JSON(fiber.Map{"error": "internal server error"})
+		}
 
 		apiKeys, err := GetAPIKeysByUserID(c.Context(), pool, user.ID)
 		if err != nil {
@@ -31,7 +34,10 @@ func ListAPIKeys(pool *pgxpool.Pool) fiber.Handler {
 // DeleteAPIKey handles DELETE /api-keys/:id
 func DeleteAPIKey(pool *pgxpool.Pool) fiber.Handler {
 	return func(c fiber.Ctx) error {
-		user := c.Locals("workos_user").(WorkOSUser)
+		user, ok := c.Locals("workos_user").(WorkOSUser)
+		if !ok {
+			return c.Status(500).JSON(fiber.Map{"error": "internal server error"})
+		}
 		keyID := c.Params("id")
 
 		if keyID == "" {

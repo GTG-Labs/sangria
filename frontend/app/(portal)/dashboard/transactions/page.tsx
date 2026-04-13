@@ -1,14 +1,8 @@
-import { withAuth, getSignInUrl } from "@workos-inc/authkit-nextjs";
-import { redirect } from "next/navigation";
+import { withAuth } from "@workos-inc/authkit-nextjs";
 import TransactionsContent from "./TransactionsContent";
 
 export default async function TransactionsPage() {
-  const { user } = await withAuth();
-
-  if (!user) {
-    const signInUrl = await getSignInUrl();
-    redirect(signInUrl);
-  }
+  await withAuth({ ensureSignedIn: true });
 
   return <TransactionsContent />;
 }

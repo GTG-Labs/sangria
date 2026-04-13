@@ -1,17 +1,15 @@
 import Link from "next/link";
 import Image from "next/image";
 
-import { getCachedAuth, getCachedSignInUrl } from "@/lib/auth";
+import { getCachedAuth } from "@/lib/auth";
 import ScrollNav from "./ScrollNav";
 import ArcadeButton from "./ArcadeButton";
+import SignInForm from "./SignInForm";
 import MobileMenu from "./MobileMenu";
 import NavLinks from "./NavLinks";
 
 export default async function Navigation() {
-  const [{ user }, signInUrl] = await Promise.all([
-    getCachedAuth(),
-    getCachedSignInUrl(),
-  ]);
+  const { user } = await getCachedAuth();
 
   return (
     <ScrollNav>
@@ -43,12 +41,14 @@ export default async function Navigation() {
               Go to Dashboard →
             </ArcadeButton>
           ) : (
-            <ArcadeButton href={signInUrl} size="sm">
-              Sign In →
-            </ArcadeButton>
+            <SignInForm className="btn-raised">
+              <span className="px-7 py-2.5 text-xs leading-none">
+                Sign In →
+              </span>
+            </SignInForm>
           )}
         </div>
-        <MobileMenu signInUrl={signInUrl} isLoggedIn={!!user} />
+        <MobileMenu isLoggedIn={!!user} />
       </div>
     </ScrollNav>
   );

@@ -22,17 +22,26 @@ export const accountTypeEnum = pgEnum("account_type", [
   "REVENUE",
   "EXPENSE",
 ]);
-export const userRoleEnum = pgEnum("user_role", ["member", "admin"]);
-
 // this is the pure WorkOS ID users
 export const users = pgTable("users", {
   workosId: text("workos_id").primaryKey(),
   owner: text().notNull(),
-  role: userRoleEnum().notNull().default("member"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+// ---------------------------------------------------------------------------
+// Admins — access control list for Sangria staff
+// ---------------------------------------------------------------------------
+export const admins = pgTable("admins", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => users.workosId),
+  createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
 });

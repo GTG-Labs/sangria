@@ -57,29 +57,27 @@ Frontend (Docs + Merchant dashboard)
 
 ### Layer descriptions
 
-| Layer | Technology | Responsibility |
-| --- | --- | --- |
-| **Client** | Python, HTTPX, x402, `eth_account` | 402 negotiation, external-wallet EIP-712 signing, credit verification |
-| **Orchestration** | Go, CDP SDK | Treasury wallets, server-side ERC-3009 authorization signing, mutexes, settlement, ledger management |
-| **Persistence** | PostgreSQL, Drizzle ORM | User balances, API keys, audit logs |
-| **Infrastructure** | Coinbase Facilitator, Base Blockchain | Gas-free settlement, on-chain USDC transfer |
-| **Frontend** | Next.js 16, React 19, Tailwind CSS 4 | Merchant dashboard, documentation, auth |
+| Layer              | Technology                                 | Responsibility                                                                                                                  |
+| ------------------ | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| **Client**         | TypeScript/Node, Python, SDK core/adapters | 402 negotiation, payload forwarding to orchestration layer, SDK integration (Next.js, Hono, Fastify, Express, FastAPI adapters) |
+| **Orchestration**  | Go, CDP SDK                                | Treasury wallets, server-side ERC-3009 authorization signing, mutexes, settlement, ledger management                            |
+| **Persistence**    | PostgreSQL, Drizzle ORM                    | User balances, API keys, audit logs                                                                                             |
+| **Infrastructure** | Coinbase Facilitator, Base Blockchain      | Gas-free settlement, on-chain USDC transfer                                                                                     |
+| **Frontend**       | Next.js 16, React 19, Tailwind CSS 4       | Merchant dashboard, documentation, auth                                                                                         |
 
 ### Component breakdown
 
 #### Sangria SDK (Client Layer)
 
-A Python client library extending HTTPX with x402 payment capabilities.
+A TypeScript (and Python) **merchant-side** SDK for protecting API endpoints with x402 payment requirements.
 
-- `sangria.post()`, `sangria.get()`, etc. behave like normal HTTP calls.
-- If an endpoint returns `402 Payment Required`, the SDK automatically:
-    1. Reads payment terms from response headers.
-    2. Verifies the user has sufficient Sangria Credits.
-    3. For Sangria-credit flows (Scenario 1), requests a backend-generated **ERC-3009 TransferWithAuthorization** signed server-side by the Treasury wallet; for external raw x402 clients (Scenario 3), the client signs the **ERC-3009 TransferWithAuthorization** with its own wallet.
-    4. Retries the request with the signed payment in the `PAYMENT-SIGNATURE` header.
+- Wraps route handlers across Express, Fastify, Hono, Next.js, and FastAPI.
+- On an incoming request **without** a payment header, the SDK calls the Sangria backend to generate payment requirements and returns a `402 Payment Required` response to the caller.
+- On a retry **with** a `PAYMENT-SIGNATURE` header, the SDK forwards the signed payload to the Sangria backend's settle endpoint and, on success, passes the request through to the protected handler.
 - Supports both `exact` (fixed price) and `upto` (variable price) schemes.
+- Credit verification and client-side ERC-3009 signing are planned future capabilities, not part of the current SDK.
 
-**Key file:** `playground/main.py`
+**Key files:** `sdk/sdk-typescript/src/core.ts`, `sdk/sdk-typescript/src/adapters/`
 
 #### Sangria Backend (Orchestration Layer)
 

@@ -30,7 +30,6 @@ The server starts on the port specified by the `PORT` environment variable (requ
 | `CDP_API_KEY` | Yes | Coinbase Developer Platform API key |
 | `CDP_API_SECRET` | Yes | CDP API secret |
 | `CDP_WALLET_SECRET` | Yes | Encryption key for CDP wallet keys |
-| `ADMIN_API_KEY` | Yes | Shared secret for admin endpoints (generate with `openssl rand -hex 32`) |
 | `X402_FACILITATOR_URL` | Yes | Facilitator URL (testnet: `https://x402.org/facilitator`) |
 | `PLATFORM_FEE_PERCENT` | No | Fee percentage per payment (default: `0`, recommended: `0.5`) |
 | `PLATFORM_FEE_MIN_MICROUNITS` | No | Minimum fee in microunits (default: `0`, recommended: `1000` = $0.001) |
@@ -61,6 +60,7 @@ These are called by the Sangria frontend dashboard. The user logs in via WorkOS 
 | DELETE | `/internal/api-keys/:id` | WorkOS JWT | Revoke an API key |
 | POST | `/internal/withdrawals` | WorkOS JWT | Request a merchant withdrawal (requires merchant_id) |
 | GET | `/internal/withdrawals` | WorkOS JWT | List withdrawals for a merchant (?merchant_id=) |
+| POST | `/internal/withdrawals/:id/cancel` | WorkOS JWT | Cancel a pending withdrawal (merchant self-service) |
 
 ### SDK endpoints — `/v1/*` (API key)
 
@@ -71,17 +71,19 @@ These are called by merchant servers using the Sangria SDK. Authenticated via me
 | POST | `/v1/generate-payment` | API key | Generate x402 PaymentRequired |
 | POST | `/v1/settle-payment` | API key | Verify + settle payment, credit merchant |
 
-### Admin endpoints — `/admin/*` (WorkOS JWT + admin key + admin role)
+### Admin endpoints — `/admin/*` (WorkOS JWT + admins table)
 
-Triple-gated: requires WorkOS JWT, `X-Admin-Key` header, and `role = "admin"` in the database.
+Requires WorkOS JWT and the user must exist in the `admins` table.
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
+| GET | `/admin/me` | Admin | Check admin status (used by Mythos dashboard) |
 | POST | `/admin/wallets/pool` | Admin | Create a CDP wallet in the pool |
 | POST | `/admin/treasury/fund` | Admin | Record a USD treasury deposit (bookkeeping only) |
 | POST | `/admin/withdrawals/:id/approve` | Admin | Approve a pending withdrawal |
 | POST | `/admin/withdrawals/:id/reject` | Admin | Reject and reverse a pending withdrawal |
 | POST | `/admin/withdrawals/:id/complete` | Admin | Mark withdrawal as completed after bank transfer |
+| POST | `/admin/withdrawals/:id/fail` | Admin | Mark withdrawal as failed and reverse balance debit |
 | GET | `/admin/withdrawals` | Admin | List withdrawals (filterable by ?status=) |
 
 ### API key format
@@ -90,12 +92,11 @@ Merchant API keys follow the format `sg_live_<key_id>_<random>` or `sg_test_<key
 
 ### Admin authentication
 
-Admin endpoints require all three:
+Admin endpoints require both:
 1. `Authorization: Bearer <workos-jwt>` header
-2. `X-Admin-Key: <admin-api-key>` header
-3. User's `role = "admin"` in the database
+2. User must exist in the `admins` table
 
-All admin auth failures return a generic `403 Forbidden`.
+Status codes: `401` (missing/invalid JWT), `403` (authenticated but not in admins table), `500` (internal lookup failure).
 
 ## Project structure
 
@@ -120,13 +121,13 @@ backend/
 │   └── hash.go                    # bcrypt hashing + verification
 ├── merchantHandlers/
 │   ├── payments.go                # GeneratePayment, SettlePayment
-│   ├── transactions.go            # GetMerchantTransactions (paginated)
-│   └── withdrawals.go             # RequestWithdrawal, ListWithdrawals
+│   ├── transactions.go            # GetMerchantBalance, GetMerchantTransactions (paginated)
+│   └── withdrawals.go             # RequestWithdrawal, ListWithdrawals, CancelWithdrawal
 ├── adminHandlers/
 │   ├── merchants.go               # CreateMerchantAPIKey
 │   ├── wallets.go                 # CreateWalletPool
 │   ├── treasury.go               # FundTreasury
-│   └── withdrawals.go             # ApproveWithdrawal, RejectWithdrawal, CompleteWithdrawal
+│   └── withdrawals.go             # ApproveWithdrawal, RejectWithdrawal, CompleteWithdrawal, FailWithdrawal
 ├── dbEngine/
 │   ├── models.go                  # All Go types + enums
 │   ├── engine.go                  # DB connection pool
@@ -134,6 +135,7 @@ backend/
 │   ├── merchants.go               # GetMerchantByID, EnsureUSDLiabilityAccount
 │   ├── cryptoWallets.go           # CreateCryptoWalletWithAccount, GetWalletByNetwork/Address
 │   ├── withdrawals.go             # CreateWithdrawal, Approve/Reject/Complete/FailWithdrawal
+│   ├── validation.go              # Shared input validation (ValidateAmountAndFee)
 │   ├── transaction.go             # Double-entry ledger (InsertTransaction, validateZeroNet)
 │   ├── users.go                   # User CRUD
 │   └── queries.go                 # Transaction queries (paginated)
@@ -161,12 +163,58 @@ backend/
 ## How withdrawals work
 
 1. Merchant requests withdrawal from the dashboard (`POST /internal/withdrawals`)
-2. Balance is debited immediately (prevents overdraw)
-3. If amount <= $200: auto-approved. If > $200: goes to `pending_approval`
-4. Admin reviews pending withdrawals via `GET /admin/withdrawals?status=pending_approval`
-5. Admin approves or rejects. Rejection reverses the balance debit.
-6. After manual bank transfer, admin marks as completed (`POST /admin/withdrawals/:id/complete`)
-7. Completion ledger entry moves funds from Withdrawal Clearing to USD Merchant Pool
+2. Balance is debited immediately and held in Withdrawal Clearing (prevents overdraw)
+3. If amount <= auto-approve threshold ($200 default): auto-approved. Otherwise: `pending_approval`
+4. Merchant can self-cancel while pending (`POST /internal/withdrawals/:id/cancel`). Cancellation reverses the balance debit.
+5. Admin reviews pending withdrawals via `GET /admin/withdrawals?status=pending_approval`
+6. Admin approves (`/approve`) or rejects (`/reject`). Rejection reverses the balance debit.
+7. Admin sends the bank transfer manually (outside Sangria)
+8. If transfer lands: admin marks as completed (`/complete`). Completion splits the ledger — net amount exits the merchant pool, fee goes to platform revenue.
+9. If transfer bounces: admin marks as failed (`/fail`). Failure reverses the balance debit, restoring the merchant's funds.
+
+### Withdrawal lifecycle
+
+```
+                          +-----------+
+                          |  pending  |
+                     +--->| _approval |---+---+
+                     |    +-----------+   |   |
+                     |         |          |   |
+               auto-approve   | approve  |   | merchant cancel
+                     |         v          |   | OR admin reject
+                     |    +---------+     v   v
+                     +--->| approved|  +----------+
+                          +---------+  | canceled |
+                               |       +----------+
+                   bank transfer attempted
+                          /          \
+                    success          failure
+                       v                v
+                 +-----------+    +--------+
+                 | completed |    | failed |
+                 +-----------+    +--------+
+```
+
+| Status | Meaning | Ledger state |
+|---|---|---|
+| `pending_approval` | Awaiting admin review | Merchant debited, clearing credited |
+| `approved` | Approved, ready for bank transfer | Same as above |
+| `processing` | Bank transfer in progress (future use) | Same as above |
+| `completed` | Bank transfer landed | Clearing debited, merchant pool credited (net), fee revenue credited (fee) |
+| `failed` | Bank transfer bounced | Debit reversed — merchant credited back, clearing debited |
+| `canceled` | Rejected by admin | Debit reversed — merchant credited back, clearing debited |
+| `reversed` | Reserved for future use | — |
+
+### Future: automated off-ramp
+
+The current flow requires manual admin action for bank transfers. This is temporary. The target architecture:
+
+1. Merchant requests withdrawal
+2. System auto-approves (or flags for review if above threshold)
+3. System calls Bridge/ACH provider to initiate the bank transfer
+4. Provider sends a webhook — success triggers `CompleteWithdrawal`, failure triggers `FailWithdrawal`
+
+The admin endpoints (approve, reject, complete, fail) remain as manual override controls for when automation breaks, a transfer gets stuck, or compliance needs to intervene.
 
 ## Schema-first workflow
 

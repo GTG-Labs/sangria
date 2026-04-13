@@ -16,7 +16,10 @@ import (
 // Admin approves a pending withdrawal.
 func ApproveWithdrawal(pool *pgxpool.Pool) fiber.Handler {
 	return func(c fiber.Ctx) error {
-		admin := c.Locals("workos_user").(auth.WorkOSUser)
+		admin, ok := c.Locals("workos_user").(auth.WorkOSUser)
+		if !ok {
+			return c.Status(500).JSON(fiber.Map{"error": "internal server error"})
+		}
 		withdrawalID := c.Params("id")
 
 		var req struct {
@@ -52,7 +55,10 @@ func ApproveWithdrawal(pool *pgxpool.Pool) fiber.Handler {
 // Admin rejects a pending withdrawal and reverses the balance debit.
 func RejectWithdrawal(pool *pgxpool.Pool) fiber.Handler {
 	return func(c fiber.Ctx) error {
-		admin := c.Locals("workos_user").(auth.WorkOSUser)
+		admin, ok := c.Locals("workos_user").(auth.WorkOSUser)
+		if !ok {
+			return c.Status(500).JSON(fiber.Map{"error": "internal server error"})
+		}
 		withdrawalID := c.Params("id")
 
 		var req struct {
@@ -95,6 +101,41 @@ func CompleteWithdrawal(pool *pgxpool.Pool) fiber.Handler {
 			}
 			slog.Error("complete withdrawal", "withdrawal_id", withdrawalID, "error", err)
 			return c.Status(500).JSON(fiber.Map{"error": "failed to complete withdrawal"})
+		}
+
+		withdrawal, err := dbengine.GetWithdrawalByID(c.Context(), pool, withdrawalID)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "failed to fetch withdrawal"})
+		}
+
+		return c.JSON(withdrawal)
+	}
+}
+
+// FailWithdrawal handles POST /admin/withdrawals/:id/fail.
+// Admin marks a withdrawal as failed (e.g., bank transfer bounced) and reverses the balance debit.
+func FailWithdrawal(pool *pgxpool.Pool) fiber.Handler {
+	return func(c fiber.Ctx) error {
+		withdrawalID := c.Params("id")
+
+		var req struct {
+			FailureCode    string `json:"failure_code"`
+			FailureMessage string `json:"failure_message"`
+		}
+		if err := c.Bind().JSON(&req); err != nil {
+			return c.Status(400).JSON(fiber.Map{"error": fmt.Sprintf("invalid request body: %v", err)})
+		}
+
+		if req.FailureCode == "" {
+			return c.Status(400).JSON(fiber.Map{"error": "failure_code is required"})
+		}
+
+		if err := dbengine.FailWithdrawal(c.Context(), pool, withdrawalID, req.FailureCode, req.FailureMessage); err != nil {
+			if errors.Is(err, dbengine.ErrWithdrawalNotFound) {
+				return c.Status(400).JSON(fiber.Map{"error": "withdrawal not found or not in approved/processing state"})
+			}
+			slog.Error("fail withdrawal", "withdrawal_id", withdrawalID, "error", err)
+			return c.Status(500).JSON(fiber.Map{"error": "failed to mark withdrawal as failed"})
 		}
 
 		withdrawal, err := dbengine.GetWithdrawalByID(c.Context(), pool, withdrawalID)

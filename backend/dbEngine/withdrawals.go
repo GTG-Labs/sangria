@@ -122,14 +122,9 @@ func CreateWithdrawal(
 	}
 
 	// Look up the withdrawal clearing system account.
-	var clearingAcctID string
-	err = tx.QueryRow(ctx,
-		`SELECT id FROM accounts
-		 WHERE name = $1 AND currency = 'USD' AND user_id IS NULL`,
-		SystemAccountWithdrawalClearing,
-	).Scan(&clearingAcctID)
+	clearingAcctID, err := getSystemAccountIDTx(ctx, tx, SystemAccountWithdrawalClearing)
 	if err != nil {
-		return Withdrawal{}, fmt.Errorf("get withdrawal clearing account: %w", err)
+		return Withdrawal{}, err
 	}
 
 	// Generate withdrawal ID upfront so we can use it in the idempotency key.
@@ -147,7 +142,6 @@ func CreateWithdrawal(
 	err = tx.QueryRow(ctx,
 		`INSERT INTO transactions (idempotency_key)
 		 VALUES ($1)
-		 ON CONFLICT (idempotency_key) DO NOTHING
 		 RETURNING id`,
 		ledgerIdempotencyKey,
 	).Scan(&txnID)
@@ -298,6 +292,81 @@ func ApproveWithdrawal(ctx context.Context, pool *pgxpool.Pool, withdrawalID, ad
 	return nil
 }
 
+// getSystemAccountIDTx looks up a system account's ID within an existing transaction.
+func getSystemAccountIDTx(ctx context.Context, tx pgx.Tx, name string) (string, error) {
+	var id string
+	err := tx.QueryRow(ctx,
+		`SELECT id FROM accounts WHERE name = $1 AND currency = 'USD' AND user_id IS NULL`,
+		name,
+	).Scan(&id)
+	if err != nil {
+		return "", fmt.Errorf("get system account %q: %w", name, err)
+	}
+	return id, nil
+}
+
+// getMerchantLiabilityAccountIDTx looks up a merchant's USD LIABILITY account ID within an existing transaction.
+func getMerchantLiabilityAccountIDTx(ctx context.Context, tx pgx.Tx, merchantID string) (string, error) {
+	var id string
+	err := tx.QueryRow(ctx,
+		`SELECT a.id FROM accounts a
+		 JOIN merchants m ON m.user_id = a.user_id
+		 WHERE m.id = $1 AND a.type = 'LIABILITY' AND a.currency = 'USD'`,
+		merchantID,
+	).Scan(&id)
+	if err != nil {
+		return "", fmt.Errorf("get merchant liability account: %w", err)
+	}
+	return id, nil
+}
+
+// writeReversalLedgerEntries is the shared reversal logic used by reject, cancel,
+// and fail. Looks up the merchant and clearing accounts, then writes the reversal
+// ledger entries (debit clearing, credit merchant). Returns the reversal
+// transaction ID. Must be called within an existing DB transaction.
+func writeReversalLedgerEntries(ctx context.Context, tx pgx.Tx, w Withdrawal, idempotencyKey string) (string, error) {
+	merchantAcctID, err := getMerchantLiabilityAccountIDTx(ctx, tx, w.MerchantID)
+	if err != nil {
+		return "", err
+	}
+
+	clearingAcctID, err := getSystemAccountIDTx(ctx, tx, SystemAccountWithdrawalClearing)
+	if err != nil {
+		return "", err
+	}
+
+	var txnID string
+	err = tx.QueryRow(ctx,
+		`INSERT INTO transactions (idempotency_key) VALUES ($1) RETURNING id`,
+		idempotencyKey,
+	).Scan(&txnID)
+	if err != nil {
+		return "", fmt.Errorf("insert reversal transaction: %w", err)
+	}
+
+	// DEBIT clearing (unwind the hold).
+	_, err = tx.Exec(ctx,
+		`INSERT INTO ledger_entries (transaction_id, currency, amount, direction, account_id)
+		 VALUES ($1, 'USD', $2, 'DEBIT', $3)`,
+		txnID, w.Amount, clearingAcctID,
+	)
+	if err != nil {
+		return "", fmt.Errorf("insert reversal debit: %w", err)
+	}
+
+	// CREDIT merchant (restore balance).
+	_, err = tx.Exec(ctx,
+		`INSERT INTO ledger_entries (transaction_id, currency, amount, direction, account_id)
+		 VALUES ($1, 'USD', $2, 'CREDIT', $3)`,
+		txnID, w.Amount, merchantAcctID,
+	)
+	if err != nil {
+		return "", fmt.Errorf("insert reversal credit: %w", err)
+	}
+
+	return txnID, nil
+}
+
 // RejectWithdrawal transitions a withdrawal from pending_approval to canceled
 // and reverses the balance debit.
 func RejectWithdrawal(ctx context.Context, pool *pgxpool.Pool, withdrawalID, adminUserID, note string) error {
@@ -307,7 +376,6 @@ func RejectWithdrawal(ctx context.Context, pool *pgxpool.Pool, withdrawalID, adm
 	}
 	defer tx.Rollback(ctx)
 
-	// Load the withdrawal and verify it's pending.
 	var w Withdrawal
 	w, err = scanWithdrawal(tx.QueryRow(ctx,
 		fmt.Sprintf(`SELECT %s FROM withdrawals WHERE id = $1 AND status = 'pending_approval' FOR UPDATE`, withdrawalColumns),
@@ -320,66 +388,56 @@ func RejectWithdrawal(ctx context.Context, pool *pgxpool.Pool, withdrawalID, adm
 		return fmt.Errorf("load withdrawal for rejection: %w", err)
 	}
 
-	// Look up accounts for reversal.
-	var merchantAcctID string
-	err = tx.QueryRow(ctx,
-		`SELECT a.id FROM accounts a
-		 JOIN merchants m ON m.user_id = a.user_id
-		 WHERE m.id = $1 AND a.type = 'LIABILITY' AND a.currency = 'USD'`,
-		w.MerchantID,
-	).Scan(&merchantAcctID)
+	txnID, err := writeReversalLedgerEntries(ctx, tx, w, fmt.Sprintf("withdrawal-reversal-%s", withdrawalID))
 	if err != nil {
-		return fmt.Errorf("get merchant account: %w", err)
+		return err
 	}
 
-	var clearingAcctID string
-	err = tx.QueryRow(ctx,
-		`SELECT id FROM accounts
-		 WHERE name = $1 AND currency = 'USD' AND user_id IS NULL`,
-		SystemAccountWithdrawalClearing,
-	).Scan(&clearingAcctID)
-	if err != nil {
-		return fmt.Errorf("get clearing account: %w", err)
-	}
-
-	// Write reversal ledger entry.
-	reversalKey := fmt.Sprintf("withdrawal-reversal-%s", withdrawalID)
-	var txnID string
-	err = tx.QueryRow(ctx,
-		`INSERT INTO transactions (idempotency_key) VALUES ($1) RETURNING id`,
-		reversalKey,
-	).Scan(&txnID)
-	if err != nil {
-		return fmt.Errorf("insert reversal transaction: %w", err)
-	}
-
-	// DEBIT clearing (unwind the hold).
-	_, err = tx.Exec(ctx,
-		`INSERT INTO ledger_entries (transaction_id, currency, amount, direction, account_id)
-		 VALUES ($1, 'USD', $2, 'DEBIT', $3)`,
-		txnID, w.Amount, clearingAcctID,
-	)
-	if err != nil {
-		return fmt.Errorf("insert reversal debit: %w", err)
-	}
-
-	// CREDIT merchant (restore balance).
-	_, err = tx.Exec(ctx,
-		`INSERT INTO ledger_entries (transaction_id, currency, amount, direction, account_id)
-		 VALUES ($1, 'USD', $2, 'CREDIT', $3)`,
-		txnID, w.Amount, merchantAcctID,
-	)
-	if err != nil {
-		return fmt.Errorf("insert reversal credit: %w", err)
-	}
-
-	// Update withdrawal status.
 	_, err = tx.Exec(ctx,
 		`UPDATE withdrawals
 		 SET status = $1, reviewed_by = $2, reviewed_at = NOW(), review_note = $3,
 		     canceled_at = NOW(), reversal_transaction_id = $4
 		 WHERE id = $5`,
 		WithdrawalStatusCanceled, adminUserID, note, txnID, withdrawalID,
+	)
+	if err != nil {
+		return fmt.Errorf("update withdrawal: %w", err)
+	}
+
+	return tx.Commit(ctx)
+}
+
+// CancelWithdrawal allows a merchant to cancel their own pending_approval withdrawal.
+// Verifies the withdrawal belongs to the given merchant before reversing.
+func CancelWithdrawal(ctx context.Context, pool *pgxpool.Pool, withdrawalID, merchantID string) error {
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	var w Withdrawal
+	w, err = scanWithdrawal(tx.QueryRow(ctx,
+		fmt.Sprintf(`SELECT %s FROM withdrawals WHERE id = $1 AND merchant_id = $2 AND status = 'pending_approval' FOR UPDATE`, withdrawalColumns),
+		withdrawalID, merchantID,
+	))
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrWithdrawalNotFound
+		}
+		return fmt.Errorf("load withdrawal for cancellation: %w", err)
+	}
+
+	txnID, err := writeReversalLedgerEntries(ctx, tx, w, fmt.Sprintf("withdrawal-cancel-%s", withdrawalID))
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.Exec(ctx,
+		`UPDATE withdrawals
+		 SET status = $1, canceled_at = NOW(), reversal_transaction_id = $2
+		 WHERE id = $3`,
+		WithdrawalStatusCanceled, txnID, withdrawalID,
 	)
 	if err != nil {
 		return fmt.Errorf("update withdrawal: %w", err)
@@ -412,32 +470,21 @@ func CompleteWithdrawal(ctx context.Context, pool *pgxpool.Pool, withdrawalID st
 	}
 
 	// Look up system accounts.
-	var clearingAcctID, poolAcctID string
-	err = tx.QueryRow(ctx,
-		`SELECT id FROM accounts WHERE name = $1 AND currency = 'USD' AND user_id IS NULL`,
-		SystemAccountWithdrawalClearing,
-	).Scan(&clearingAcctID)
+	clearingAcctID, err := getSystemAccountIDTx(ctx, tx, SystemAccountWithdrawalClearing)
 	if err != nil {
-		return fmt.Errorf("get clearing account: %w", err)
+		return err
 	}
 
-	err = tx.QueryRow(ctx,
-		`SELECT id FROM accounts WHERE name = $1 AND currency = 'USD' AND user_id IS NULL`,
-		SystemAccountUSDMerchantPool,
-	).Scan(&poolAcctID)
+	poolAcctID, err := getSystemAccountIDTx(ctx, tx, SystemAccountUSDMerchantPool)
 	if err != nil {
-		return fmt.Errorf("get merchant pool account: %w", err)
+		return err
 	}
 
-	// Look up fee revenue account (needed when fee > 0).
 	var feeRevenueAcctID string
 	if w.Fee > 0 {
-		err = tx.QueryRow(ctx,
-			`SELECT id FROM accounts WHERE name = $1 AND currency = 'USD' AND user_id IS NULL`,
-			SystemAccountPlatformFeeRevenue,
-		).Scan(&feeRevenueAcctID)
+		feeRevenueAcctID, err = getSystemAccountIDTx(ctx, tx, SystemAccountPlatformFeeRevenue)
 		if err != nil {
-			return fmt.Errorf("get fee revenue account: %w", err)
+			return err
 		}
 	}
 
@@ -506,7 +553,6 @@ func FailWithdrawal(ctx context.Context, pool *pgxpool.Pool, withdrawalID, failu
 	}
 	defer tx.Rollback(ctx)
 
-	// Load and lock the withdrawal.
 	var w Withdrawal
 	w, err = scanWithdrawal(tx.QueryRow(ctx,
 		fmt.Sprintf(`SELECT %s FROM withdrawals WHERE id = $1 AND status IN ('approved', 'processing') FOR UPDATE`, withdrawalColumns),
@@ -519,59 +565,11 @@ func FailWithdrawal(ctx context.Context, pool *pgxpool.Pool, withdrawalID, failu
 		return fmt.Errorf("load withdrawal for failure: %w", err)
 	}
 
-	// Look up accounts for reversal.
-	var merchantAcctID string
-	err = tx.QueryRow(ctx,
-		`SELECT a.id FROM accounts a
-		 JOIN merchants m ON m.user_id = a.user_id
-		 WHERE m.id = $1 AND a.type = 'LIABILITY' AND a.currency = 'USD'`,
-		w.MerchantID,
-	).Scan(&merchantAcctID)
+	txnID, err := writeReversalLedgerEntries(ctx, tx, w, fmt.Sprintf("withdrawal-failure-%s", withdrawalID))
 	if err != nil {
-		return fmt.Errorf("get merchant account: %w", err)
+		return err
 	}
 
-	var clearingAcctID string
-	err = tx.QueryRow(ctx,
-		`SELECT id FROM accounts WHERE name = $1 AND currency = 'USD' AND user_id IS NULL`,
-		SystemAccountWithdrawalClearing,
-	).Scan(&clearingAcctID)
-	if err != nil {
-		return fmt.Errorf("get clearing account: %w", err)
-	}
-
-	// Write reversal ledger entry.
-	reversalKey := fmt.Sprintf("withdrawal-reversal-%s", withdrawalID)
-	var txnID string
-	err = tx.QueryRow(ctx,
-		`INSERT INTO transactions (idempotency_key) VALUES ($1) RETURNING id`,
-		reversalKey,
-	).Scan(&txnID)
-	if err != nil {
-		return fmt.Errorf("insert reversal transaction: %w", err)
-	}
-
-	// DEBIT clearing (unwind the hold).
-	_, err = tx.Exec(ctx,
-		`INSERT INTO ledger_entries (transaction_id, currency, amount, direction, account_id)
-		 VALUES ($1, 'USD', $2, 'DEBIT', $3)`,
-		txnID, w.Amount, clearingAcctID,
-	)
-	if err != nil {
-		return fmt.Errorf("insert reversal debit: %w", err)
-	}
-
-	// CREDIT merchant (restore balance).
-	_, err = tx.Exec(ctx,
-		`INSERT INTO ledger_entries (transaction_id, currency, amount, direction, account_id)
-		 VALUES ($1, 'USD', $2, 'CREDIT', $3)`,
-		txnID, w.Amount, merchantAcctID,
-	)
-	if err != nil {
-		return fmt.Errorf("insert reversal credit: %w", err)
-	}
-
-	// Update withdrawal status.
 	_, err = tx.Exec(ctx,
 		`UPDATE withdrawals
 		 SET status = $1, failed_at = NOW(), failure_code = $2, failure_message = $3,

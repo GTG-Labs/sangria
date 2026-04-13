@@ -40,7 +40,7 @@ This is what makes x402 practical: app developers can stay HTTP-native while sti
 
 The ad/subscription model was a workaround for broken internet payments. But AI-native traffic is changing the economics of the web:
 
-- Agents don’t click ads.
+- Agents don't click ads.
 - Workflows need machine-speed transactions.
 - Services increasingly want pay-per-use monetization, not coarse monthly plans.
 
@@ -50,18 +50,9 @@ x402 enables pricing at request granularity: per API call, per data lookup, per 
 
 x402 defines **payment negotiation and transport**. Sangria focuses on **execution, merchant usability, and operational reliability** for real-world deployments.
 
-Based on Sangria's architecture, we support three practical payment scenarios:
+Today, Sangria supports external clients paying USDC on-chain to merchants hosted on the platform. Sangria receives the on-chain payment, verifies settlement, and credits the merchant's fiat balance — so merchants never need to handle crypto directly.
 
-1. **Client on Sangria, merchant external**  
-   The client pays in Sangria Credits; Sangria’s treasury handles USDC settlement to the external merchant over x402-compatible flows.
-
-2. **Client and merchant both on Sangria**  
-   Settlement can happen as an internal ledger/database transfer for speed and cost efficiency, with no unnecessary on-chain hop.
-
-3. **Client external, merchant on Sangria**  
-   Sangria receives USDC into treasury rails, then handles merchant-facing payout/settlement pathways cleanly.
-
-This model gives merchants better interoperability while insulating end users from unnecessary crypto complexity.
+This model gives merchants reliable interoperability while insulating them from unnecessary crypto complexity.
 
 ## Why This Matters for AI Agents
 
@@ -81,8 +72,8 @@ In short: x402 supplies the protocol primitive, while Sangria delivers productio
 
 ## Conclusion
 
-x402 is a real attempt to solve one of the web’s oldest missing pieces: low-friction native payments for digital requests.
+x402 is a real attempt to solve one of the web's oldest missing pieces: low-friction native payments for digital requests.
 
 As usage shifts toward autonomous software and pay-per-action services, protocols like x402 become foundational. Sangria builds on that foundation to make these flows practical for both developers and merchants—without forcing users to become crypto experts.
 
-The next internet payment layer is not about bigger checkout pages. It’s about programmable value exchange at request speed.
+The next internet payment layer is not about bigger checkout pages. It's about money moving autonomously at the speed of of a HTTP request.
