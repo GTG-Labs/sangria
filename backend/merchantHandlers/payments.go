@@ -95,6 +95,10 @@ type payloadEnvelope struct {
 // writes a pending ledger entry, verifies and settles via the facilitator,
 // then confirms the ledger. This ordering ensures the ledger is never
 // missing a record for an on-chain settlement.
+//
+// TODO: Reconcile against the chain, not the facilitator. Confirm ledger rows
+// by querying USDC.authorizationState(from, nonce) on Base directly, and add a
+// background job to resolve stale pending rows using on-chain state.
 func SettlePayment(pool *pgxpool.Pool) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		merchant, ok := c.Locals("merchant_api_key").(*dbengine.Merchant)
