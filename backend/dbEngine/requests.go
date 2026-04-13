@@ -248,7 +248,10 @@ func AcceptInvitation(ctx context.Context, pool *pgxpool.Pool, token, userID str
 		return fmt.Errorf("failed to update invitation status: %w", err)
 	}
 
-	return tx.Commit(ctx)
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("failed to commit invitation acceptance: %w", err)
+	}
+	return nil
 }
 
 // DeclineInvitation declines a pending invitation.
