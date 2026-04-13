@@ -48,6 +48,7 @@ Defined in `schema.ts`. All tables use UUID primary keys with `defaultRandom()`.
 
 | Enum | Values |
 |---|---|
+| `transaction_status` | pending, confirmed, failed |
 | `direction` | DEBIT, CREDIT |
 | `currency` | USD, USDC, ETH |
 | `account_type` | ASSET, LIABILITY, EQUITY, REVENUE, EXPENSE |
@@ -89,7 +90,8 @@ Defined in `schema.ts`. All tables use UUID primary keys with `defaultRandom()`.
 |---|---|---|
 | id | uuid | Primary key |
 | idempotency_key | varchar(255) | NOT NULL, UNIQUE |
-| description | text | Nullable |
+| status | transaction_status | Default 'confirmed' (pending, confirmed, failed) |
+| tx_hash | varchar(255) | Nullable, blockchain tx hash (set on confirm) |
 | created_at | timestamp (tz) | Default now() |
 
 **ledger_entries** — append-only journal lines
@@ -148,7 +150,11 @@ Constraints: `UNIQUE(address, network)`, `UNIQUE(account_id)`
 | reversal_transaction_id | uuid | FK → transactions.id |
 | failure_code | varchar(100) | Nullable |
 | failure_message | text | Nullable |
-| reviewed_by | text | Admin workos_id |
+| reviewed_by | text | Admin who approved/rejected |
+| reviewed_at | timestamp (tz) | When approved/rejected |
+| review_note | text | Optional admin note |
+| completed_by | text | Admin who completed the withdrawal |
+| failed_by | text | Admin who marked the withdrawal as failed |
 | idempotency_key | varchar(255) | UNIQUE |
 | created_at + per-status timestamps | timestamp (tz) | approved_at, completed_at, etc. |
 

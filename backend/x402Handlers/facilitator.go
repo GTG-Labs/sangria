@@ -82,7 +82,8 @@ func doFacilitatorRequest(ctx context.Context, method, url, authPath, facilitato
 		}
 
 		if isRetryable(nil, resp.StatusCode) {
-			lastErr = fmt.Errorf("returned %d: %s", resp.StatusCode, string(respBody))
+			slog.Debug("facilitator returned retryable status", "status", resp.StatusCode, "body", string(respBody))
+			lastErr = fmt.Errorf("returned status %d", resp.StatusCode)
 			continue
 		}
 
@@ -193,8 +194,10 @@ func Verify(ctx context.Context, payload json.RawMessage, requirements PaymentRe
 	if err != nil {
 		return nil, fmt.Errorf("facilitator verify: %w", err)
 	}
+
 	if statusCode != http.StatusOK {
-		return nil, fmt.Errorf("facilitator verify returned %d: %s", statusCode, string(respBody))
+		slog.Debug("facilitator verify non-200 response", "status", statusCode, "body", string(respBody))
+		return nil, fmt.Errorf("facilitator verify returned status %d", statusCode)
 	}
 
 	var result VerifyResponse
@@ -226,7 +229,8 @@ func Settle(ctx context.Context, payload json.RawMessage, requirements PaymentRe
 		return nil, fmt.Errorf("facilitator settle: %w", err)
 	}
 	if statusCode != http.StatusOK {
-		return nil, fmt.Errorf("facilitator settle returned %d: %s", statusCode, string(respBody))
+		slog.Debug("facilitator settle non-200 response", "status", statusCode, "body", string(respBody))
+		return nil, fmt.Errorf("facilitator settle returned status %d", statusCode)
 	}
 
 	var result SettleResponse

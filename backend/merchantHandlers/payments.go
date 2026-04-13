@@ -286,6 +286,7 @@ func SettlePayment(pool *pgxpool.Pool) fiber.Handler {
 		}
 		if !verifyResp.IsValid {
 			// Definitive rejection — the facilitator explicitly said no.
+			// Log the raw facilitator reason but return a sanitized message to the client.
 			logger.Warn("settle payment: verify rejected",
 				"reason", verifyResp.InvalidReason,
 				"message", verifyResp.InvalidMessage)
@@ -294,8 +295,8 @@ func SettlePayment(pool *pgxpool.Pool) fiber.Handler {
 			}
 			return c.Status(400).JSON(fiber.Map{
 				"success":       false,
-				"error_reason":  verifyResp.InvalidReason,
-				"error_message": verifyResp.InvalidMessage,
+				"error_reason":  "payment_rejected",
+				"error_message": "payment verification was rejected by the network",
 			})
 		}
 		logger.Info("settle payment: verify ok")
@@ -318,6 +319,7 @@ func SettlePayment(pool *pgxpool.Pool) fiber.Handler {
 		if !settleResp.Success {
 			// Definitive rejection — the facilitator explicitly said no.
 			// On-chain transfer did NOT happen.
+			// Log the raw facilitator reason but return a sanitized message to the client.
 			logger.Warn("settle payment: settle rejected",
 				"reason", settleResp.ErrorReason,
 				"message", settleResp.ErrorMessage)
@@ -326,8 +328,8 @@ func SettlePayment(pool *pgxpool.Pool) fiber.Handler {
 			}
 			return c.Status(400).JSON(fiber.Map{
 				"success":       false,
-				"error_reason":  settleResp.ErrorReason,
-				"error_message": settleResp.ErrorMessage,
+				"error_reason":  "settlement_rejected",
+				"error_message": "payment settlement was rejected by the network",
 			})
 		}
 		logger.Info("settle payment: settled on-chain", "tx", settleResp.Transaction)
