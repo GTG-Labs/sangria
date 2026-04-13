@@ -44,17 +44,21 @@ func ResolveOrganizationContext(ctx context.Context, c fiber.Ctx, pool *pgxpool.
 	// Derive selectedOrgID from request or user's active selection
 	var selectedOrgID string
 
-	// Check for "org_id" parameter first
-	if orgID := c.Query("org_id"); orgID != "" {
-		found := false
+	// Helper function to validate organization membership
+	validateAndSelectOrg := func(queryVal string, memberships []dbengine.Membership) (selected string, ok bool) {
 		for _, membership := range memberships {
-			if membership.OrganizationID == orgID {
-				selectedOrgID = orgID
-				found = true
-				break
+			if membership.OrganizationID == queryVal {
+				return queryVal, true
 			}
 		}
-		if !found {
+		return "", false
+	}
+
+	// Check for "org_id" parameter first
+	if orgID := c.Query("org_id"); orgID != "" {
+		if selected, found := validateAndSelectOrg(orgID, memberships); found {
+			selectedOrgID = selected
+		} else {
 			return OrganizationResolutionResult{
 				HTTPStatus: 400,
 				Error:      "user is not a member of the specified organization",
@@ -62,15 +66,9 @@ func ResolveOrganizationContext(ctx context.Context, c fiber.Ctx, pool *pgxpool.
 		}
 	} else if orgID := c.Query("organization_id"); orgID != "" {
 		// Also check for "organization_id" parameter
-		found := false
-		for _, membership := range memberships {
-			if membership.OrganizationID == orgID {
-				selectedOrgID = orgID
-				found = true
-				break
-			}
-		}
-		if !found {
+		if selected, found := validateAndSelectOrg(orgID, memberships); found {
+			selectedOrgID = selected
+		} else {
 			return OrganizationResolutionResult{
 				HTTPStatus: 400,
 				Error:      "user is not a member of the specified organization",

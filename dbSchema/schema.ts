@@ -32,14 +32,20 @@ export const accountTypeEnum = pgEnum("account_type", [
 // ---------------------------------------------------------------------------
 // Organizations — the main business entities that own accounts and API keys
 // ---------------------------------------------------------------------------
-export const organizations = pgTable("organizations", {
-  id: uuid().primaryKey().defaultRandom(),
-  name: varchar({ length: 255 }).notNull(),
-  isPersonal: boolean("is_personal").notNull().default(false),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
+export const organizations = pgTable(
+  "organizations",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    name: varchar({ length: 255 }).notNull(),
+    isPersonal: boolean("is_personal").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("organizations_name_idx").on(table.name),
+  ],
+);
 
 // this is the pure WorkOS ID users
 export const users = pgTable("users", {

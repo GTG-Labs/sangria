@@ -33,7 +33,7 @@ func ListAPIKeys(pool *pgxpool.Pool) fiber.Handler {
 	}
 }
 
-// DeleteAPIKey handles DELETE /api-keys/:id (admin-only)
+// DeleteAPIKey handles DELETE /api-keys/:id (org admin-only)
 func DeleteAPIKey(pool *pgxpool.Pool) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		user, ok := c.Locals("workos_user").(WorkOSUser)
