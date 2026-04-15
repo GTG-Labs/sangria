@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"os"
+	"strings"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -105,6 +106,7 @@ func handleInvitationAccepted(c fiber.Ctx, pool *pgxpool.Pool, event WorkOSWebho
 		slog.Error("missing user email in webhook", "event_id", event.ID)
 		return c.Status(400).JSON(fiber.Map{"error": "missing user email"})
 	}
+	userEmail = strings.TrimSpace(strings.ToLower(userEmail))
 
 	slog.Info("processing invitation acceptance",
 		"user_id", userID,

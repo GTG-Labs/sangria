@@ -57,7 +57,7 @@ export function OrganizationProvider({ children }: OrganizationProviderProps) {
 
         // Set default organization to personal org or first available
         if (user.organizations && user.organizations.length > 0) {
-          const personalOrg = user.organizations.find((org: any) => org.is_personal);
+          const personalOrg = user.organizations.find((org: Organization) => org.isPersonal);
           const defaultOrg = personalOrg ? personalOrg.id : user.organizations[0].id;
 
           // Use functional state updater and validate prev against refreshed list

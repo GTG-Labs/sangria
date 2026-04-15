@@ -99,25 +99,6 @@ func GetMerchantUSDLiabilityAccount(ctx context.Context, pool *pgxpool.Pool, mer
 	return a, err
 }
 
-// GetPendingMerchantOrgForAdmin returns the organization ID for a pending merchant,
-// but only if the given user is an admin of that organization.
-// Returns ErrNoRows if the merchant doesn't exist, isn't pending, or the user isn't an admin.
-func GetPendingMerchantOrgForAdmin(ctx context.Context, pool *pgxpool.Pool, merchantID, userID string) (string, error) {
-	var orgID string
-	err := pool.QueryRow(ctx, `
-		SELECT m.organization_id
-		FROM merchants m
-		JOIN organization_members om ON m.organization_id = om.organization_id
-		WHERE m.id = $1 AND m.status = 'pending'
-		AND om.user_id = $2 AND om.is_admin = true`,
-		merchantID, userID,
-	).Scan(&orgID)
-	if err != nil {
-		return "", err
-	}
-	return orgID, nil
-}
-
 // UpdatePendingMerchantStatus atomically updates a pending merchant's status,
 // but only if the given user is an admin of the merchant's organization.
 // Returns the number of rows affected (0 means not found or not authorized).

@@ -35,9 +35,21 @@ export default function AcceptInvitationPage() {
         const data = await response.json();
 
         if (response.ok) {
+          setOrganizationId(data.organization_id);
+
+          // Check if user is already logged in — if so, redirect to dashboard
+          try {
+            const meResponse = await fetch("/api/backend/me");
+            if (meResponse.ok) {
+              router.push("/dashboard");
+              return;
+            }
+          } catch {
+            // Not logged in — fall through to show sign-in button
+          }
+
           setStatus("success");
           setMessage(data.message || "Invitation accepted successfully!");
-          setOrganizationId(data.organization_id);
         } else {
           setStatus("error");
           setMessage(data.error || "Failed to accept invitation.");

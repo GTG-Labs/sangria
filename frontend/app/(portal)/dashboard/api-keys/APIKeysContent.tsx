@@ -36,14 +36,16 @@ export default function APIKeysContent() {
   };
 
 
-  const fetchAPIKeys = async (showLoading = true) => {
+  const fetchAPIKeys = async (showLoading = true, signal?: AbortSignal) => {
     if (showLoading) {
       setLoading(true);
     }
 
     try {
       const orgParam = selectedOrgId ? `?org_id=${selectedOrgId}` : "";
-      const response = await fetch(`/api/backend/api-keys${orgParam}`);
+      const response = await fetch(`/api/backend/api-keys${orgParam}`, { signal });
+
+      if (signal?.aborted) return;
 
       if (response.ok) {
         const keys = await response.json();
@@ -60,11 +62,12 @@ export default function APIKeysContent() {
         setApiKeys([]);
       }
     } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") return;
       console.error("Failed to load API keys:", err);
       setError("Failed to load API keys");
       setApiKeys([]);
     } finally {
-      if (showLoading) {
+      if (!signal?.aborted && showLoading) {
         setLoading(false);
       }
     }
@@ -204,19 +207,23 @@ export default function APIKeysContent() {
   const copyNewKey = () => copyToClipboard(newKeyResult!);
 
   useEffect(() => {
-    if (selectedOrgId) {
-      // Reset all form and alert states when switching organizations
-      setShowCreateForm(false);
-      setNewKeyName("");
-      setNewKeyResult(null);
-      setShowNewKey(false);
-      setError(null);
-      setCopiedKey(null);
-      setApprovalLoading(new Set());
+    if (!selectedOrgId) return;
 
-      // Fetch API keys for the new organization
-      fetchAPIKeys();
-    }
+    const controller = new AbortController();
+
+    // Reset all form and alert states when switching organizations
+    setShowCreateForm(false);
+    setNewKeyName("");
+    setNewKeyResult(null);
+    setShowNewKey(false);
+    setError(null);
+    setCopiedKey(null);
+    setApprovalLoading(new Set());
+
+    // Fetch API keys for the new organization
+    fetchAPIKeys(true, controller.signal);
+
+    return () => controller.abort();
   }, [selectedOrgId]);
 
   if (loading) {
