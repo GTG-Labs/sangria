@@ -3,6 +3,7 @@ package adminHandlers
 import (
 	"errors"
 	"log/slog"
+	"strings"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -28,8 +29,12 @@ func CreateMerchantAPIKey(pool *pgxpool.Pool) fiber.Handler {
 			return c.Status(400).JSON(fiber.Map{"error": "invalid request body"})
 		}
 
+		req.Name = strings.TrimSpace(req.Name)
 		if req.Name == "" {
 			return c.Status(400).JSON(fiber.Map{"error": "name is required"})
+		}
+		if len(req.Name) > 255 {
+			return c.Status(400).JSON(fiber.Map{"error": "name must be 255 characters or less"})
 		}
 
 		// Ensure the user exists in the database first

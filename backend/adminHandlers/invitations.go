@@ -171,7 +171,7 @@ func sendInvitationEmail(inviteeEmail, inviterName, orgName, invitationURL, cust
 			}
 			return ""
 		}(),
-		invitationURL)
+		html.EscapeString(invitationURL))
 
 	// Create plain text version
 	plainContent := fmt.Sprintf(`You're invited to join %s!
@@ -261,7 +261,10 @@ func CreateOrganizationInvitation(pool *pgxpool.Pool) fiber.Handler {
 		// Create invitation in database with atomic admin check
 		message := ""
 		if req.Message != nil {
-			message = *req.Message
+			message = strings.TrimSpace(*req.Message)
+			if len(message) > 500 {
+				return c.Status(400).JSON(fiber.Map{"error": "message must be 500 characters or less"})
+			}
 		}
 
 		invitationID, err := dbengine.CreateInvitationWithAdminCheck(c.Context(), pool, orgID, user.ID, req.Email, message, invitationToken)
@@ -315,12 +318,7 @@ func CreateOrganizationInvitation(pool *pgxpool.Pool) fiber.Handler {
 		invitationURL := fmt.Sprintf("%s/accept-invitation?token=%s", baseURL, invitationToken)
 
 		// Send beautiful invitation email via SendGrid
-		customMessage := ""
-		if req.Message != nil {
-			customMessage = *req.Message
-		}
-
-		err = sendInvitationEmail(req.Email, inviterName, orgName, invitationURL, customMessage)
+		err = sendInvitationEmail(req.Email, inviterName, orgName, invitationURL, message)
 		if err != nil {
 			slog.Error("send invitation email", "org_id", orgID, "user_id", user.ID, "email", maskEmail(req.Email), "error", err)
 

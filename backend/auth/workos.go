@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -267,6 +268,7 @@ func CreateOrganization(pool *pgxpool.Pool) fiber.Handler {
 		}
 
 		// Validate organization name
+		req.Name = strings.TrimSpace(req.Name)
 		if req.Name == "" {
 			return c.Status(400).JSON(fiber.Map{"error": "organization name is required"})
 		}

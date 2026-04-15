@@ -5,13 +5,21 @@ import { Copy, Plus, Trash2, AlertCircle, Check, X, Users, Crown } from "lucide-
 import ArcadeButton from "@/components/ArcadeButton";
 import { useOrganization } from "@/contexts/OrganizationContext";
 
+const API_KEY_STATUS = {
+  ACTIVE: "active",
+  PENDING: "pending",
+  INACTIVE: "inactive",
+} as const;
+
+type APIKeyStatus = (typeof API_KEY_STATUS)[keyof typeof API_KEY_STATUS];
+
 interface APIKey {
   id: string;
   organization_id: string;
   name: string;
   key_id: string;
   api_key?: string; // Only present during creation
-  status: 'active' | 'pending' | 'inactive';
+  status: APIKeyStatus;
   last_used_at: string | null;
   created_at: string;
 }
@@ -454,15 +462,15 @@ export default function APIKeysContent() {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span
                         className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-                          key.status === 'active'
+                          key.status === API_KEY_STATUS.ACTIVE
                             ? "bg-green-100 text-green-800"
-                            : key.status === 'pending'
+                            : key.status === API_KEY_STATUS.PENDING
                             ? "bg-yellow-100 text-yellow-800"
                             : "bg-gray-100 text-gray-800"
                         }`}
                       >
-                        {key.status === 'active' ? 'Active' :
-                         key.status === 'pending' ? 'Pending' : 'Inactive'}
+                        {key.status === API_KEY_STATUS.ACTIVE ? 'Active' :
+                         key.status === API_KEY_STATUS.PENDING ? 'Pending' : 'Inactive'}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -476,13 +484,14 @@ export default function APIKeysContent() {
                     <td className="px-6 py-4 whitespace-nowrap text-right">
                       <div className="flex items-center justify-end gap-2">
                         {/* Admin approval actions for pending keys */}
-                        {key.status === 'pending' && selectedOrg?.isAdmin && (
+                        {key.status === API_KEY_STATUS.PENDING && selectedOrg?.isAdmin && (
                           <>
                             <button
                               onClick={() => approveAPIKey(key.id)}
                               disabled={approvalLoading.has(key.id)}
                               className="p-1 text-green-600 hover:text-green-800 disabled:opacity-50 disabled:cursor-not-allowed"
                               title="Approve this API key"
+                              aria-label="Approve this API key"
                             >
                               {approvalLoading.has(key.id) ? (
                                 <div className="w-4 h-4 animate-spin rounded-full border-2 border-green-600 border-t-transparent" />
@@ -495,6 +504,7 @@ export default function APIKeysContent() {
                               disabled={approvalLoading.has(key.id)}
                               className="p-1 text-red-600 hover:text-red-800 disabled:opacity-50 disabled:cursor-not-allowed"
                               title="Reject this API key"
+                              aria-label="Reject this API key"
                             >
                               {approvalLoading.has(key.id) ? (
                                 <div className="w-4 h-4 animate-spin rounded-full border-2 border-red-600 border-t-transparent" />
@@ -506,18 +516,19 @@ export default function APIKeysContent() {
                         )}
 
                         {/* Revoke action for active keys */}
-                        {key.status === 'active' && (
+                        {key.status === API_KEY_STATUS.ACTIVE && (
                           <button
                             onClick={() => revokeAPIKey(key.id)}
                             className="p-1 text-red-600 hover:text-red-800"
                             title="Revoke this API key"
+                            aria-label="Revoke this API key"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
                         )}
 
                         {/* Show status message for pending keys (non-admin users) */}
-                        {key.status === 'pending' && !selectedOrg?.isAdmin && (
+                        {key.status === API_KEY_STATUS.PENDING && !selectedOrg?.isAdmin && (
                           <span className="text-xs text-yellow-600 font-medium">Awaiting approval</span>
                         )}
                       </div>

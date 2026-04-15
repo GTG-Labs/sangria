@@ -14,53 +14,55 @@ export default function AcceptInvitationPage() {
   const [message, setMessage] = useState("");
   const [organizationId, setOrganizationId] = useState<string | null>(null);
 
-  useEffect(() => {
+  const acceptInvitation = async () => {
     if (!token) {
       setStatus("error");
       setMessage("Invalid invitation link. No token found.");
       return;
     }
 
-    // Automatically accept the invitation
-    const acceptInvitation = async () => {
-      try {
-        const response = await fetch("/api/backend/accept-invitation", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ token }),
-        });
+    setStatus("loading");
+    setMessage("");
 
-        const data = await response.json();
+    try {
+      const response = await fetch("/api/backend/accept-invitation", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ token }),
+      });
 
-        if (response.ok) {
-          setOrganizationId(data.organization_id);
+      const data = await response.json();
 
-          // Check if user is already logged in — if so, redirect to dashboard
-          try {
-            const meResponse = await fetch("/api/backend/me");
-            if (meResponse.ok) {
-              router.push("/dashboard");
-              return;
-            }
-          } catch {
-            // Not logged in — fall through to show sign-in button
+      if (response.ok) {
+        setOrganizationId(data.organization_id);
+
+        // Check if user is already logged in — if so, redirect to dashboard
+        try {
+          const meResponse = await fetch("/api/backend/me");
+          if (meResponse.ok) {
+            router.push("/dashboard");
+            return;
           }
-
-          setStatus("success");
-          setMessage(data.message || "Invitation accepted successfully!");
-        } else {
-          setStatus("error");
-          setMessage(data.error || "Failed to accept invitation.");
+        } catch {
+          // Not logged in — fall through to show sign-in button
         }
-      } catch (error) {
-        console.error("Failed to accept invitation:", error);
-        setStatus("error");
-        setMessage("An unexpected error occurred. Please try again.");
-      }
-    };
 
+        setStatus("success");
+        setMessage(data.message || "Invitation accepted successfully!");
+      } else {
+        setStatus("error");
+        setMessage(data.error || "Failed to accept invitation.");
+      }
+    } catch (error) {
+      console.error("Failed to accept invitation:", error);
+      setStatus("error");
+      setMessage("An unexpected error occurred. Please try again.");
+    }
+  };
+
+  useEffect(() => {
     acceptInvitation();
   }, [token]);
 
@@ -112,12 +114,7 @@ export default function AcceptInvitationPage() {
                 <p className="mt-2 text-sm text-gray-600">{message}</p>
                 <div className="mt-6 space-y-3">
                   <button
-                    onClick={() => {
-                      setStatus("loading");
-                      setMessage("");
-                      // Retry the invitation acceptance
-                      window.location.reload();
-                    }}
+                    onClick={() => acceptInvitation()}
                     className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                   >
                     Try Again

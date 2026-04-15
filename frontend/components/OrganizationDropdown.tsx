@@ -9,7 +9,7 @@ export default function OrganizationDropdown() {
   const [isOpen, setIsOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [newOrgName, setNewOrgName] = useState("");
-
+  const [createError, setCreateError] = useState("");
 
   const handleOrganizationSelect = (orgId: string) => {
     setSelectedOrgId(orgId);
@@ -18,6 +18,8 @@ export default function OrganizationDropdown() {
 
   const handleCreateOrganization = async () => {
     if (!newOrgName.trim()) return;
+
+    setCreateError("");
 
     try {
       const response = await fetch("/api/backend/organizations", {
@@ -30,16 +32,18 @@ export default function OrganizationDropdown() {
 
       if (response.ok) {
         const newOrg = await response.json();
-        await refreshUserInfo(); // Refresh the user info to get the new organization
+        await refreshUserInfo();
         setSelectedOrgId(newOrg.id);
         setNewOrgName("");
         setIsCreating(false);
         setIsOpen(false);
       } else {
-        console.error("Failed to create organization");
+        const data = await response.json().catch(() => ({}));
+        setCreateError(data.error || "Failed to create organization");
       }
     } catch (err) {
       console.error("Error creating organization:", err);
+      setCreateError("Failed to create organization");
     }
   };
 
@@ -56,6 +60,9 @@ export default function OrganizationDropdown() {
       {/* Organization Dropdown Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
+        aria-label="Switch organization"
+        aria-expanded={isOpen}
+        aria-haspopup="true"
         className="w-full flex items-center justify-between gap-3 px-3 py-2.5 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors text-left"
       >
         <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -129,10 +136,14 @@ export default function OrganizationDropdown() {
                     } else if (e.key === 'Escape') {
                       setIsCreating(false);
                       setNewOrgName("");
+                      setCreateError("");
                     }
                   }}
                   autoFocus
                 />
+                {createError && (
+                  <p className="text-xs text-red-600 mt-1">{createError}</p>
+                )}
                 <div className="flex items-center gap-2 mt-2">
                   <button
                     onClick={handleCreateOrganization}
@@ -145,6 +156,7 @@ export default function OrganizationDropdown() {
                     onClick={() => {
                       setIsCreating(false);
                       setNewOrgName("");
+                      setCreateError("");
                     }}
                     className="px-3 py-1.5 text-xs text-gray-600 hover:text-gray-800 transition-colors"
                   >
