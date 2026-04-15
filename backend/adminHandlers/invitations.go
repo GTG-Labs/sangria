@@ -87,7 +87,7 @@ func sendInvitationEmail(inviteeEmail, inviterName, orgName, invitationURL, cust
 	// Set up sender (you should update this to your verified sender email)
 	fromEmail := os.Getenv("SENDGRID_FROM_EMAIL")
 	if fromEmail == "" {
-		fromEmail = "noreply@yourdomain.com" // Update this to your domain
+		fromEmail = "noreply@yourdomain.com" // TODO: update this to the actual Sangria domain
 	}
 	from := sgmail.NewEmail("Sangria Team", fromEmail)
 
@@ -148,6 +148,9 @@ func sendInvitationEmail(inviteeEmail, inviterName, orgName, invitationURL, cust
         <div style="margin-top: 40px; padding-top: 30px; border-top: 1px solid #e1e5e9;">
             <p style="font-size: 14px; color: #666; margin: 0;">
                 This invitation will expire in 7 days. If you have any questions, please contact the person who invited you.
+            </p>
+            <p style="font-size: 13px; color: #999; margin: 10px 0 0 0;">
+                ⚠️ This email contains a unique invitation link. Please do not forward or share it with anyone — it grants access to the organization. Sangria will never ask you to share this link.
             </p>
         </div>
     </div>
@@ -279,25 +282,21 @@ func CreateOrganizationInvitation(pool *pgxpool.Pool) fiber.Handler {
 		}
 
 		// Get organization name for the email
-		var orgName string
-		err = pool.QueryRow(c.Context(),
-			`SELECT name FROM organizations WHERE id = $1`,
-			orgID,
-		).Scan(&orgName)
+		org, err := dbengine.GetOrganization(c.Context(), pool, orgID)
+		orgName := "Unknown Organization"
 		if err != nil {
 			slog.Error("get organization name", "org_id", orgID, "error", err)
-			orgName = "Unknown Organization" // fallback
+		} else {
+			orgName = org.Name
 		}
 
 		// Get inviter's name/email for the email
-		var inviterName string
-		err = pool.QueryRow(c.Context(),
-			`SELECT owner FROM users WHERE workos_id = $1`,
-			user.ID,
-		).Scan(&inviterName)
+		inviterUser, err := dbengine.GetUserByWorkosID(c.Context(), pool, user.ID)
+		inviterName := "A team member"
 		if err != nil {
 			slog.Error("get inviter name", "user_id", user.ID, "error", err)
-			inviterName = "A team member" // fallback
+		} else {
+			inviterName = inviterUser.Owner
 		}
 
 		// Build invitation acceptance URL that includes our token

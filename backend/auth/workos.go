@@ -149,11 +149,6 @@ func CreateUser(pool *pgxpool.Pool) fiber.Handler {
 			return c.Status(500).JSON(fiber.Map{"error": "internal server error"})
 		}
 
-		if user.ID == "" {
-			slog.Error("CreateUser: session missing WorkOS ID")
-			return c.Status(500).JSON(fiber.Map{"error": "Invalid user session"})
-		}
-
 		owner := user.Email
 		if user.FirstName != "" && user.LastName != "" {
 			owner = fmt.Sprintf("%s %s", user.FirstName, user.LastName)
@@ -260,13 +255,8 @@ func GetCurrentUser(pool *pgxpool.Pool) fiber.Handler {
 			return c.Status(500).JSON(fiber.Map{"error": "internal server error"})
 		}
 
-		if user.ID == "" {
-			slog.Error("GetCurrentUser: session missing WorkOS ID")
-			return c.Status(500).JSON(fiber.Map{"error": "Invalid user session"})
-		}
-
-		// Get user's organizations
-		memberships, err := dbengine.GetUserOrganizations(c.Context(), pool, user.ID)
+		// Get user's organizations with details in a single query
+		userOrgs, err := dbengine.GetUserOrganizationsWithDetails(c.Context(), pool, user.ID)
 		if err != nil {
 			slog.Error("get user organizations", "error", err)
 			return c.Status(500).JSON(fiber.Map{"error": "failed to fetch user organizations"})
@@ -281,25 +271,13 @@ func GetCurrentUser(pool *pgxpool.Pool) fiber.Handler {
 		}
 
 		// Format organizations for frontend
-		var organizations []fiber.Map
-		for _, membership := range memberships {
-			// Get organization details
-			var orgName string
-			var isPersonal bool
-			err := pool.QueryRow(c.Context(),
-				`SELECT name, is_personal FROM organizations WHERE id = $1`,
-				membership.OrganizationID,
-			).Scan(&orgName, &isPersonal)
-			if err != nil {
-				slog.Error("get organization details", "error", err)
-				continue
-			}
-
+		organizations := make([]fiber.Map, 0, len(userOrgs))
+		for _, org := range userOrgs {
 			organizations = append(organizations, fiber.Map{
-				"id":         membership.OrganizationID,
-				"name":       orgName,
-				"isPersonal": isPersonal,
-				"isAdmin":    membership.IsAdmin,
+				"id":         org.ID,
+				"name":       org.Name,
+				"isPersonal": org.IsPersonal,
+				"isAdmin":    org.IsAdmin,
 			})
 		}
 
@@ -375,21 +353,12 @@ func GetOrganizationMembers(pool *pgxpool.Pool) fiber.Handler {
 		}
 
 		// Verify the requesting user is a member of this organization
-		memberships, err := dbengine.GetUserOrganizations(c.Context(), pool, user.ID)
+		isMember, err := dbengine.IsOrganizationMember(c.Context(), pool, user.ID, orgID)
 		if err != nil {
-			slog.Error("get user organizations", "user_id", user.ID, "error", err)
+			slog.Error("check org membership", "user_id", user.ID, "org_id", orgID, "error", err)
 			return c.Status(500).JSON(fiber.Map{"error": "failed to verify permissions"})
 		}
-
-		isOrgMember := false
-		for _, membership := range memberships {
-			if membership.OrganizationID == orgID {
-				isOrgMember = true
-				break
-			}
-		}
-
-		if !isOrgMember {
+		if !isMember {
 			return c.Status(403).JSON(fiber.Map{"error": "access denied - not a member of this organization"})
 		}
 
@@ -424,29 +393,13 @@ func RemoveOrganizationMember(pool *pgxpool.Pool) fiber.Handler {
 			return c.Status(400).JSON(fiber.Map{"error": "organization ID and user ID are required"})
 		}
 
-		// Verify the requesting user is a member of this organization
-		memberships, err := dbengine.GetUserOrganizations(c.Context(), pool, user.ID)
+		// Only admins can remove members
+		isAdmin, err := dbengine.IsOrganizationAdmin(c.Context(), pool, user.ID, orgID)
 		if err != nil {
-			slog.Error("get user organizations", "user_id", user.ID, "error", err)
+			slog.Error("check org admin status", "user_id", user.ID, "org_id", orgID, "error", err)
 			return c.Status(500).JSON(fiber.Map{"error": "failed to verify permissions"})
 		}
-
-		isOrgMember := false
-		isOrgAdmin := false
-		for _, membership := range memberships {
-			if membership.OrganizationID == orgID {
-				isOrgMember = true
-				isOrgAdmin = membership.IsAdmin
-				break
-			}
-		}
-
-		if !isOrgMember {
-			return c.Status(403).JSON(fiber.Map{"error": "access denied - not a member of this organization"})
-		}
-
-		// Only admins can remove members
-		if !isOrgAdmin {
+		if !isAdmin {
 			return c.Status(403).JSON(fiber.Map{"error": "admin access required to remove members"})
 		}
 

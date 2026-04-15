@@ -61,6 +61,14 @@ type OrganizationMember struct {
 	ActualEmail    string    `json:"actual_email,omitempty"` // The actual email address from WorkOS
 }
 
+// UserOrganization represents a user's membership in an organization with org details included.
+type UserOrganization struct {
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	IsPersonal bool   `json:"is_personal"`
+	IsAdmin    bool   `json:"is_admin"`
+}
+
 type InvitationStatus string
 
 const (

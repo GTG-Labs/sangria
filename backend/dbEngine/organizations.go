@@ -177,6 +177,51 @@ func GetUserOrganizations(ctx context.Context, pool *pgxpool.Pool, userID string
 	return organizations, nil
 }
 
+// GetUserOrganizationsWithDetails returns all organizations for a user with org name and personal flag included.
+func GetUserOrganizationsWithDetails(ctx context.Context, pool *pgxpool.Pool, userID string) ([]UserOrganization, error) {
+	rows, err := pool.Query(ctx,
+		`SELECT o.id, o.name, o.is_personal, om.is_admin
+		 FROM organization_members om
+		 JOIN organizations o ON o.id = om.organization_id
+		 WHERE om.user_id = $1
+		 ORDER BY om.joined_at DESC`,
+		userID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user organizations with details: %w", err)
+	}
+	defer rows.Close()
+
+	var orgs []UserOrganization
+	for rows.Next() {
+		var org UserOrganization
+		if err := rows.Scan(&org.ID, &org.Name, &org.IsPersonal, &org.IsAdmin); err != nil {
+			return nil, fmt.Errorf("failed to scan organization: %w", err)
+		}
+		orgs = append(orgs, org)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows iteration error: %w", err)
+	}
+
+	return orgs, nil
+}
+
+// IsOrganizationMember returns true if the given user belongs to the specified organization.
+func IsOrganizationMember(ctx context.Context, pool *pgxpool.Pool, userID, organizationID string) (bool, error) {
+	var exists bool
+	err := pool.QueryRow(ctx,
+		`SELECT EXISTS(SELECT 1 FROM organization_members
+		 WHERE user_id = $1 AND organization_id = $2)`,
+		userID, organizationID,
+	).Scan(&exists)
+	if err != nil {
+		return false, err
+	}
+	return exists, nil
+}
+
 // IsOrganizationAdmin returns true if the given user is an admin of the specified organization.
 func IsOrganizationAdmin(ctx context.Context, pool *pgxpool.Pool, userID, organizationID string) (bool, error) {
 	var isAdmin bool
