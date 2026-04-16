@@ -10,6 +10,7 @@ import (
 	"sangria/backend/auth"
 	"sangria/backend/config"
 	dbengine "sangria/backend/dbEngine"
+	"sangria/backend/utils"
 )
 
 // RequestWithdrawal handles POST /withdrawals.
@@ -109,8 +110,9 @@ func RequestWithdrawal(pool *pgxpool.Pool) fiber.Handler {
 	}
 }
 
-// ListWithdrawals handles GET /withdrawals.
-// Dashboard endpoint — returns withdrawals for a specific merchant owned by the authenticated user.
+// ListWithdrawals handles GET /withdrawals with cursor-based pagination.
+// Dashboard endpoint — returns withdrawals for the user's organization.
+// Query params: ?limit=20&cursor=base64_encoded_timestamp&org_id=optional
 func ListWithdrawals(pool *pgxpool.Pool) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		user, ok := c.Locals("workos_user").(auth.WorkOSUser)
@@ -118,51 +120,54 @@ func ListWithdrawals(pool *pgxpool.Pool) fiber.Handler {
 			return c.Status(500).JSON(fiber.Map{"error": "internal server error"})
 		}
 
-		merchantID := c.Query("merchant_id")
-		if merchantID == "" {
-			return c.Status(400).JSON(fiber.Map{"error": "merchant_id query param is required"})
-		}
-
-		// Get user organizations to validate merchant access
-		memberships, err := dbengine.GetUserOrganizations(c.Context(), pool, user.ID)
+		// Parse pagination params from query string
+		limit, cursor, err := utils.ParsePaginationParams(
+			c.Query("limit"),
+			c.Query("cursor"),
+		)
 		if err != nil {
-			slog.Error("get user organizations", "user_id", user.ID, "error", err)
-			return c.Status(500).JSON(fiber.Map{"error": "failed to get user organizations"})
-		}
-		if len(memberships) == 0 {
-			slog.Error("user has no organizations", "user_id", user.ID)
-			return c.Status(400).JSON(fiber.Map{"error": "user must belong to an organization"})
+			return c.Status(400).JSON(fiber.Map{
+				"error": "Invalid pagination parameters: " + err.Error(),
+			})
 		}
 
-		// Verify this merchant belongs to the authenticated user's organization.
-		merchant, err := dbengine.GetMerchantByID(c.Context(), pool, merchantID)
+		// Resolve organization context
+		orgResult := auth.ResolveOrganizationContext(c.Context(), c, pool, user)
+		if orgResult.Error != "" {
+			return c.Status(orgResult.HTTPStatus).JSON(fiber.Map{"error": orgResult.Error})
+		}
+		selectedOrgID := orgResult.OrganizationID
+
+		// Fetch paginated withdrawals for the organization
+		withdrawals, nextCursor, total, err := dbengine.GetWithdrawalsByOrganizationPaginated(
+			c.Context(), pool, selectedOrgID, limit, cursor,
+		)
 		if err != nil {
-			if errors.Is(err, dbengine.ErrMerchantNotFound) {
-				return c.Status(404).JSON(fiber.Map{"error": "merchant not found"})
-			}
-			slog.Error("get merchant", "merchant_id", merchantID, "error", err)
-			return c.Status(500).JSON(fiber.Map{"error": "failed to look up merchant"})
+			slog.Error("fetch withdrawals: query failed", "user_id", user.ID, "org_id", selectedOrgID, "error", err)
+			return c.Status(500).JSON(fiber.Map{
+				"error": "failed to retrieve withdrawals",
+			})
 		}
 
-		// Check if user is a member of the organization that owns this merchant
-		userHasAccess := false
-		for _, membership := range memberships {
-			if membership.OrganizationID == merchant.OrganizationID {
-				userHasAccess = true
-				break
-			}
+		// Build pagination metadata
+		paginationMeta := dbengine.PaginationMeta{
+			HasMore: nextCursor != nil,
+			Count:   len(withdrawals),
+			Limit:   limit,
+			Total:   total,
 		}
-		if !userHasAccess {
-			return c.Status(403).JSON(fiber.Map{"error": "Forbidden"})
-		}
-
-		withdrawals, err := dbengine.ListWithdrawalsByMerchant(c.Context(), pool, merchant.ID)
-		if err != nil {
-			slog.Error("list withdrawals", "merchant_id", merchant.ID, "error", err)
-			return c.Status(500).JSON(fiber.Map{"error": "failed to list withdrawals"})
+		if nextCursor != nil {
+			encoded := utils.EncodeCursor(*nextCursor)
+			paginationMeta.NextCursor = &encoded
 		}
 
-		return c.JSON(withdrawals)
+		// Return paginated response
+		response := dbengine.WithdrawalsResponse{
+			Data:       withdrawals,
+			Pagination: paginationMeta,
+		}
+
+		return c.JSON(response)
 	}
 }
 
