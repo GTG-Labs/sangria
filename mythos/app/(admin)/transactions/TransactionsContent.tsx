@@ -255,7 +255,7 @@ export default function TransactionsContent() {
         </div>
       )}
 
-      {!transactions || transactions.length === 0 ? (
+      {!error && (!transactions || transactions.length === 0) ? (
         <div className="py-16 text-center">
           <p className="text-gray-500 mb-1">
             {activeSearch ? "No transactions match your search" : "No transactions yet"}
