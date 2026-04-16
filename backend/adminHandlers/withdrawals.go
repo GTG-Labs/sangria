@@ -10,6 +10,7 @@ import (
 
 	"sangria/backend/auth"
 	dbengine "sangria/backend/dbEngine"
+	"sangria/backend/utils"
 )
 
 // ApproveWithdrawal handles POST /admin/withdrawals/:id/approve.
@@ -155,27 +156,45 @@ func FailWithdrawal(pool *pgxpool.Pool) fiber.Handler {
 	}
 }
 
-// ListAllWithdrawals handles GET /admin/withdrawals.
+// ListAllWithdrawals handles GET /admin/withdrawals with cursor-based pagination.
 // Returns all withdrawals, optionally filtered by status.
+// Query params: ?limit=20&cursor=base64_encoded_timestamp&status=optional
 func ListAllWithdrawals(pool *pgxpool.Pool) fiber.Handler {
 	return func(c fiber.Ctx) error {
+		limit, cursor, err := utils.ParsePaginationParams(
+			c.Query("limit"),
+			c.Query("cursor"),
+		)
+		if err != nil {
+			return c.Status(400).JSON(fiber.Map{
+				"error": "Invalid pagination parameters: " + err.Error(),
+			})
+		}
+
 		status := c.Query("status")
 
-		if status != "" {
-			withdrawals, err := dbengine.ListWithdrawalsByStatus(c.Context(), pool, dbengine.WithdrawalStatus(status))
-			if err != nil {
-				slog.Error("list withdrawals by status", "status", status, "error", err)
-				return c.Status(500).JSON(fiber.Map{"error": "failed to list withdrawals"})
-			}
-			return c.JSON(withdrawals)
-		}
-
-		// No filter — return all withdrawals.
-		withdrawals, err := dbengine.ListAllWithdrawals(c.Context(), pool)
+		withdrawals, nextCursor, total, err := dbengine.GetAllWithdrawalsPaginated(
+			c.Context(), pool, status, limit, cursor,
+		)
 		if err != nil {
-			slog.Error("list all withdrawals", "error", err)
+			slog.Error("list all withdrawals", "status", status, "error", err)
 			return c.Status(500).JSON(fiber.Map{"error": "failed to list withdrawals"})
 		}
-		return c.JSON(withdrawals)
+
+		paginationMeta := dbengine.PaginationMeta{
+			HasMore: nextCursor != nil,
+			Count:   len(withdrawals),
+			Limit:   limit,
+			Total:   total,
+		}
+		if nextCursor != nil {
+			encoded := utils.EncodeCursor(*nextCursor)
+			paginationMeta.NextCursor = &encoded
+		}
+
+		return c.JSON(dbengine.WithdrawalsResponse{
+			Data:       withdrawals,
+			Pagination: paginationMeta,
+		})
 	}
 }
