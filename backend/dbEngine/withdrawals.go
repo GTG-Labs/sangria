@@ -316,6 +316,20 @@ func GetAllWithdrawalsPaginated(
 	limit int,
 	cursor *time.Time,
 ) ([]Withdrawal, *time.Time, int, error) {
+	// Validate status if provided.
+	validStatuses := map[string]bool{
+		string(WithdrawalStatusPendingApproval): true,
+		string(WithdrawalStatusApproved):        true,
+		string(WithdrawalStatusProcessing):      true,
+		string(WithdrawalStatusCompleted):       true,
+		string(WithdrawalStatusFailed):          true,
+		string(WithdrawalStatusReversed):        true,
+		string(WithdrawalStatusCanceled):        true,
+	}
+	if status != "" && !validStatuses[status] {
+		return nil, nil, 0, fmt.Errorf("invalid withdrawal status: %s", status)
+	}
+
 	// Build WHERE clauses dynamically based on optional filters.
 	var whereClauses []string
 	var args []interface{}

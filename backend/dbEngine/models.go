@@ -248,6 +248,12 @@ type WithdrawalsResponse struct {
 	Pagination PaginationMeta `json:"pagination"`
 }
 
+// WithdrawalsResponse wraps withdrawal data with pagination metadata
+type WithdrawalsResponse struct {
+	Data       []Withdrawal   `json:"data"`
+	Pagination PaginationMeta `json:"pagination"`
+}
+
 type WithdrawalStatus string
 
 const (
