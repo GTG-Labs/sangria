@@ -3,7 +3,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { KeyRound, LayoutDashboard, ExternalLink, Users } from "lucide-react";
+import { KeyRound, LayoutDashboard, ExternalLink, Users, Wallet } from "lucide-react";
 import OrganizationDropdown from "./OrganizationDropdown";
 import { useOrganization } from "@/contexts/OrganizationContext";
 
@@ -23,6 +23,7 @@ export default function PortalSidebarNav() {
     const baseItems: NavItem[] = [
       { href: "/dashboard/transactions", label: "Overview", icon: LayoutDashboard },
       { href: "/dashboard/api-keys", label: "API Keys", icon: KeyRound },
+      { href: "/dashboard/withdrawals", label: "Withdrawals", icon: Wallet },
     ];
 
     // Add Members tab for all organization members (admins get additional controls within the page)
