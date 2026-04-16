@@ -181,19 +181,15 @@ export default function WithdrawalsContent() {
     return () => controller.abort();
   }, [selectedOrgId]);
 
-  const formatBalance = (microunits: number) => {
+  const formatMicrounits = (microunits: number) => {
     const whole = Math.floor(microunits / 1_000_000);
     const frac = microunits % 1_000_000;
     const fracStr = frac.toString().padStart(6, "0").replace(/0+$/, "").padEnd(2, "0");
     return `${whole.toLocaleString("en-US")}.${fracStr}`;
   };
 
-  const formatAmount = (microunits: number) => {
-    const whole = Math.floor(microunits / 1_000_000);
-    const frac = microunits % 1_000_000;
-    const fracStr = frac.toString().padStart(6, "0").replace(/0+$/, "").padEnd(2, "0");
-    return `$${whole.toLocaleString("en-US")}.${fracStr}`;
-  };
+  const formatBalance = formatMicrounits;
+  const formatAmount = (microunits: number) => `$${formatMicrounits(microunits)}`;
 
   const timeAgo = (dateString: string) => {
     const now = new Date();

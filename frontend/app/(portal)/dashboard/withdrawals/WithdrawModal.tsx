@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { X as XIcon, AlertCircle } from "lucide-react";
 
 interface APIKey {
@@ -27,6 +27,14 @@ export default function WithdrawModal({
   onSuccess,
   formatBalance,
 }: WithdrawModalProps) {
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
   const [merchantId, setMerchantId] = useState(
     merchants.length === 1 ? merchants[0].id : ""
   );
@@ -68,7 +76,7 @@ export default function WithdrawModal({
         }),
       });
 
-      if (response.ok || response.status === 201) {
+      if (response.ok) {
         await onSuccess();
       } else {
         const data = await response.json().catch(() => ({ error: "Unknown error" }));
