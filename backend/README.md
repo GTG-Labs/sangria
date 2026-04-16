@@ -91,7 +91,8 @@ Requires WorkOS JWT and the user must exist in the `admins` table.
 | Method | Path | Auth | Description |
 |---|---|---|---|
 | GET | `/admin/me` | Admin | Check admin status (used by Mythos dashboard) |
-| GET | `/admin/transactions` | Admin | List all transactions across all merchants (paginated, ?limit=&cursor=) |
+| GET | `/admin/transactions` | Admin | List all transactions across all merchants (paginated, ?limit=&cursor=&search=&organization_id=&start_date=&end_date=) |
+| GET | `/admin/transactions/:id/ledger` | Admin | Get ledger entries for a transaction with account details |
 | POST | `/admin/wallets/pool` | Admin | Create a CDP wallet in the pool |
 | POST | `/admin/treasury/fund` | Admin | Record a USD treasury deposit (bookkeeping only) |
 | POST | `/admin/withdrawals/:id/approve` | Admin | Approve a pending withdrawal |
