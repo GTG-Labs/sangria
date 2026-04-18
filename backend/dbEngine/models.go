@@ -118,6 +118,16 @@ type LedgerEntry struct {
 	AccountID     string    `json:"account_id"`
 }
 
+// AdminLedgerEntry is a ledger entry enriched with account details for admin views.
+type AdminLedgerEntry struct {
+	ID          string      `json:"id"`
+	Amount      int64       `json:"amount"`
+	Direction   Direction   `json:"direction"`
+	Currency    Currency    `json:"currency"`
+	AccountName string      `json:"account_name"`
+	AccountType AccountType `json:"account_type"`
+}
+
 // LedgerLine is an input struct used when building entries to insert.
 type LedgerLine struct {
 	Currency  Currency  `json:"currency"`
@@ -201,7 +211,35 @@ type PaginationMeta struct {
 // TransactionsResponse wraps transaction data with pagination metadata
 type TransactionsResponse struct {
 	Data       []MerchantTransaction `json:"data"`
-	Pagination PaginationMeta    `json:"pagination"`
+	Pagination PaginationMeta        `json:"pagination"`
+}
+
+// AdminTransaction represents a transaction enriched with organization and fee data.
+type AdminTransaction struct {
+	ID               string    `json:"id"`
+	IdempotencyKey   string    `json:"idempotency_key"`
+	CreatedAt        time.Time `json:"created_at"`
+	MerchantName     string    `json:"merchant_name"`      // organization name
+	MerchantID       string    `json:"merchant_id"`        // organization id
+	Amount           int64     `json:"amount"`             // merchant received (microunits)
+	Fee              int64     `json:"fee"`                // platform fee (microunits)
+	Total            int64     `json:"total"`              // amount + fee
+	Currency         Currency  `json:"currency"`
+}
+
+// AdminTransactionsResponse wraps enriched admin transactions with pagination and totals.
+type AdminTransactionsResponse struct {
+	Data       []AdminTransaction `json:"data"`
+	Pagination PaginationMeta     `json:"pagination"`
+	Totals     *AdminTotals       `json:"totals,omitempty"`
+}
+
+// AdminTotals holds aggregate metrics across all transactions.
+type AdminTotals struct {
+	TransactionCount int   `json:"transaction_count"`
+	TotalVolume      int64 `json:"total_volume"`      // sum of all payments (microunits)
+	TotalFees        int64 `json:"total_fees"`         // sum of platform fees (microunits)
+	MerchantCount    int   `json:"merchant_count"`     // distinct merchants
 }
 
 // WithdrawalsResponse wraps withdrawal data with pagination metadata
