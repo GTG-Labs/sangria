@@ -12,7 +12,7 @@ import (
 )
 
 // GetAllTransactions handles GET /admin/transactions with cursor-based pagination.
-// Supports query params: limit, cursor, merchant_id, search, start_date, end_date
+// Supports query params: limit, cursor, organization_id, search, start_date, end_date
 func GetAllTransactions(pool *pgxpool.Pool) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		limit, cursor, err := utils.ParsePaginationParams(
