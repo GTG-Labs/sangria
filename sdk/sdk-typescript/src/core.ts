@@ -6,8 +6,20 @@ import type {
   X402ChallengePayload,
 } from "./types.js";
 import { toMicrounits } from "./types.js";
+import {
+  SangriaAPIStatusError,
+  SangriaConnectionError,
+  SangriaTimeoutError,
+  type SangriaOperation,
+} from "./errors.js";
 
 const DEFAULT_BASE_URL = "https://api.getsangria.com";
+
+export function validateFixedPriceOptions(options: FixedPriceOptions): void {
+  if (!Number.isFinite(options.price) || options.price <= 0) {
+    throw new Error("Sangria: price must be a positive number (dollars)");
+  }
+}
 
 export class Sangria {
   private apiKey: string;
@@ -22,18 +34,10 @@ export class Sangria {
     this.baseUrl = (config.baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, "");
   }
 
-  private validateFixedPriceOptions(options: FixedPriceOptions): void {
-    if (!Number.isFinite(options.price) || options.price <= 0) {
-      throw new Error("Sangria: price must be a positive number (dollars)");
-    }
-  }
-
   async handleFixedPrice(
     ctx: PaymentContext,
     options: FixedPriceOptions
   ): Promise<PaymentResult> {
-    this.validateFixedPriceOptions(options);
-
     if (!ctx.paymentHeader) {
       return this.generatePayment(ctx, options);
     } else {
@@ -47,33 +51,25 @@ export class Sangria {
     ctx: PaymentContext,
     options: FixedPriceOptions
   ): Promise<PaymentResult> {
-    try {
-      const x402_responsePayload = (await this.postToSangriaBackend(
-        "/v1/generate-payment",
-        {
-          amount: toMicrounits(options.price),
-          resource: ctx.resourceUrl,
-          description: options.description,
-        }
-      )) as X402ChallengePayload;
+    const x402_responsePayload = (await this.postToSangriaBackend(
+      "/v1/generate-payment",
+      {
+        amount: toMicrounits(options.price),
+        resource: ctx.resourceUrl,
+        description: options.description,
+      },
+      "generate"
+    )) as X402ChallengePayload;
 
-      // you gotta encode the payload before sending it back (part of the spec)
-      const encoded = btoa(JSON.stringify(x402_responsePayload));
+    // you gotta encode the payload before sending it back (part of the spec)
+    const encoded = btoa(JSON.stringify(x402_responsePayload));
 
-      return {
-        action: "respond",
-        status: 402,
-        body: x402_responsePayload,
-        headers: { "PAYMENT-REQUIRED": encoded },
-      };
-    } catch {
-      //TODO: instead of doing this, raise an error so the merchant handles it.
-      return {
-        action: "respond",
-        status: 500,
-        body: { error: "Payment service unavailable" },
-      };
-    }
+    return {
+      action: "respond",
+      status: 402,
+      body: x402_responsePayload,
+      headers: { "PAYMENT-REQUIRED": encoded },
+    };
   }
 
   // there was a payment header so we try to settle the payment
@@ -81,49 +77,45 @@ export class Sangria {
     paymentHeader: string,
     options: FixedPriceOptions
   ): Promise<PaymentResult> {
-    try {
-      const result = (await this.postToSangriaBackend("/v1/settle-payment", {
-        payment_payload: paymentHeader,
-      })) as {
-        success: boolean;
-        transaction?: string;
-        error_reason?: string;
-        error_message?: string;
-      };
+    const result = (await this.postToSangriaBackend(
+      "/v1/settle-payment",
+      { payment_payload: paymentHeader },
+      "settle"
+    )) as {
+      success: boolean;
+      transaction?: string;
+      error_reason?: string;
+      error_message?: string;
+    };
 
-      if (!result.success) {
-        return {
-          action: "respond",
-          status: 402,
-          body: {
-            error: result.error_message ?? "Payment failed",
-            error_reason: result.error_reason,
-          },
-        };
-      }
-
-      return {
-        action: "proceed",
-        data: {
-          paid: true,
-          amount: options.price,
-          transaction: result.transaction,
-        },
-      };
-    } catch {
+    if (!result.success) {
       return {
         action: "respond",
-        status: 500,
-        body: { error: "Payment settlement failed" },
+        status: 402,
+        body: {
+          error: result.error_message ?? "Payment failed",
+          error_reason: result.error_reason,
+        },
       };
     }
+
+    return {
+      action: "proceed",
+      data: {
+        paid: true,
+        amount: options.price,
+        transaction: result.transaction,
+      },
+    };
   }
 
   private async postToSangriaBackend(
     path: string,
-    body: Record<string, unknown>
-  ) {
-    const res = await fetch(`${this.baseUrl}${path}`, {
+    body: Record<string, unknown>,
+    operation: SangriaOperation
+  ): Promise<unknown> {
+    const url = `${this.baseUrl}${path}`;
+    const init: RequestInit = {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -131,12 +123,66 @@ export class Sangria {
       },
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(8000),
-    });
+    };
 
-    if (!res.ok) {
-      throw new Error(`Sangria API error (${res.status})`);
+    let res: Response;
+    try {
+      res = await fetch(url, init);
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "TimeoutError") {
+        throw new SangriaTimeoutError(
+          "Sangria request timed out after 8000ms",
+          { operation, cause: err }
+        );
+      }
+      throw new SangriaConnectionError(
+        err instanceof Error ? err.message : "Sangria connection failed",
+        { operation, cause: err }
+      );
     }
 
-    return res.json();
+    if (!res.ok) {
+      const message = await parseErrorMessage(res.clone());
+      throw new SangriaAPIStatusError(message, {
+        operation,
+        response: res,
+        statusCode: res.status,
+      });
+    }
+
+    try {
+      return await res.clone().json();
+    } catch (err) {
+      throw new SangriaAPIStatusError(
+        "Sangria returned a malformed response body",
+        { operation, response: res, statusCode: res.status, cause: err }
+      );
+    }
   }
+}
+
+async function parseErrorMessage(response: Response): Promise<string> {
+  try {
+    const text = await response.text();
+    try {
+      const body = JSON.parse(text) as Record<string, unknown> | null | undefined;
+      const errorObj = body?.["error"] as Record<string, unknown> | null | undefined;
+      const nestedMsg = errorObj?.["message"];
+      const topMsg = body?.["message"];
+      const stringError = typeof body?.["error"] === "string" ? (body["error"] as string) : undefined;
+      const msg =
+        (typeof nestedMsg === "string" ? nestedMsg : undefined) ??
+        (typeof topMsg === "string" ? topMsg : undefined) ??
+        stringError;
+      if (typeof msg === "string" && msg.length > 0) {
+        return msg;
+      }
+    } catch {
+      // not JSON — fall through
+    }
+    if (text.length > 0) return text;
+  } catch {
+    // body read failed
+  }
+  return `HTTP ${response.status}`;
 }

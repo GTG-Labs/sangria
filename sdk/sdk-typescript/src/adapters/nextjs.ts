@@ -1,5 +1,5 @@
 import type { SangriaRequestData, FixedPriceOptions } from "../types.js";
-import { Sangria } from "../core.js";
+import { Sangria, validateFixedPriceOptions } from "../core.js";
 
 /**
  * Minimal type stubs for Next.js request/response.
@@ -38,6 +38,8 @@ export function fixedPrice(
   handler: NextRouteHandler,
   config?: NextJSConfig
 ): NextRouteHandler {
+  validateFixedPriceOptions(options);
+
   return async (request: any, context?: any) => {
     // 1. Bypass check — let the request through without payment
     if (config?.bypassPaymentIf?.(request)) {

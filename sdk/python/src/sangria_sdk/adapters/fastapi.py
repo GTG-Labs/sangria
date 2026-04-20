@@ -7,7 +7,7 @@ from typing import Any
 from fastapi import HTTPException, Request
 from fastapi.responses import JSONResponse
 
-from ..client import SangriaMerchantClient
+from ..client import SangriaMerchantClient, validate_fixed_price_options
 from ..models import FixedPriceOptions, PaymentResponse
 
 
@@ -22,6 +22,12 @@ def require_sangria_payment(
     description: str | None = None,
     bypass_if: Callable[[Request], bool] | None = None,
 ) -> Callable[[Callable[..., Awaitable[Any]]], Callable[..., Awaitable[Any]]]:
+    # Validate at decorator construction time so misconfigured prices fail at
+    # app startup instead of on the first paying request.
+    validate_fixed_price_options(
+        FixedPriceOptions(price=amount, resource="", description=description)
+    )
+
     def decorator(func: Callable[..., Awaitable[Any]]) -> Callable[..., Awaitable[Any]]:
         @wraps(func)
         async def wrapper(*args: Any, **kwargs: Any) -> Any:

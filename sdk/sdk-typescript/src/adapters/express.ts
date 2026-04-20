@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import type { SangriaRequestData, FixedPriceOptions } from "../types.js";
-import { Sangria } from "../core.js";
+import { Sangria, validateFixedPriceOptions } from "../core.js";
 
 export interface ExpressConfig {
   bypassPaymentIf?: (req: Request) => boolean;
@@ -23,32 +23,39 @@ export function fixedPrice(
   options: FixedPriceOptions,
   config?: ExpressConfig
 ) {
+  validateFixedPriceOptions(options);
+
   return async (req: Request, res: Response, next: NextFunction) => {
-    if (config?.bypassPaymentIf?.(req)) {
-      req.sangria = { paid: false, amount: 0 };
-      return next();
-    }
-
-    const result = await sangria.handleFixedPrice(
-      {
-        paymentHeader: Array.isArray(req.headers["payment-signature"])
-          ? req.headers["payment-signature"][0]
-          : req.headers["payment-signature"],
-        resourceUrl: `${req.protocol}://${req.hostname}${req.originalUrl}`,
-      },
-      options
-    );
-
-    if (result.action === "respond") {
-      if (result.headers) {
-        for (const [key, value] of Object.entries(result.headers)) {
-          res.setHeader(key, value);
-        }
+    try {
+      if (config?.bypassPaymentIf?.(req)) {
+        req.sangria = { paid: false, amount: 0 };
+        return next();
       }
-      return res.status(result.status).json(result.body);
-    }
 
-    req.sangria = result.data;
-    return next();
+      const result = await sangria.handleFixedPrice(
+        {
+          paymentHeader: Array.isArray(req.headers["payment-signature"])
+            ? req.headers["payment-signature"][0]
+            : req.headers["payment-signature"],
+          resourceUrl: `${req.protocol}://${req.hostname}${req.originalUrl}`,
+        },
+        options
+      );
+
+      if (result.action === "respond") {
+        if (result.headers) {
+          for (const [key, value] of Object.entries(result.headers)) {
+            res.setHeader(key, value);
+          }
+        }
+        return res.status(result.status).json(result.body);
+      }
+
+      req.sangria = result.data;
+      return next();
+    } catch (err) {
+      // Hand off to Express's error middleware (app.use((err, req, res, next) => ...))
+      return next(err);
+    }
   };
 }

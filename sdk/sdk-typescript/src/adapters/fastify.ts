@@ -6,7 +6,7 @@ import type {
 } from "fastify";
 import fp from "fastify-plugin";
 import type { SangriaRequestData, FixedPriceOptions } from "../types.js";
-import { Sangria } from "../core.js";
+import { Sangria, validateFixedPriceOptions } from "../core.js";
 
 export interface FastifyConfig {
   bypassPaymentIf?: (request: FastifyRequest) => boolean;
@@ -29,6 +29,8 @@ export function fixedPrice(
   options: FixedPriceOptions,
   config?: FastifyConfig
 ): preHandlerAsyncHookHandler {
+  validateFixedPriceOptions(options);
+
   return async (request: FastifyRequest, reply: FastifyReply) => {
     if (config?.bypassPaymentIf?.(request)) {
       request.sangria = { paid: false, amount: 0 };

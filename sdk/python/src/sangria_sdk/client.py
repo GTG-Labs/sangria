@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import base64
 import json
-from typing import Any
+import math
 
 from ._http import SangriaHTTPClient
 from .models import (
@@ -11,6 +11,17 @@ from .models import (
     PaymentResponse,
     PaymentResult,
 )
+
+
+def validate_fixed_price_options(options: FixedPriceOptions) -> None:
+    """Raise ValueError if options are invalid. Called at adapter construction."""
+    if (
+        isinstance(options.price, bool)
+        or not isinstance(options.price, (int, float))
+        or not math.isfinite(options.price)
+        or options.price <= 0
+    ):
+        raise ValueError("Sangria: price must be a positive number (dollars)")
 
 
 class SangriaMerchantClient:
@@ -24,6 +35,9 @@ class SangriaMerchantClient:
         settle_endpoint: str = "/v1/settle-payment",
         timeout_seconds: float = 8.0,
     ) -> None:
+        if not api_key:
+            raise ValueError("Sangria: api_key is required")
+
         self._http = SangriaHTTPClient(
             base_url=base_url,
             api_key=api_key,
@@ -48,25 +62,20 @@ class SangriaMerchantClient:
         self,
         options: FixedPriceOptions,
     ) -> PaymentResult:
-        try:
-            x402_response_payload = await self._http.post_json(
-                self.generate_endpoint,
-                options.to_generate_dict(),
-            )
+        x402_response_payload = await self._http.post_json(
+            self.generate_endpoint,
+            options.to_generate_dict(),
+            operation="generate",
+        )
 
-            # you gotta encode the payload before sending it back (part of the spec)
-            encoded = base64.b64encode(json.dumps(x402_response_payload).encode()).decode()
+        # you gotta encode the payload before sending it back (part of the spec)
+        encoded = base64.b64encode(json.dumps(x402_response_payload).encode()).decode()
 
-            return PaymentResponse(
-                status_code=402,
-                body=x402_response_payload,
-                headers={"PAYMENT-REQUIRED": encoded},
-            )
-        except Exception:
-            return PaymentResponse(
-                status_code=500,
-                body={"error": "Payment service unavailable"},
-            )
+        return PaymentResponse(
+            status_code=402,
+            body=x402_response_payload,
+            headers={"PAYMENT-REQUIRED": encoded},
+        )
 
     # there was a payment header so we try to settle the payment
     async def _settle_payment(
@@ -74,31 +83,26 @@ class SangriaMerchantClient:
         payment_header: str,
         options: FixedPriceOptions,
     ) -> PaymentResult:
-        try:
-            result = await self._http.post_json(
-                self.settle_endpoint,
-                {"payment_payload": payment_header},
-            )
+        result = await self._http.post_json(
+            self.settle_endpoint,
+            {"payment_payload": payment_header},
+            operation="settle",
+        )
 
-            if not result.get("success", False):
-                return PaymentResponse(
-                    status_code=402,
-                    body={
-                        "error": result.get("error_message", "Payment failed"),
-                        "error_reason": result.get("error_reason"),
-                    },
-                )
-
-            return PaymentProceeded(
-                paid=True,
-                amount=options.price,
-                transaction=result.get("transaction"),
-            )
-        except Exception:
+        if not result.get("success", False):
             return PaymentResponse(
-                status_code=500,
-                body={"error": "Payment settlement failed"},
+                status_code=402,
+                body={
+                    "error": result.get("error_message", "Payment failed"),
+                    "error_reason": result.get("error_reason"),
+                },
             )
+
+        return PaymentProceeded(
+            paid=True,
+            amount=options.price,
+            transaction=result.get("transaction"),
+        )
 
     async def aclose(self) -> None:
         await self._http.close()

@@ -1,7 +1,7 @@
 import type { MiddlewareHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { SangriaRequestData, FixedPriceOptions } from "../types.js";
-import { Sangria } from "../core.js";
+import { Sangria, validateFixedPriceOptions } from "../core.js";
 
 type SangriaEnv = {
   Variables: {
@@ -24,6 +24,8 @@ export function fixedPrice(
   options: FixedPriceOptions,
   config?: HonoConfig
 ): MiddlewareHandler<SangriaEnv> {
+  validateFixedPriceOptions(options);
+
   return async (c, next) => {
     if (config?.bypassPaymentIf?.(c)) {
       c.set("sangria", { paid: false, amount: 0 });
