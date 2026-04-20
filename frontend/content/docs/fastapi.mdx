@@ -59,7 +59,32 @@ async def premium(request: Request):
     return {"message": "You accessed the premium endpoint!"}
 ```
 
-## 4. Run it
+## 4. Handle errors
+
+If the Sangria backend is unreachable, times out, or returns a non-2xx status, the SDK raises a `SangriaError`. Register a FastAPI exception handler to return a clean response instead of a raw `500`:
+
+```python
+from fastapi import Request
+from fastapi.responses import JSONResponse
+from sangria_sdk import SangriaError
+
+@app.exception_handler(SangriaError)
+async def sangria_error_handler(_request: Request, exc: SangriaError):
+    return JSONResponse(
+        status_code=503,
+        content={"error": "Payment provider unavailable"},
+    )
+```
+
+`SangriaError` has an `.operation` attribute (`"generate"` or `"settle"`) so you know which step failed. Subclasses give you more detail:
+
+- `SangriaConnectionError` — network failure (DNS, refused, reset)
+- `SangriaTimeoutError` — request timed out
+- `SangriaAPIStatusError` — backend returned 4xx/5xx (has `.status_code` and `.response`)
+
+Business-level payment failures (bad signature, insufficient funds) are **not** errors — they return a normal `402` response to the caller.
+
+## 5. Run it
 
 Start your server:
 

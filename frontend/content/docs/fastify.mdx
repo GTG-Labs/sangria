@@ -81,7 +81,31 @@ fastify.get(
 await fastify.listen({ port: 4002 });
 ```
 
-## 5. Run it
+## 5. Handle errors
+
+If the Sangria backend is unreachable, times out, or returns a non-2xx status, the SDK throws a `SangriaError`. Register a Fastify error handler to return a clean response instead of Fastify's default `500`:
+
+```ts
+import { SangriaError } from "@sangria-sdk/core";
+
+fastify.setErrorHandler((err, _request, reply) => {
+  if (err instanceof SangriaError) {
+    fastify.log.error(`[sangria:${err.operation}] ${err.message}`);
+    return reply.status(503).send({ error: "Payment provider unavailable" });
+  }
+  throw err;
+});
+```
+
+`SangriaError` has an `.operation` field (`"generate"` or `"settle"`) so you know which step failed. Subclasses give you more detail:
+
+- `SangriaConnectionError` — network failure (DNS, refused, reset)
+- `SangriaTimeoutError` — request timed out
+- `SangriaAPIStatusError` — backend returned 4xx/5xx (has `.statusCode` and `.response`)
+
+Business-level payment failures (bad signature, insufficient funds) are **not** errors — they return a normal `402` response to the caller.
+
+## 6. Run it
 
 Start your server:
 

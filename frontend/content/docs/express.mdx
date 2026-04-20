@@ -65,7 +65,33 @@ app.get(
 app.listen(4001);
 ```
 
-## 4. Run it
+## 4. Handle errors
+
+If the Sangria backend is unreachable, times out, or returns a non-2xx status, the SDK throws a `SangriaError`. Without an error handler, Express returns a raw `500` stack trace to the caller.
+
+Add an error handler **after** all your routes:
+
+```ts
+import { SangriaError } from "@sangria-sdk/core";
+
+app.use((err, _req, res, next) => {
+  if (err instanceof SangriaError) {
+    console.error(`[sangria:${err.operation}]`, err.message);
+    return res.status(503).json({ error: "Payment provider unavailable" });
+  }
+  next(err);
+});
+```
+
+`SangriaError` has an `.operation` field (`"generate"` or `"settle"`) so you know which step failed. Subclasses give you more detail:
+
+- `SangriaConnectionError` — network failure (DNS, refused, reset)
+- `SangriaTimeoutError` — request timed out
+- `SangriaAPIStatusError` — backend returned 4xx/5xx (has `.statusCode` and `.response`)
+
+Business-level payment failures (bad signature, insufficient funds) are **not** errors — they return a normal `402` response to the caller.
+
+## 5. Run it
 
 Start your server:
 

@@ -90,7 +90,55 @@ async function handler(request: NextRequest) {
 }
 ```
 
-## 4. Run it
+## 4. Handle errors
+
+If the Sangria backend is unreachable, times out, or returns a non-2xx status, the SDK throws a `SangriaError`. Next.js App Router doesn't have global error middleware for API routes, so wrap the call in a try/catch:
+
+```ts
+import { Sangria, SangriaError } from "@sangria-sdk/core";
+import { fixedPrice } from "@sangria-sdk/core/nextjs";
+
+async function handler(request: NextRequest) {
+  return NextResponse.json({ message: "Premium content" });
+}
+
+export const GET = fixedPrice(
+  sangria,
+  { price: 0.01, description: "Access premium content" },
+  handler
+);
+```
+
+If you want to catch errors and return a clean 503 instead of Next.js's default 500:
+
+```ts
+import { SangriaError } from "@sangria-sdk/core";
+
+export async function GET(request: NextRequest) {
+  try {
+    return await myFixedPriceHandler(request);
+  } catch (err) {
+    if (err instanceof SangriaError) {
+      console.error(`[sangria:${err.operation}]`, err.message);
+      return NextResponse.json(
+        { error: "Payment provider unavailable" },
+        { status: 503 }
+      );
+    }
+    throw err;
+  }
+}
+```
+
+`SangriaError` has an `.operation` field (`"generate"` or `"settle"`) so you know which step failed. Subclasses give you more detail:
+
+- `SangriaConnectionError` — network failure (DNS, refused, reset)
+- `SangriaTimeoutError` — request timed out
+- `SangriaAPIStatusError` — backend returned 4xx/5xx (has `.statusCode` and `.response`)
+
+Business-level payment failures (bad signature, insufficient funds) are **not** errors — they return a normal `402` response to the caller.
+
+## 5. Run it
 
 Start your Next.js dev server:
 
