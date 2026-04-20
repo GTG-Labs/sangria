@@ -56,6 +56,15 @@ export default function WithdrawalsContent() {
   const [merchants, setMerchants] = useState<APIKey[]>([]);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
 
+  // Clear list + pagination metadata after an initial-load failure so a stale
+  // Load More button can't render below an empty state.
+  const resetForInitialLoadFailure = () => {
+    setWithdrawals([]);
+    setHasMore(false);
+    setNextCursor(null);
+    setTotal(null);
+  };
+
   const fetchWithdrawals = async (cursor?: string, signal?: AbortSignal) => {
     const isInitialLoad = !cursor;
     isInitialLoad ? setLoading(true) : setLoadingMore(true);
@@ -92,13 +101,13 @@ export default function WithdrawalsContent() {
           .json()
           .catch(() => ({ error: "Unknown error" }));
         setError(errorData.error || "Failed to load withdrawals");
-        if (isInitialLoad) setWithdrawals([]);
+        if (isInitialLoad) resetForInitialLoadFailure();
       }
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") return;
       console.error("Failed to load withdrawals:", err);
       setError("Failed to load withdrawals");
-      if (isInitialLoad) setWithdrawals([]);
+      if (isInitialLoad) resetForInitialLoadFailure();
     } finally {
       if (!signal?.aborted) {
         isInitialLoad ? setLoading(false) : setLoadingMore(false);
@@ -353,8 +362,8 @@ export default function WithdrawalsContent() {
       {hasMore && (
         <div className="mt-6 flex justify-center">
           <button
-            onClick={() => fetchWithdrawals(nextCursor!)}
-            disabled={loadingMore}
+            onClick={() => nextCursor && fetchWithdrawals(nextCursor)}
+            disabled={loadingMore || !nextCursor}
             className="px-5 py-2 text-sm border border-zinc-200 rounded-lg text-gray-600 hover:bg-zinc-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {loadingMore ? "Loading..." : "Load More"}

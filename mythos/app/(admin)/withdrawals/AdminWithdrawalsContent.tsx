@@ -163,7 +163,14 @@ export default function AdminWithdrawalsContent() {
       );
 
       if (response.ok) {
-        await fetchWithdrawals();
+        // Patch the acted-upon row in place using the returned Withdrawal
+        // instead of full-refetching. Avoids the full-page loading spinner
+        // (`loading` guard unmounts the table), preserves scroll position,
+        // and keeps any expanded detail panel open.
+        const updated = (await response.json()) as Withdrawal;
+        setWithdrawals((prev) =>
+          prev.map((w) => (w.id === updated.id ? updated : w))
+        );
       } else {
         const errorData = await response
           .json()
@@ -654,8 +661,8 @@ export default function AdminWithdrawalsContent() {
       {hasMore && (
         <div className="mt-6 flex justify-center">
           <button
-            onClick={() => fetchWithdrawals(nextCursor!)}
-            disabled={loadingMore}
+            onClick={() => nextCursor && fetchWithdrawals(nextCursor)}
+            disabled={loadingMore || !nextCursor}
             className="px-5 py-2 text-sm border border-gray-700 rounded-lg text-gray-400 hover:bg-white/5 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {loadingMore ? "Loading..." : "Load More"}

@@ -58,6 +58,17 @@ export default function TransactionsContent() {
   const fetchControllerRef = useRef<AbortController | null>(null);
   const ledgerControllerRef = useRef<AbortController | null>(null);
 
+  // Clear list, pagination metadata, and aggregates after an initial-load
+  // failure so a stale Load More button or Volume card can't render above an
+  // empty table.
+  const resetForInitialLoadFailure = () => {
+    setTransactions([]);
+    setHasMore(false);
+    setNextCursor(null);
+    setTotal(null);
+    setTotals(null);
+  };
+
   // Filters
   const [search, setSearch] = useState("");
   const [activeSearch, setActiveSearch] = useState("");
@@ -100,12 +111,12 @@ export default function TransactionsContent() {
             .json()
             .catch(() => ({ error: "Unknown error" }));
           setError(errorData.error || "Failed to load transactions");
-          if (isInitialLoad) setTransactions([]);
+          if (isInitialLoad) resetForInitialLoadFailure();
         }
       } catch (e) {
         if ((e as Error).name === "AbortError") return;
         setError("Failed to load transactions");
-        if (isInitialLoad) setTransactions([]);
+        if (isInitialLoad) resetForInitialLoadFailure();
       } finally {
         if (!controller.signal.aborted) {
           isInitialLoad ? setLoading(false) : setLoadingMore(false);
@@ -374,8 +385,8 @@ export default function TransactionsContent() {
       {hasMore && (
         <div className="mt-6 flex justify-center">
           <button
-            onClick={() => fetchTransactions(nextCursor!)}
-            disabled={loadingMore}
+            onClick={() => nextCursor && fetchTransactions(nextCursor)}
+            disabled={loadingMore || !nextCursor}
             className="px-5 py-2 text-sm border border-gray-700 rounded-lg text-gray-400 hover:bg-white/5 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {loadingMore ? "Loading..." : "Load More"}

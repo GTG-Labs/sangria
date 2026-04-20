@@ -33,6 +33,15 @@ export default function TransactionsContent() {
   const [total, setTotal] = useState<number | null>(null);
   const [balance, setBalance] = useState<number | null>(null);
 
+  // Clear list + pagination metadata after an initial-load failure so a stale
+  // Load More button can't render below an empty state.
+  const resetForInitialLoadFailure = () => {
+    setTransactions([]);
+    setHasMore(false);
+    setNextCursor(null);
+    setTotal(null);
+  };
+
   const fetchTransactions = async (cursor?: string) => {
     const isInitialLoad = !cursor;
     isInitialLoad ? setLoading(true) : setLoadingMore(true);
@@ -66,12 +75,12 @@ export default function TransactionsContent() {
           .json()
           .catch(() => ({ error: "Unknown error" }));
         setError(errorData.error || "Failed to load transactions");
-        if (isInitialLoad) setTransactions([]);
+        if (isInitialLoad) resetForInitialLoadFailure();
       }
     } catch (err) {
       console.error("Failed to load transactions:", err);
       setError("Failed to load transactions");
-      if (isInitialLoad) setTransactions([]);
+      if (isInitialLoad) resetForInitialLoadFailure();
     } finally {
       isInitialLoad ? setLoading(false) : setLoadingMore(false);
     }
@@ -237,8 +246,8 @@ export default function TransactionsContent() {
       {hasMore && (
         <div className="mt-6 flex justify-center">
           <button
-            onClick={() => fetchTransactions(nextCursor!)}
-            disabled={loadingMore}
+            onClick={() => nextCursor && fetchTransactions(nextCursor)}
+            disabled={loadingMore || !nextCursor}
             className="px-5 py-2 text-sm border border-zinc-200 rounded-lg text-gray-600 hover:bg-zinc-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {loadingMore ? "Loading..." : "Load More"}
