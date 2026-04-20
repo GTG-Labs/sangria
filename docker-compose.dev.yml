@@ -1,0 +1,51 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8080:8080"
+    env_file: ./backend/.env
+    environment:
+      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 5s
+      retries: 5
+      start_period: 30s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3000:3000"
+    env_file: ./frontend/.env
+    environment:
+      - BACKEND_URL=http://backend:8080
+      - WATCHPACK_POLLING=true
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  mythos:
+    build:
+      context: ./mythos
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3001:3001"
+    env_file: ./mythos/.env.local
+    environment:
+      - BACKEND_URL=http://backend:8080
+      - WATCHPACK_POLLING=true
+    volumes:
+      - ./mythos:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      backend:
+        condition: service_healthy
