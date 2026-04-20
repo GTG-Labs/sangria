@@ -6,5 +6,5 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string; userId: string }> }
 ) {
   const { id, userId } = await params;
-  return proxyToBackend("DELETE", `/internal/organizations/${id}/members/${userId}`, { rawResponse: true });
+  return proxyToBackend("DELETE", `/internal/organizations/${encodeURIComponent(id)}/members/${encodeURIComponent(userId)}`, { rawResponse: true });
 }

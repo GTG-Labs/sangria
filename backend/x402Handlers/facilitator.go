@@ -43,10 +43,44 @@ func isRetryable(err error, statusCode int) bool {
 	return statusCode >= 500
 }
 
-// doFacilitatorRequest executes an HTTP request against the facilitator with
-// a single retry on transient failures. Returns the response body and status
-// code on success, or an error if all attempts fail.
-func doFacilitatorRequest(ctx context.Context, method, url, authPath, facilitatorURL string, body []byte) ([]byte, int, error) {
+// doFacilitatorRequestOnce makes a single HTTP attempt against the facilitator
+// with no retries. Used directly by Settle — which per root CLAUDE.md is NOT
+// HTTP-idempotent, so retrying at this layer can conflate on-chain success
+// with HTTP-layer ambiguity. Also used as the underlying transport for
+// doFacilitatorRequestIdempotent.
+func doFacilitatorRequestOnce(ctx context.Context, method, url, authPath, facilitatorURL string, body []byte) ([]byte, int, error) {
+	req, err := http.NewRequestWithContext(ctx, method, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, 0, fmt.Errorf("create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	if err := addCDPAuth(req, facilitatorURL, authPath); err != nil {
+		return nil, 0, fmt.Errorf("facilitator auth: %w", err)
+	}
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, 0, fmt.Errorf("http request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxFacilitatorBody))
+	if err != nil {
+		return nil, 0, fmt.Errorf("read response: %w", err)
+	}
+
+	return respBody, resp.StatusCode, nil
+}
+
+// doFacilitatorRequestIdempotent executes an HTTP request against the
+// facilitator with a single retry on transient failures (network errors,
+// timeouts, 5xx). ONLY USE FOR IDEMPOTENT ENDPOINTS like /verify.
+//
+// Do NOT use for /settle. Per root CLAUDE.md: "x402 settle is NOT HTTP-
+// idempotent. Persist intent before calling. Treat ambiguous HTTP responses as
+// UNRESOLVED (not failed) and reconcile against on-chain state."
+func doFacilitatorRequestIdempotent(ctx context.Context, method, url, authPath, facilitatorURL string, body []byte) ([]byte, int, error) {
 	var lastErr error
 
 	for attempt := 0; attempt <= maxRetries; attempt++ {
@@ -55,39 +89,22 @@ func doFacilitatorRequest(ctx context.Context, method, url, authPath, facilitato
 			time.Sleep(retryDelay)
 		}
 
-		req, err := http.NewRequestWithContext(ctx, method, url, bytes.NewReader(body))
+		respBody, statusCode, err := doFacilitatorRequestOnce(ctx, method, url, authPath, facilitatorURL, body)
 		if err != nil {
-			return nil, 0, fmt.Errorf("create request: %w", err)
-		}
-		req.Header.Set("Content-Type", "application/json")
-
-		if err := addCDPAuth(req, facilitatorURL, authPath); err != nil {
-			return nil, 0, fmt.Errorf("facilitator auth: %w", err)
-		}
-
-		resp, err := httpClient.Do(req)
-		if err != nil {
-			lastErr = fmt.Errorf("http request: %w", err)
+			lastErr = err
 			if isRetryable(err, 0) {
 				continue
 			}
 			return nil, 0, lastErr
 		}
 
-		respBody, readErr := io.ReadAll(io.LimitReader(resp.Body, maxFacilitatorBody))
-		resp.Body.Close()
-		if readErr != nil {
-			lastErr = fmt.Errorf("read response: %w", readErr)
+		if isRetryable(nil, statusCode) {
+			slog.Debug("facilitator returned retryable status", "status", statusCode, "body", string(respBody))
+			lastErr = fmt.Errorf("returned status %d", statusCode)
 			continue
 		}
 
-		if isRetryable(nil, resp.StatusCode) {
-			slog.Debug("facilitator returned retryable status", "status", resp.StatusCode, "body", string(respBody))
-			lastErr = fmt.Errorf("returned status %d", resp.StatusCode)
-			continue
-		}
-
-		return respBody, resp.StatusCode, nil
+		return respBody, statusCode, nil
 	}
 
 	return nil, 0, fmt.Errorf("all attempts failed: %w", lastErr)
@@ -187,7 +204,7 @@ func Verify(ctx context.Context, payload json.RawMessage, requirements PaymentRe
 
 	slog.Debug("calling facilitator verify", "url", facilitatorURL)
 
-	respBody, statusCode, err := doFacilitatorRequest(
+	respBody, statusCode, err := doFacilitatorRequestIdempotent(
 		ctx, http.MethodPost, facilitatorURL+"/verify",
 		"/platform/v2/x402/verify", facilitatorURL, body,
 	)
@@ -221,7 +238,12 @@ func Settle(ctx context.Context, payload json.RawMessage, requirements PaymentRe
 		return nil, fmt.Errorf("build settle request: %w", err)
 	}
 
-	respBody, statusCode, err := doFacilitatorRequest(
+	// NOTE: Settle uses doFacilitatorRequestOnce (no retries) because x402
+	// settle is NOT HTTP-idempotent — see root CLAUDE.md. A retry after an
+	// ambiguous 5xx could attempt a second on-chain transfer; we rely on
+	// upstream reconciliation against chain state (TODO: merchantHandlers/
+	// payments.go:99-101) rather than on HTTP-layer retries.
+	respBody, statusCode, err := doFacilitatorRequestOnce(
 		ctx, http.MethodPost, facilitatorURL+"/settle",
 		"/platform/v2/x402/settle", facilitatorURL, body,
 	)

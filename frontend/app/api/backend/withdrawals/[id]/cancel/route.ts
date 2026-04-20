@@ -7,5 +7,5 @@ export async function POST(
 ) {
   const { id } = await params;
   const body = await request.json().catch(() => ({}));
-  return proxyToBackend("POST", `/internal/withdrawals/${id}/cancel`, { body });
+  return proxyToBackend("POST", `/internal/withdrawals/${encodeURIComponent(id)}/cancel`, { body });
 }

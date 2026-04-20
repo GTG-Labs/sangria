@@ -3,5 +3,5 @@ import { proxyToBackend } from "@/lib/api-proxy";
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  return proxyToBackend("GET", `/internal/organizations/${id}/members`);
+  return proxyToBackend("GET", `/internal/organizations/${encodeURIComponent(id)}/members`);
 }

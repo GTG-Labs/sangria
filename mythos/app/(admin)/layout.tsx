@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { withAuth } from "@workos-inc/authkit-nextjs";
 import { verifyAdmin } from "@/lib/admin";
 import { handleSignOut } from "@/lib/auth-actions";
+import NavLinks from "./NavLinks";
 
 export default async function AdminLayout({
   children,
@@ -28,20 +29,7 @@ export default async function AdminLayout({
             <Link href="/transactions" className="text-lg font-bold">
               mythos
             </Link>
-            <div className="flex items-center gap-6">
-              <Link
-                href="/transactions"
-                className="text-sm text-gray-400 hover:text-white transition-colors"
-              >
-                Transactions
-              </Link>
-              <Link
-                href="/withdrawals"
-                className="text-sm text-gray-400 hover:text-white transition-colors"
-              >
-                Withdrawals
-              </Link>
-            </div>
+            <NavLinks />
           </div>
           <form action={handleSignOut}>
             <button

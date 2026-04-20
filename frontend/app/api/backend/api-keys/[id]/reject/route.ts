@@ -6,5 +6,5 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  return proxyToBackend("POST", `/internal/api-keys/${id}/reject`, { rawResponse: true });
+  return proxyToBackend("POST", `/internal/api-keys/${encodeURIComponent(id)}/reject`, { rawResponse: true });
 }

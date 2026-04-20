@@ -99,7 +99,7 @@ Requires WorkOS JWT and the user must exist in the `admins` table.
 | POST | `/admin/withdrawals/:id/reject` | Admin | Reject and reverse a pending withdrawal |
 | POST | `/admin/withdrawals/:id/complete` | Admin | Mark withdrawal as completed after bank transfer |
 | POST | `/admin/withdrawals/:id/fail` | Admin | Mark withdrawal as failed and reverse balance debit |
-| GET | `/admin/withdrawals` | Admin | List withdrawals (filterable by ?status=) |
+| GET | `/admin/withdrawals` | Admin | List withdrawals across all merchants (paginated, ?limit=&cursor=&status=) |
 
 ### API key format
 

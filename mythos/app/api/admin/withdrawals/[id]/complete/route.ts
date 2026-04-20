@@ -1,10 +1,10 @@
 import { NextRequest } from "next/server";
 import { proxyToBackend } from "@/lib/api-proxy";
 
-export async function DELETE(
-  request: NextRequest,
+export async function POST(
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  return proxyToBackend("DELETE", `/internal/api-keys/${encodeURIComponent(id)}`, { rawResponse: true });
+  return proxyToBackend("POST", `/admin/withdrawals/${encodeURIComponent(id)}/complete`);
 }

@@ -56,9 +56,26 @@ export default function WithdrawalsContent() {
   const [merchants, setMerchants] = useState<APIKey[]>([]);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
 
+  // Clear list + pagination metadata after an initial-load failure so a stale
+  // Load More button can't render below an empty state.
+  const resetForInitialLoadFailure = () => {
+    setWithdrawals([]);
+    setHasMore(false);
+    setNextCursor(null);
+    setTotal(null);
+  };
+
   const fetchWithdrawals = async (cursor?: string, signal?: AbortSignal) => {
     const isInitialLoad = !cursor;
-    isInitialLoad ? setLoading(true) : setLoadingMore(true);
+    // Symmetric set: clear the opposite flag so a superseding fetch can't
+    // leave the other flag stuck.
+    if (isInitialLoad) {
+      setLoading(true);
+      setLoadingMore(false);
+    } else {
+      setLoadingMore(true);
+      setLoading(false);
+    }
 
     try {
       const params = new URLSearchParams();
@@ -92,16 +109,17 @@ export default function WithdrawalsContent() {
           .json()
           .catch(() => ({ error: "Unknown error" }));
         setError(errorData.error || "Failed to load withdrawals");
-        if (isInitialLoad) setWithdrawals([]);
+        if (isInitialLoad) resetForInitialLoadFailure();
       }
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") return;
       console.error("Failed to load withdrawals:", err);
       setError("Failed to load withdrawals");
-      if (isInitialLoad) setWithdrawals([]);
+      if (isInitialLoad) resetForInitialLoadFailure();
     } finally {
       if (!signal?.aborted) {
-        isInitialLoad ? setLoading(false) : setLoadingMore(false);
+        setLoading(false);
+        setLoadingMore(false);
       }
     }
   };
@@ -211,6 +229,7 @@ export default function WithdrawalsContent() {
       processing: "bg-blue-100 text-blue-800",
       completed: "bg-green-100 text-green-800",
       failed: "bg-red-100 text-red-800",
+      reversed: "bg-purple-100 text-purple-800",
       canceled: "bg-gray-100 text-gray-800",
     };
     const labels: Record<string, string> = {
@@ -219,6 +238,7 @@ export default function WithdrawalsContent() {
       processing: "Processing",
       completed: "Completed",
       failed: "Failed",
+      reversed: "Reversed",
       canceled: "Canceled",
     };
     return (
@@ -353,8 +373,8 @@ export default function WithdrawalsContent() {
       {hasMore && (
         <div className="mt-6 flex justify-center">
           <button
-            onClick={() => fetchWithdrawals(nextCursor!)}
-            disabled={loadingMore}
+            onClick={() => nextCursor && fetchWithdrawals(nextCursor)}
+            disabled={loadingMore || !nextCursor}
             className="px-5 py-2 text-sm border border-zinc-200 rounded-lg text-gray-600 hover:bg-zinc-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {loadingMore ? "Loading..." : "Load More"}
