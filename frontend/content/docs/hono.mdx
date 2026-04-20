@@ -5,22 +5,36 @@ description: Learn how to accept your first payment using Hono and the Sangria T
 
 ## Prerequisites
 
-To get the most out of this guide, you'll need to:
-
-- [Create an API key](https://sangria.dev/dashboard/api-keys) from the Sangria dashboard
-- Have Node.js 18+ installed
+- [Create a Sangria secret key](https://getsangria.com/dashboard/api-keys) from the Sangria dashboard
 
 ## 1. Install
 
 Install the Sangria SDK in your Hono project.
 
-```bash
-npm install @sangria-sdk/core
-```
+<Tabs items={["npm", "yarn", "pnpm", "bun"]}>
+  <Tab value="npm">
+  ```bash
+  npm install @sangria-sdk/core
+  ```
+  </Tab>
+  <Tab value="yarn">
+  ```bash
+  yarn add @sangria-sdk/core
+  ```
+  </Tab>
+  <Tab value="pnpm">
+  ```bash
+  pnpm add @sangria-sdk/core
+  ```
+  </Tab>
+  <Tab value="bun">
+  ```bash
+  bun add @sangria-sdk/core
+  ```
+  </Tab>
+</Tabs>
 
 ## 2. Initialize the client
-
-Create a Sangria instance with your API key.
 
 ```ts
 import { Sangria } from "@sangria-sdk/core";
@@ -30,9 +44,9 @@ const sangria = new Sangria({
 });
 ```
 
-## 3. Protect a route
+## 3. Set a price on your endpoint
 
-Import the Hono adapter and add `fixedPrice` as middleware to any route.
+Add `fixedPrice` as middleware to any route you want to charge for.
 
 ```ts
 import { Hono } from "hono";
@@ -66,24 +80,84 @@ app.get(
 serve({ fetch: app.fetch, port: 4003 });
 ```
 
-## 4. Run it
+<div style={{ borderLeft: '2px solid var(--color-fd-border)', paddingLeft: '1.5rem', marginTop: '1.5rem' }}>
 
-Start your server:
+### Bypassing payment
 
-```bash
-SANGRIA_SECRET_KEY=sg_live_xxx node server.js
+If your customers already authenticate with their own API key, you can skip Sangria payment for those requests:
+
+```ts
+app.get(
+  "/premium",
+  fixedPrice(sangria, {
+    price: 0.01,
+    description: "Access premium content",
+  }, {
+    bypassPaymentIf: (c) => {
+      const key = c.req.header("x-api-key");
+      return key != null && isValidApiKey(key); // validate against your own auth system
+    },
+  }),
+  (c) => {
+    return c.json({ message: "You accessed the premium endpoint!" });
+  }
+);
 ```
 
-When an agent calls `GET /premium`:
+### Accessing payment data
 
-1. **First request** (no payment) — the SDK returns `402 Payment Required` with the price and payment details
-2. **Agent signs** the USDC payment off-chain
-3. **Retry with payment** — the agent sends the signed payment in a `payment-signature` header
-4. **SDK settles** the payment on-chain and your handler runs
+Use the `getSangria` helper to read payment details inside your handler:
 
-## Try it yourself
+```ts
+import { fixedPrice, getSangria } from "@sangria-sdk/core/hono";
 
-```bash
-# This will return a 402 with payment requirements
-curl http://localhost:4003/premium
+app.get(
+  "/premium",
+  fixedPrice(sangria, { price: 0.01, description: "Access premium content" }),
+  (c) => {
+    const payment = getSangria(c);
+    // payment.paid — true if agent paid
+    // payment.amount — the price charged
+    // payment.transaction — on-chain tx hash
+
+    return c.json({ paid: payment?.paid });
+  }
+);
 ```
+
+</div>
+
+## Handle errors
+
+If the Sangria backend is *unreachable, times out, or returns a non-2xx status*, the SDK throws a `SangriaError`. Register an `onError` handler to return a clean response:
+
+```ts
+import { SangriaError } from "@sangria-sdk/core";
+
+app.onError((err, c) => {
+  if (err instanceof SangriaError) {
+    console.error(`[sangria:${err.operation}]`, err.message);
+    return c.json({ error: "Payment provider unavailable" }, 503);
+  }
+  console.error(err);
+  return c.json({ error: "Internal Server Error" }, 500);
+});
+```
+
+`SangriaError` has an `.operation` field (`"generate"` or `"settle"`) so you know which step failed. Subclasses give you more detail:
+
+| Error | When | Properties |
+|-------|------|------------|
+| `SangriaConnectionError` | Network failure (DNS, refused, reset) | — |
+| `SangriaTimeoutError` | Request timed out | — |
+| `SangriaAPIStatusError` | Backend returned 4xx/5xx | `.statusCode`, `.response` |
+
+Business-level payment failures (bad signature, insufficient funds) are **not** errors — they return a normal `402` response to the caller.
+
+## That's it
+
+Your endpoint is now priced. When an AI agent calls it, here's what happens:
+
+1. The SDK returns a `402` with the price and payment details
+2. The agent signs a USDC payment off-chain and retries with a `payment-signature` header
+3. The SDK settles the payment on-chain, and your handler runs

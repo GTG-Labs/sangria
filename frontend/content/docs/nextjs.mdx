@@ -5,52 +5,60 @@ description: Learn how to accept your first payment using Next.js App Router and
 
 ## Prerequisites
 
-To get the most out of this guide, you'll need to:
-
-- [Create an API key](https://sangria.dev/dashboard/api-keys) from the Sangria dashboard
-- Have Node.js 18+ installed
+- [Create a Sangria secret key](https://getsangria.com/dashboard/api-keys) from the Sangria dashboard
 
 ## 1. Install
 
 Install the Sangria SDK in your Next.js project.
 
-```bash
-npm install @sangria-sdk/core
-```
+<Tabs items={["npm", "yarn", "pnpm", "bun"]}>
+  <Tab value="npm">
+  ```bash
+  npm install @sangria-sdk/core
+  ```
+  </Tab>
+  <Tab value="yarn">
+  ```bash
+  yarn add @sangria-sdk/core
+  ```
+  </Tab>
+  <Tab value="pnpm">
+  ```bash
+  pnpm add @sangria-sdk/core
+  ```
+  </Tab>
+  <Tab value="bun">
+  ```bash
+  bun add @sangria-sdk/core
+  ```
+  </Tab>
+</Tabs>
 
 ## 2. Initialize the client
 
-Create a Sangria instance with your API key. Store your key in an environment variable — never hard-code it.
-
 ```ts
+// lib/sangria.ts
 import { Sangria } from "@sangria-sdk/core";
 
-const sangria = new Sangria({
+export const sangria = new Sangria({
   apiKey: process.env.SANGRIA_SECRET_KEY!,
 });
 ```
 
-## 3. Protect a route
+## 3. Set a price on your endpoint
 
-Import the Next.js adapter and wrap your route handler with `fixedPrice`. Your existing handler code stays exactly the same — just wrap it.
+Create your API route handler like you normally would. Then wrap it with `fixedPrice` — this charges the caller before your handler runs.
 
 ```ts
+// app/api/premium/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { Sangria } from "@sangria-sdk/core";
+import { sangria } from "@/lib/sangria";
 import { fixedPrice } from "@sangria-sdk/core/nextjs";
 
-const sangria = new Sangria({
-  apiKey: process.env.SANGRIA_SECRET_KEY!,
-});
-
-// Your existing handler — no changes needed
 async function handler(request: NextRequest) {
-  return NextResponse.json({
-    message: "You accessed the premium endpoint!",
-  });
+  return NextResponse.json({ message: "Premium content" });
 }
 
-// Wrap it with fixedPrice
 export const GET = fixedPrice(
   sangria,
   { price: 0.01, description: "Access premium content" },
@@ -58,9 +66,11 @@ export const GET = fixedPrice(
 );
 ```
 
+<div style={{ borderLeft: '2px solid var(--color-fd-border)', paddingLeft: '1.5rem', marginTop: '1.5rem' }}>
+
 ### Bypassing payment
 
-If you want to skip Sangria for requests that already have their own API key (e.g. existing customers), use the `bypassPaymentIf` callback:
+If your customers already authenticate with their own API key, you can skip Sangria payment for those requests:
 
 ```ts
 export const GET = fixedPrice(
@@ -68,7 +78,10 @@ export const GET = fixedPrice(
   { price: 0.01, description: "Access premium content" },
   handler,
   {
-    bypassPaymentIf: (request) => request.headers.has("x-api-key"),
+    bypassPaymentIf: (request) => {
+      const key = request.headers.get("x-api-key");
+      return key != null && isValidApiKey(key); // validate against your own auth system
+    },
   }
 );
 ```
@@ -90,26 +103,60 @@ async function handler(request: NextRequest) {
 }
 ```
 
-## 4. Run it
+</div>
 
-Start your Next.js dev server:
+## Handle errors
 
-```bash
-SANGRIA_SECRET_KEY=sg_live_xxx npm run dev
+If the Sangria backend is *unreachable, times out, or returns a non-2xx status*, the SDK throws a `SangriaError`. Next.js App Router doesn't have global error middleware for API routes, so wrap the call in a try/catch:
+
+```ts
+// app/api/premium/route.ts
+import { NextRequest, NextResponse } from "next/server";
+import { sangria } from "@/lib/sangria";
+import { SangriaError } from "@sangria-sdk/core";
+import { fixedPrice } from "@sangria-sdk/core/nextjs";
+
+async function handler(request: NextRequest) {
+  return NextResponse.json({ message: "Premium content" });
+}
+
+const premiumRoute = fixedPrice(
+  sangria,
+  { price: 0.01, description: "Access premium content" },
+  handler
+);
+
+export async function GET(request: NextRequest) {
+  try {
+    return await premiumRoute(request);
+  } catch (err) {
+    if (err instanceof SangriaError) {
+      console.error(`[sangria:${err.operation}]`, err.message);
+      return NextResponse.json(
+        { error: "Payment provider unavailable" },
+        { status: 503 }
+      );
+    }
+    throw err;
+  }
+}
 ```
 
-When an agent calls your protected route:
+`SangriaError` has an `.operation` field (`"generate"` or `"settle"`) so you know which step failed. Subclasses give you more detail:
 
-1. **First request** (no payment) — the SDK returns `402 Payment Required` with the price and payment details
-2. **Agent signs** the USDC payment off-chain
-3. **Retry with payment** — the agent sends the signed payment in a `payment-signature` header
-4. **SDK settles** the payment on-chain and your handler runs
+| Error | When | Properties |
+|-------|------|------------|
+| `SangriaConnectionError` | Network failure (DNS, refused, reset) | — |
+| `SangriaTimeoutError` | Request timed out | — |
+| `SangriaAPIStatusError` | Backend returned 4xx/5xx | `.statusCode`, `.response` |
 
-## Try it yourself
+Business-level payment failures (bad signature, insufficient funds) are **not** errors — they return a normal `402` response to the caller.
 
-```bash
-# This will return a 402 with payment requirements
-curl http://localhost:3000/api/premium
-```
+## That's it
 
-The response includes everything an agent needs to sign and submit payment automatically.
+Your endpoint is now priced. When an AI agent calls it, here's what happens:
+
+1. The SDK returns a `402` with the price and payment details
+2. The agent signs a USDC payment off-chain and retries with a `payment-signature` header
+3. The SDK settles the payment on-chain, and your handler runs
+

@@ -5,22 +5,36 @@ description: Learn how to accept your first payment using Fastify and the Sangri
 
 ## Prerequisites
 
-To get the most out of this guide, you'll need to:
-
-- [Create an API key](https://sangria.dev/dashboard/api-keys) from the Sangria dashboard
-- Have Node.js 18+ installed
+- [Create a Sangria secret key](https://getsangria.com/dashboard/api-keys) from the Sangria dashboard
 
 ## 1. Install
 
 Install the Sangria SDK in your Fastify project.
 
-```bash
-npm install @sangria-sdk/core
-```
+<Tabs items={["npm", "yarn", "pnpm", "bun"]}>
+  <Tab value="npm">
+  ```bash
+  npm install @sangria-sdk/core
+  ```
+  </Tab>
+  <Tab value="yarn">
+  ```bash
+  yarn add @sangria-sdk/core
+  ```
+  </Tab>
+  <Tab value="pnpm">
+  ```bash
+  pnpm add @sangria-sdk/core
+  ```
+  </Tab>
+  <Tab value="bun">
+  ```bash
+  bun add @sangria-sdk/core
+  ```
+  </Tab>
+</Tabs>
 
 ## 2. Initialize the client
-
-Create a Sangria instance with your API key.
 
 ```ts
 import { Sangria } from "@sangria-sdk/core";
@@ -32,7 +46,7 @@ const sangria = new Sangria({
 
 ## 3. Register the plugin
 
-Fastify requires a one-time plugin registration before using the payment middleware. This decorates the request object so `request.sangria` is available in your handlers.
+Fastify requires a one-time plugin registration. This decorates the request object so `request.sangria` is available in your handlers.
 
 ```ts
 import Fastify from "fastify";
@@ -42,9 +56,9 @@ const fastify = Fastify();
 fastify.register(sangriaPlugin);
 ```
 
-## 4. Protect a route
+## 4. Set a price on your endpoint
 
-Use `fixedPrice` as a `preHandler` hook on any route.
+Use `fixedPrice` as a `preHandler` hook on any route you want to charge for.
 
 ```ts
 import Fastify from "fastify";
@@ -81,24 +95,85 @@ fastify.get(
 await fastify.listen({ port: 4002 });
 ```
 
-## 5. Run it
+<div style={{ borderLeft: '2px solid var(--color-fd-border)', paddingLeft: '1.5rem', marginTop: '1.5rem' }}>
 
-Start your server:
+### Bypassing payment
 
-```bash
-SANGRIA_SECRET_KEY=sg_live_xxx node server.js
+If your customers already authenticate with their own API key, you can skip Sangria payment for those requests:
+
+```ts
+fastify.get(
+  "/premium",
+  {
+    preHandler: fixedPrice(sangria, {
+      price: 0.01,
+      description: "Access premium content",
+    }, {
+      bypassPaymentIf: (request) => {
+        const key = request.headers["x-api-key"];
+        return typeof key === "string" && isValidApiKey(key); // validate against your own auth system
+      },
+    }),
+  },
+  async () => {
+    return { message: "You accessed the premium endpoint!" };
+  }
+);
 ```
 
-When an agent calls `GET /premium`:
+### Accessing payment data
 
-1. **First request** (no payment) — the SDK returns `402 Payment Required` with the price and payment details
-2. **Agent signs** the USDC payment off-chain
-3. **Retry with payment** — the agent sends the signed payment in a `payment-signature` header
-4. **SDK settles** the payment on-chain and your handler runs
+Payment details are available on `request.sangria` inside your handler:
 
-## Try it yourself
+```ts
+fastify.get(
+  "/premium",
+  {
+    preHandler: fixedPrice(sangria, { price: 0.01, description: "Access premium content" }),
+  },
+  async (request) => {
+    const payment = request.sangria;
+    // payment.paid — true if agent paid
+    // payment.amount — the price charged
+    // payment.transaction — on-chain tx hash
 
-```bash
-# This will return a 402 with payment requirements
-curl http://localhost:4002/premium
+    return { paid: payment?.paid };
+  }
+);
 ```
+
+</div>
+
+## Handle errors
+
+If the Sangria backend is *unreachable, times out, or returns a non-2xx status*, the SDK throws a `SangriaError`. Register a Fastify error handler to return a clean response instead of Fastify's default `500`:
+
+```ts
+import { SangriaError } from "@sangria-sdk/core";
+
+fastify.setErrorHandler((err, _request, reply) => {
+  if (err instanceof SangriaError) {
+    fastify.log.error(`[sangria:${err.operation}] ${err.message}`);
+    return reply.status(503).send({ error: "Payment provider unavailable" });
+  }
+  throw err;
+});
+```
+
+`SangriaError` has an `.operation` field (`"generate"` or `"settle"`) so you know which step failed. Subclasses give you more detail:
+
+| Error | When | Properties |
+|-------|------|------------|
+| `SangriaConnectionError` | Network failure (DNS, refused, reset) | — |
+| `SangriaTimeoutError` | Request timed out | — |
+| `SangriaAPIStatusError` | Backend returned 4xx/5xx | `.statusCode`, `.response` |
+
+Business-level payment failures (bad signature, insufficient funds) are **not** errors — they return a normal `402` response to the caller.
+
+## That's it
+
+Your endpoint is now priced. When an AI agent calls it, here's what happens:
+
+1. The SDK returns a `402` with the price and payment details
+2. The agent signs a USDC payment off-chain and retries with a `payment-signature` header
+3. The SDK settles the payment on-chain, and your handler runs

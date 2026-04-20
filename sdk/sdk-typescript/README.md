@@ -109,6 +109,47 @@ The `fixedPrice` middleware handles the x402 negotiation loop:
 1. **First request** (no `payment-signature` header): calls Sangria's `/v1/generate-payment` endpoint, returns `402 Payment Required` with payment terms to the client.
 2. **Retry** (with `payment-signature` header): forwards the signed payload to Sangria's `/v1/settle-payment` endpoint. On success, attaches payment data to the request and calls your handler.
 
+## Errors
+
+The SDK throws a `SangriaError` (or subclass) when the Sangria backend is unreachable, times out, or returns a non-2xx status. Business-level payment failures (bad signature, insufficient funds) are **not** errors — they flow through as normal `402` responses.
+
+```text
+SangriaError                   // base — catch-all
+├── SangriaConnectionError     // DNS, refused, socket error
+│   └── SangriaTimeoutError    // client-side timeout
+└── SangriaAPIStatusError      // backend returned non-2xx (has .statusCode, .response)
+```
+
+Every error carries `.operation` (`"generate"` or `"settle"`) so you know which call failed.
+
+Handle errors using your framework's native pattern:
+
+```typescript
+// Express
+app.use((err, _req, res, next) => {
+  if (err instanceof SangriaError) {
+    return res.status(503).json({ error: "Payment provider unavailable" });
+  }
+  next(err);
+});
+
+// Fastify
+fastify.setErrorHandler((err, _req, reply) => {
+  if (err instanceof SangriaError) {
+    return reply.status(503).send({ error: "Payment provider unavailable" });
+  }
+  throw err;
+});
+
+// Hono
+app.onError((err, c) => {
+  if (err instanceof SangriaError) {
+    return c.json({ error: "Payment provider unavailable" }, 503);
+  }
+  return c.json({ error: "Internal Server Error" }, 500);
+});
+```
+
 ## Requirements
 
 - Node.js >= 18

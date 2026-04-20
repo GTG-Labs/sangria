@@ -5,22 +5,31 @@ description: Learn how to accept your first payment using FastAPI and the Sangri
 
 ## Prerequisites
 
-To get the most out of this guide, you'll need to:
-
-- [Create an API key](https://sangria.dev/dashboard/api-keys) from the Sangria dashboard
-- Have Python 3.10+ installed
+- [Create a Sangria secret key](https://getsangria.com/dashboard/api-keys) from the Sangria dashboard
 
 ## 1. Install
 
 Install the Sangria SDK with the FastAPI adapter.
 
-```bash
-pip install sangria-merchant-sdk[fastapi]
-```
+<Tabs items={["pip", "uv", "poetry"]}>
+  <Tab value="pip">
+  ```bash
+  pip install sangria-merchant-sdk[fastapi]
+  ```
+  </Tab>
+  <Tab value="uv">
+  ```bash
+  uv add sangria-merchant-sdk[fastapi]
+  ```
+  </Tab>
+  <Tab value="poetry">
+  ```bash
+  poetry add sangria-merchant-sdk[fastapi]
+  ```
+  </Tab>
+</Tabs>
 
 ## 2. Initialize the client
-
-Create a `SangriaMerchantClient` with your API key.
 
 ```python
 import os
@@ -31,9 +40,9 @@ client = SangriaMerchantClient(
 )
 ```
 
-## 3. Protect a route
+## 3. Set a price on your endpoint
 
-Import the FastAPI adapter and add the `@require_sangria_payment` decorator to any endpoint you want to charge for.
+Add the `@require_sangria_payment` decorator to any endpoint you want to charge for.
 
 ```python
 import os
@@ -59,26 +68,78 @@ async def premium(request: Request):
     return {"message": "You accessed the premium endpoint!"}
 ```
 
-## 4. Run it
+<div style={{ borderLeft: '2px solid var(--color-fd-border)', paddingLeft: '1.5rem', marginTop: '1.5rem' }}>
 
-Start your server:
+### Bypassing payment
 
-```bash
-SANGRIA_SECRET_KEY=sg_live_xxx uvicorn main:app --port 4004
+If your customers already authenticate with their own API key, you can skip Sangria payment for those requests:
+
+```python
+def has_valid_api_key(request: Request) -> bool:
+    key = request.headers.get("x-api-key")
+    return key is not None and is_valid_api_key(key)  # validate against your own auth system
+
+@app.get("/premium")
+@require_sangria_payment(
+    client,
+    amount=0.01,
+    description="Access premium content",
+    bypass_if=has_valid_api_key,
+)
+async def premium(request: Request):
+    return {"message": "You accessed the premium endpoint!"}
 ```
 
-When an agent calls `GET /premium`:
+### Accessing payment data
 
-1. **First request** (no payment) — the SDK returns `402 Payment Required` with the price and payment details
-2. **Agent signs** the USDC payment off-chain
-3. **Retry with payment** — the agent sends the signed payment in a `PAYMENT-SIGNATURE` header
-4. **SDK settles** the payment on-chain and your handler runs
+Payment details are available on `request.state.sangria_payment` inside your handler:
 
-Payment data is available in your handler via `request.state.sangria_payment`.
+```python
+@app.get("/premium")
+@require_sangria_payment(client, amount=0.01, description="Access premium content")
+async def premium(request: Request):
+    payment = request.state.sangria_payment
+    # payment.paid — True if agent paid
+    # payment.amount — the price charged
+    # payment.transaction — on-chain tx hash
 
-## Try it yourself
-
-```bash
-# This will return a 402 with payment requirements
-curl http://localhost:4004/premium
+    return {"paid": payment.paid}
 ```
+
+</div>
+
+## Handle errors
+
+If the Sangria backend is *unreachable, times out, or returns a non-2xx status*, the SDK raises a `SangriaError`. Register a FastAPI exception handler to return a clean response instead of a raw `500`:
+
+```python
+from fastapi import Request
+from fastapi.responses import JSONResponse
+from sangria_sdk import SangriaError
+
+@app.exception_handler(SangriaError)
+async def sangria_error_handler(_request: Request, exc: SangriaError):
+    print(f"[sangria:{exc.operation}] {exc}")
+    return JSONResponse(
+        status_code=503,
+        content={"error": "Payment provider unavailable"},
+    )
+```
+
+`SangriaError` has an `.operation` attribute (`"generate"` or `"settle"`) so you know which step failed. Subclasses give you more detail:
+
+| Error | When | Properties |
+|-------|------|------------|
+| `SangriaConnectionError` | Network failure (DNS, refused, reset) | — |
+| `SangriaTimeoutError` | Request timed out | — |
+| `SangriaAPIStatusError` | Backend returned 4xx/5xx | `.status_code`, `.response` |
+
+Business-level payment failures (bad signature, insufficient funds) are **not** errors — they return a normal `402` response to the caller.
+
+## That's it
+
+Your endpoint is now priced. When an AI agent calls it, here's what happens:
+
+1. The SDK returns a `402` with the price and payment details
+2. The agent signs a USDC payment off-chain and retries with a `payment-signature` header
+3. The SDK settles the payment on-chain, and your handler runs
