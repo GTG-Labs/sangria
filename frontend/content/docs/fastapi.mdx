@@ -119,6 +119,7 @@ from sangria_sdk import SangriaError
 
 @app.exception_handler(SangriaError)
 async def sangria_error_handler(_request: Request, exc: SangriaError):
+    print(f"[sangria:{exc.operation}] {exc}")
     return JSONResponse(
         status_code=503,
         content={"error": "Payment provider unavailable"},
