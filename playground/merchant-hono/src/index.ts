@@ -5,8 +5,13 @@ import { fixedPrice } from "@sangria-sdk/core/hono";
 
 const app = new Hono();
 
+const apiKey = process.env.SANGRIA_SECRET_KEY;
+if (!apiKey) {
+  throw new Error("SANGRIA_SECRET_KEY environment variable is required");
+}
+
 const sangria = new Sangria({
-  apiKey: process.env.SANGRIA_SECRET_KEY ?? "sk_test_abc123",
+  apiKey,
   baseUrl: process.env.SANGRIA_URL ?? "http://localhost:8080",
 });
 

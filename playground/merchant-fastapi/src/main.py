@@ -7,9 +7,13 @@ from sangria_sdk.adapters.fastapi import require_sangria_payment
 
 app = FastAPI(title="Merchant FastAPI")
 
+api_key = os.getenv("SANGRIA_SECRET_KEY")
+if not api_key:
+    raise RuntimeError("SANGRIA_SECRET_KEY environment variable is required")
+
 client = SangriaMerchantClient(
     base_url=os.getenv("SANGRIA_URL", "http://localhost:8080"),
-    api_key=os.getenv("SANGRIA_SECRET_KEY", "sk_test_abc123"),
+    api_key=api_key,
 )
 
 
