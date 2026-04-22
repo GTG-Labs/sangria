@@ -67,7 +67,7 @@ const emailSchema = z
       domain_specific_validation: true,
       allow_display_name: false,
       require_display_name: false,
-      allow_utf8_local_part: false,
+      allow_utf8_local_part: true,
       require_tld: true,
     });
   }, "Please enter a valid business email address")
@@ -85,7 +85,8 @@ const emailSchema = z
     if (parts.length < 2) return false;
 
     const tld = parts[parts.length - 1];
-    return tld && tld.length >= 2 && /^[a-zA-Z]+$/.test(tld);
+    // Allow ASCII letters plus digits/hyphen to support punycode IDN TLDs (xn--…)
+    return !!tld && tld.length >= 2 && /^[a-zA-Z]([a-zA-Z0-9-]*[a-zA-Z0-9])?$/.test(tld);
   }, "Please enter a valid business email address");
 
 // Base name schema for reusable validation patterns

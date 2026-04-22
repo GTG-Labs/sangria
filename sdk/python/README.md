@@ -122,3 +122,4 @@ Response:
 - Python >= 3.10
 - FastAPI >= 0.135.1
 - httpx >= 0.28.1
+

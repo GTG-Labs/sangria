@@ -149,7 +149,7 @@ API key creation flow:
 
 ## Project structure
 
-```
+```text
 backend/
 ├── main.go                        # Server startup + route registration
 ├── routes/
@@ -228,7 +228,7 @@ backend/
 
 ### Withdrawal lifecycle
 
-```
+```text
                           +-----------+
                           |  pending  |
                      +--->| _approval |---+---+

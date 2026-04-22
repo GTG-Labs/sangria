@@ -48,7 +48,8 @@ Open [http://localhost:3000](http://localhost:3000) to view the application.
 - **Security**: Multi-layer protection with CSRF, CSP, XSS prevention
 
 ### Project Structure
-```
+
+```text
 frontend/
 ├── app/                          # Next.js App Router
 │   ├── (marketing)/             # Public pages (landing, docs, blog)

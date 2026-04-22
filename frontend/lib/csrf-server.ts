@@ -90,6 +90,7 @@ export async function generateCSRFTokenResponse(): Promise<Response> {
       status: 200,
       headers: {
         'Content-Type': 'application/json',
+        'Cache-Control': 'no-store',
       },
     });
   } catch (error) {
