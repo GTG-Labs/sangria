@@ -64,6 +64,13 @@ func main() {
 		"min_microunits", config.WithdrawalConfig.MinAmount,
 		"fee_flat_microunits", config.WithdrawalConfig.FeeFlat)
 
+	if err := config.LoadPaymentConfig(); err != nil {
+		slog.Error("failed to load payment config", "error", err)
+		os.Exit(1)
+	}
+	slog.Info("payment config loaded",
+		"max_amount_microunits", config.PaymentConfig.MaxAmountMicrounits)
+
 	ctx := context.Background()
 
 	pool, err := config.ConnectDatabase(ctx)

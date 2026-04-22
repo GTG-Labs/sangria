@@ -6,12 +6,28 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	dbengine "sangria/backend/dbEngine"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // ErrAPIKeyNotFound is returned when an API key does not exist or is not owned by the user.
 var ErrAPIKeyNotFound = errors.New("API key not found or not owned by user")
+
+// precomputed bcrypt dummy hash
+var dummyHash []byte
+
+func init() {
+	// The plaintext we hash doesn't matter — this hash is only ever compared
+	// against an attacker-supplied key that won't match. The goal is purely
+	// to force bcrypt to run so response time is constant on a no-match.
+	h, err := bcrypt.GenerateFromPassword([]byte("dummy"), bcrypt.DefaultCost)
+	if err != nil {
+		panic(fmt.Sprintf("failed to generate dummy bcrypt hash: %v", err))
+	}
+	dummyHash = h
+}
 
 // CreateAPIKey creates a new API key for an organization with the specified status.
 func CreateAPIKey(ctx context.Context, pool *pgxpool.Pool, organizationID, name string, status dbengine.APIKeyStatus) (*dbengine.Merchant, string, error) {
@@ -70,6 +86,11 @@ func AuthenticateAPIKey(ctx context.Context, pool *pgxpool.Pool, providedKey str
 
 			return &merchant, nil
 		}
+	}
+
+	// No candidates matched!
+	if len(candidates) == 0 {
+		_ = bcrypt.CompareHashAndPassword(dummyHash, []byte(providedKey))
 	}
 
 	return nil, fmt.Errorf("invalid API key")

@@ -43,9 +43,7 @@ export const organizations = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (table) => [
-    index("organizations_name_idx").on(table.name),
-  ],
+  (table) => [index("organizations_name_idx").on(table.name)],
 );
 
 // this is the pure WorkOS ID users
@@ -139,6 +137,11 @@ export const transactions = pgTable(
     unique("uq_idempotency_key").on(table.idempotencyKey),
     index("idx_transactions_created_at").on(table.createdAt.desc()),
     index("idx_transactions_status").on(table.status),
+    // Guarantee a 1-to-1 mapping between confirmed internal transactions and
+    // on-chain settlements.
+    uniqueIndex("uq_transactions_tx_hash_confirmed")
+      .on(table.txHash)
+      .where(sql`status = 'confirmed' AND tx_hash IS NOT NULL`),
   ],
 );
 
@@ -204,7 +207,11 @@ export const networkEnum = pgEnum("network", [
 // Merchants — API keys for businesses receiving payments through x402
 // ---------------------------------------------------------------------------
 
-export const apiKeyStatusEnum = pgEnum("api_key_status", ["active", "pending", "inactive"]);
+export const apiKeyStatusEnum = pgEnum("api_key_status", [
+  "active",
+  "pending",
+  "inactive",
+]);
 
 export const merchants = pgTable(
   "merchants",
@@ -252,7 +259,10 @@ export const cryptoWallets = pgTable(
   (table) => [
     index("idx_crypto_wallets_last_used_at").on(table.lastUsedAt),
     index("idx_crypto_wallets_network").on(table.network),
-    unique("uq_crypto_wallets_address_network").on(table.address, table.network),
+    unique("uq_crypto_wallets_address_network").on(
+      table.address,
+      table.network,
+    ),
     unique("uq_crypto_wallets_account_id").on(table.accountId),
   ],
 );
@@ -271,7 +281,9 @@ export const withdrawals = pgTable(
 
     // Money
     amount: bigint({ mode: "bigint" }).notNull(),
-    fee: bigint({ mode: "bigint" }).notNull().default(BigInt(0)),
+    fee: bigint({ mode: "bigint" })
+      .notNull()
+      .default(sql`0`),
     netAmount: bigint("net_amount", { mode: "bigint" }).notNull(),
 
     // Status lifecycle
@@ -362,8 +374,8 @@ export const organizationInvitations = pgTable(
     // Unique secure token for invitation links
     unique("uq_org_invitations_token").on(table.invitationToken),
     // Prevent duplicate pending invitations to same email for same org (case-insensitive)
-    uniqueIndex("uq_org_invitations_pending").on(table.organizationId, sql`lower(${table.inviteeEmail})`).where(sql`status = 'pending'`),
+    uniqueIndex("uq_org_invitations_pending")
+      .on(table.organizationId, sql`lower(${table.inviteeEmail})`)
+      .where(sql`status = 'pending'`),
   ],
 );
-
-
