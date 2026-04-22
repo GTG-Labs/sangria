@@ -45,6 +45,8 @@ async def premium(request: Request):
     return {"data": "premium content"}
 ```
 
+If your `bypass_if` callback raises, the SDK logs the exception (via `logging.getLogger("sangria_sdk")`, prefixed `[sangria-sdk]`) and falls through to the normal payment-required flow — the request is **not** bypassed. This is intentional: the SDK fails closed so a crashing callback cannot silently leak free access to paid endpoints. Write callbacks defensively against missing headers, unavailable stores, etc.
+
 ## How It Works
 
 The `@require_sangria_payment` decorator handles the x402 negotiation loop:

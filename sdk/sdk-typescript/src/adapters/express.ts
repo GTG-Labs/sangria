@@ -27,7 +27,21 @@ export function fixedPrice(
 
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
-      if (config?.bypassPaymentIf?.(req)) {
+      let shouldBypass = false;
+      if (config?.bypassPaymentIf) {
+        try {
+          shouldBypass = config.bypassPaymentIf(req);
+        } catch (err) {
+          // Fail closed: if the merchant's bypass callback throws, enforce
+          // payment rather than risk letting the request through for free.
+          console.error(
+            "[sangria-sdk] bypassPaymentIf threw; falling through to payment required",
+            err,
+          );
+          shouldBypass = false;
+        }
+      }
+      if (shouldBypass) {
         req.sangria = { paid: false, amount: 0 };
         return next();
       }

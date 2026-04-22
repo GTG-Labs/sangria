@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import Awaitable, Callable
 from functools import wraps
 from typing import Any
@@ -9,6 +10,8 @@ from fastapi.responses import JSONResponse
 
 from ..client import SangriaMerchantClient, validate_fixed_price_options
 from ..models import FixedPriceOptions, PaymentResponse
+
+logger = logging.getLogger("sangria_sdk")
 
 
 # ── Entry point: decorate a FastAPI route to require payment ──
@@ -41,7 +44,19 @@ def require_sangria_payment(
             if request is None:
                 raise HTTPException(status_code=500, detail="FastAPI request not available")
 
-            if bypass_if and bypass_if(request):
+            should_bypass = False
+            if bypass_if is not None:
+                try:
+                    should_bypass = bypass_if(request)
+                except Exception:
+                    # Fail closed: if the merchant's bypass_if callback raises,
+                    # enforce payment rather than risk letting the request
+                    # through for free.
+                    logger.exception(
+                        "[sangria-sdk] bypass_if raised; falling through to payment required"
+                    )
+                    should_bypass = False
+            if should_bypass:
                 return await func(*args, **kwargs)
 
             result = await merchant_client.handle_fixed_price(

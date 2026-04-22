@@ -86,6 +86,8 @@ export const GET = fixedPrice(
 );
 ```
 
+If your `bypassPaymentIf` callback throws, the SDK logs the error and falls through to the normal payment-required flow — the request is **not** bypassed. This is intentional: a crashing callback cannot silently leak free access to paid endpoints. Write your callback defensively against missing headers, unavailable stores, etc.
+
 ### Accessing payment data
 
 Use the `getSangria` helper to read payment details inside your handler:

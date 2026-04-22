@@ -32,7 +32,21 @@ export function fixedPrice(
   validateFixedPriceOptions(options);
 
   return async (request: FastifyRequest, reply: FastifyReply) => {
-    if (config?.bypassPaymentIf?.(request)) {
+    let shouldBypass = false;
+    if (config?.bypassPaymentIf) {
+      try {
+        shouldBypass = config.bypassPaymentIf(request);
+      } catch (err) {
+        // Fail closed: if the merchant's bypass callback throws, enforce
+        // payment rather than risk letting the request through for free.
+        console.error(
+          "[sangria-sdk] bypassPaymentIf threw; falling through to payment required",
+          err,
+        );
+        shouldBypass = false;
+      }
+    }
+    if (shouldBypass) {
       request.sangria = { paid: false, amount: 0 };
       return;
     }
