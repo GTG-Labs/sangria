@@ -3,6 +3,7 @@ package auth
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"os"
 	"time"
 
 	"github.com/gofiber/fiber/v3"
@@ -25,13 +26,16 @@ func GenerateCSRFToken() (string, error) {
 
 // SetCSRFTokenCookie sets a secure CSRF token cookie
 func SetCSRFTokenCookie(c fiber.Ctx, token string) {
-	// In development, allow cross-origin cookies for localhost
+	// Determine environment-based cookie settings
+	isDev := os.Getenv("APP_ENV") == "development" || os.Getenv("NODE_ENV") == "development"
+
+	// Production defaults: strict security
 	sameSite := "Strict"
 	secure := c.Protocol() == "https"
 
-	// For development with frontend on different port
-	if c.Hostname() == "localhost" || c.Hostname() == "127.0.0.1" {
-		sameSite = "Lax"  // Allow cross-origin for localhost
+	// Development settings: relaxed for local development
+	if isDev {
+		sameSite = "Lax"  // Allow cross-origin for localhost frontend
 		secure = false    // Allow HTTP in development
 	}
 
