@@ -1,18 +1,6 @@
-// CSRF Protection utilities (Server and Client-side compatible)
-
-import { useState, useEffect } from "react";
-
+'use client';
 // Client-side CSRF token utilities
-// Note: All token generation and validation happens server-side
-//
-// 403 Recovery Pattern:
-// When API calls return 403 (Invalid CSRF token), callers should:
-// 1. Call refresh() from useCSRFToken to get a fresh token
-// 2. Retry the original request with the new token
-// 3. This avoids requiring a full page reload for token expiry
-//
-// Automatic Recovery Helper:
-// Use handleAPICall() wrapper for automatic 403 retry logic
+import { useState, useEffect } from 'react';
 
 // Store CSRF token in cookie (client-side only)
 export function setToken(token: string): void {
@@ -52,98 +40,61 @@ function clearToken(): void {
   }
 }
 
-// Add CSRF token to form data
-export function addTokenToFormData(formData: FormData): FormData {
-  const token = getToken();
-  if (token) {
-    formData.append('csrf_token', token);
-  }
-  return formData;
-}
+// Fetch fresh CSRF token from backend
+async function fetchToken(): Promise<string | null> {
+  try {
+    const response = await globalThis.fetch('/api/csrf-token', {
+      credentials: 'include'
+    });
 
-// Add CSRF token to JSON payload with proper typing
-export function addTokenToJSON<T extends object>(data: T): T & { csrf_token?: string } {
-  const token = getToken();
-  if (token) {
-    return { ...data, csrf_token: token };
+    if (!response.ok) {
+      console.error('Failed to fetch CSRF token:', response.statusText);
+      return null;
+    }
+
+    const data = await response.json();
+
+    if (data.csrf_token) {
+      setToken(data.csrf_token);
+      return data.csrf_token;
+    }
+
+    return null;
+  } catch (error) {
+    console.error('Error fetching CSRF token:', error);
+    return null;
   }
-  return data;
 }
 
 /**
- * React hook for CSRF protection - fetches server-generated tokens
+ * React hook for CSRF token management
+ * Provides automatic token fetching and refresh capabilities
  *
- * @returns Object containing:
- *   - token: Current CSRF token (null if not loaded)
- *   - refresh: Function to clear cached token and fetch a new one
+ * @returns Object with token management functions:
+ *   - token: Current CSRF token (string or null)
+ *   - refresh: Function to refresh the token manually
  *   - addToFormData: Function to add current token to FormData
  *   - addToJSON: Function to add current token to JSON payload
- *
- * Usage for 403 recovery:
- * ```
- * const { refresh } = useCSRFToken();
- *
- * try {
- *   await apiCall();
- * } catch (error) {
- *   if (error.status === 403) {
- *     await refresh();
- *     await apiCall(); // Retry with fresh token
- *   }
- * }
- * ```
+ *   - handleAPICall: Wrapper for automatic 403 retry logic
  */
 export function useCSRFToken() {
-  const [token, setTokenState] = useState<string | null>(() => {
-    // Get existing token from storage if available
-    if (typeof window === 'undefined') return null;
-    return getToken();
-  });
+  const [token, setTokenState] = useState<string | null>(getToken());
 
-  // Fetch a new CSRF token from the backend (via frontend proxy)
-  const fetchToken = async () => {
-    try {
-      const response = await fetch('/api/csrf-token', {
-        credentials: 'include', // Include cookies for CSRF token storage
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        const serverToken = data.csrf_token;
-        if (serverToken) {
-          setToken(serverToken);
-          setTokenState(serverToken);
-          return serverToken;
-        }
-      }
-      throw new Error(`Failed to fetch CSRF token: ${response.status}`);
-    } catch (error) {
-      console.error('Failed to fetch CSRF token:', error);
-      throw error;
-    }
-  };
-
-  // Refresh the CSRF token (clears cached token and fetches a new one)
-  const refresh = async (): Promise<string | null> => {
-    // Clear stored token and state
-    clearToken();
-    setTokenState(null);
-
-    try {
-      return await fetchToken();
-    } catch (error) {
-      console.error('Failed to refresh CSRF token:', error);
-      return null;
-    }
-  };
-
-  // Fetch server-generated token if not available
+  // Load token on mount if not already present
   useEffect(() => {
     if (typeof window === 'undefined' || token) return;
     fetchToken().catch(() => {
       // Error already logged in fetchToken
     });
   }, [token]);
+
+  // Manual refresh function for 403 recovery
+  const refresh = async (): Promise<string | null> => {
+    clearToken();
+    const newToken = await fetchToken();
+    setTokenState(newToken);
+    return newToken;
+  };
 
   // Create token-aware versions of helper functions that use hook state
   const addToFormData = (formData: FormData): FormData => {

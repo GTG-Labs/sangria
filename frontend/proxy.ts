@@ -33,7 +33,20 @@ export async function proxy(request: NextRequest, event: NextFetchEvent) {
   // Create response based on auth result
   let response: NextResponse;
   if (authResponse instanceof NextResponse) {
+    // Preserve authkit's response (redirects/cookies) but still forward nonce
+    // into downstream request headers via a fresh NextResponse when possible.
     response = authResponse;
+    // If the auth response is a pass-through (no redirect/rewrite), re-issue
+    // it so the x-nonce propagates to server components.
+    if (!authResponse.headers.get('location')) {
+      const passthrough = NextResponse.next({ request: { headers: requestHeaders } });
+      authResponse.headers.forEach((value, key) => {
+        if (key.toLowerCase() !== 'content-security-policy') {
+          passthrough.headers.set(key, value);
+        }
+      });
+      response = passthrough;
+    }
   } else if (authResponse instanceof Response) {
     // Convert Response to NextResponse
     response = NextResponse.next({ request: { headers: requestHeaders } });

@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { ChevronDown, Building, Users, Plus } from "lucide-react";
 import { useOrganization } from "@/contexts/OrganizationContext";
+import { fetch } from "@/lib/fetch";
 
 export default function OrganizationDropdown() {
   const { userInfo, selectedOrgId, selectedOrg, setSelectedOrgId, refreshUserInfo } = useOrganization();

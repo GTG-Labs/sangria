@@ -5,6 +5,7 @@ import { Building, Users, Plus, Settings, UserPlus } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { organizationSchema, type OrganizationData } from "@/lib/validation";
+import { fetch } from "@/lib/fetch";
 
 interface Organization {
   id: string;
@@ -59,7 +60,7 @@ export default function OrganizationsPage() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ name: data.name }),
+        body: JSON.stringify({ name: data.name })
       });
 
       if (response.ok) {

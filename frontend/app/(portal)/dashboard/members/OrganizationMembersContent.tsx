@@ -7,6 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useOrganization } from "@/contexts/OrganizationContext";
 import { inviteSchema, type InviteData } from "@/lib/validation";
 import { useSecureSubmit } from "@/lib/security-hooks";
+import { fetch } from "@/lib/fetch";
 
 interface Member {
   user_id: string;

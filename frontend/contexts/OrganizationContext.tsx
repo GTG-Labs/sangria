@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { fetch } from "@/lib/fetch";
 
 interface Organization {
   id: string;

@@ -68,6 +68,10 @@ Use these terms consistently:
 - **Email normalization.** Always `strings.TrimSpace(strings.ToLower(email))` before storing or matching.
 - **Sentinel errors.** Use package-level `var Err... = errors.New(...)` for typed error handling.
 
+### Security
+- **CSRF Protection is automatic.** Frontend components use standard `fetch()` calls â€” never manual CSRF token handling. The fetch wrapper (`lib/fetch.ts`) automatically injects tokens. Backend validates via `auth.CSRFMiddleware()`.
+- **Use secure fetch wrapper.** Import `{ fetch } from "@/lib/fetch"` instead of global `fetch` for automatic CSRF protection on state-changing requests.
+
 ### SDK
 - **SDK surface is a product.** Breaking changes to `@sangria-sdk/core` or `sangria-merchant-sdk` need explicit justification.
 - Match idioms of each host framework (Express middleware vs Fastify plugin vs FastAPI dependency) rather than forcing a single abstraction.
@@ -94,6 +98,15 @@ Applies to both `frontend/` (merchant portal) and `mythos/` (admin dashboard) â€
   return proxyToBackend("POST", `/admin/withdrawals/${encodeURIComponent(id)}/approve`, { body });
   ```
   Raw `${id}` lets a caller inject `/` or `..` to reach a different backend route with the authenticated bearer token attached.
+
+- **CSRF Protection**: Pass the request object to `proxyToBackend()` for automatic CSRF token extraction:
+  ```ts
+  export async function POST(request: Request) {
+    const body = await request.json();
+    return proxyToBackend("POST", "/internal/organizations", { body }, request);
+  }
+  ```
+  The proxy extracts CSRF tokens from cookies and forwards them to the backend via `X-CSRF-Token` headers.
 
 ### Paginated list components
 

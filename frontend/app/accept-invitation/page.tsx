@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { CheckCircle, XCircle, Loader, LogIn } from "lucide-react";
 import { handleSignIn } from "@/lib/auth-actions";
 import { safeValidate, tokenSchema } from "@/lib/validation";
+import { fetch } from "@/lib/fetch";
 
 export default function AcceptInvitationPage() {
   return (
@@ -55,25 +56,13 @@ function AcceptInvitationContent() {
     setMessage("");
 
     try {
-      // First, fetch CSRF token to prime the cookie
-      const csrfResponse = await fetch("/api/csrf-token");
-      if (!csrfResponse.ok) {
-        setStatus("error");
-        setMessage("Failed to initialize security token.");
-        return;
-      }
-
-      const csrfData = await csrfResponse.json();
-
-      // Now make the invitation acceptance request with CSRF token
       const response = await fetch("/api/backend/accept-invitation", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          token,
-          csrf_token: csrfData.csrf_token
+          token
         }),
       });
 

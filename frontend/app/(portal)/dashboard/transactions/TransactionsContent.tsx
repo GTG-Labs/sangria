@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { ExternalLink, AlertCircle } from "lucide-react";
+import { fetch } from "@/lib/fetch";
 
 interface Transaction {
   id: string;

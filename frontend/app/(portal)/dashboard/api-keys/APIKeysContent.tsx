@@ -7,6 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import ArcadeButton from "@/components/ArcadeButton";
 import { useOrganization } from "@/contexts/OrganizationContext";
 import { apiKeySchema, type APIKeyData } from "@/lib/validation";
+import { fetch } from "@/lib/fetch";
 
 const API_KEY_STATUS = {
   ACTIVE: "active",

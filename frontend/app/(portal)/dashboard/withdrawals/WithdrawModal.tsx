@@ -5,7 +5,7 @@ import { X as XIcon, AlertCircle } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { createWithdrawalSchema, type WithdrawalData } from "@/lib/validation";
-import { useCSRFToken } from "@/lib/csrf-protection";
+import { fetch } from "@/lib/fetch";
 
 interface APIKey {
   id: string;
@@ -41,7 +41,6 @@ export default function WithdrawModal({
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { addToJSON } = useCSRFToken();
 
   // Memoized resolver to prevent recreation on every render
   const memoizedResolver = useCallback(() => {
@@ -72,11 +71,11 @@ export default function WithdrawModal({
       const response = await fetch("/api/backend/withdrawals", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(addToJSON({
+        body: JSON.stringify({
           merchant_id: data.merchantId,
           amount: microunits,
           idempotency_key: crypto.randomUUID(),
-        })),
+        }),
       });
 
       if (response.ok) {
