@@ -6,16 +6,26 @@ import (
 
 	"sangria/backend/adminHandlers"
 	"sangria/backend/auth"
+	"sangria/backend/config"
 	"sangria/backend/merchantHandlers"
+	"sangria/backend/ratelimit"
 )
 
 func RegisterJWTRoutes(app *fiber.App, pool *pgxpool.Pool) {
-	// Public endpoints (no authentication required)
+	// Public endpoints. /webhooks/workos uses an IP allowlist inside the
+	// handler; /accept-invitation is per-IP since the token is the only auth.
 	app.Post("/webhooks/workos", adminHandlers.HandleWorkOSWebhook(pool))
-	app.Post("/accept-invitation", adminHandlers.AcceptOrganizationInvitation(pool))
+	app.Post("/accept-invitation",
+		ratelimit.PerIPLimiter(config.RateLimit.AcceptInvitationPerMin, "accept-invitation"),
+		adminHandlers.AcceptOrganizationInvitation(pool),
+	)
 
-	// Authenticated endpoints (require WorkOS JWT token + CSRF protection)
-	internal := app.Group("/internal", auth.WorkosAuthMiddleware, auth.CSRFMiddleware())
+	// Authenticated endpoints (WorkOS JWT + CSRF + per-user rate limit).
+	internal := app.Group("/internal",
+		auth.WorkosAuthMiddleware,
+		auth.CSRFMiddleware(),
+		ratelimit.PerUserLimiter(config.RateLimit.InternalPerMin, "internal-per-user"),
+	)
 
 	internal.Post("/users", auth.CreateUser(pool))
 	internal.Get("/me", auth.GetCurrentUser(pool))
@@ -34,10 +44,14 @@ func RegisterJWTRoutes(app *fiber.App, pool *pgxpool.Pool) {
 	internal.Get("/withdrawals", merchantHandlers.ListWithdrawals(pool))
 	internal.Post("/withdrawals/:id/cancel", merchantHandlers.CancelWithdrawal(pool))
 
-	// Organization management routes
+	// Organization routes. Invitations have a tighter per-org limit on top
+	// of the per-user bucket because each call sends a paid Resend email.
 	organizations := internal.Group("/organizations")
 	organizations.Post("/", auth.CreateOrganization(pool))
 	organizations.Get("/:id/members", auth.GetOrganizationMembers(pool))
 	organizations.Delete("/:id/members/:userId", auth.RemoveOrganizationMember(pool))
-	organizations.Post("/:id/invitations", adminHandlers.CreateOrganizationInvitation(pool))
+	organizations.Post("/:id/invitations",
+		ratelimit.PerOrgLimiter(config.RateLimit.InvitationsPerMin, "invitations-per-org"),
+		adminHandlers.CreateOrganizationInvitation(pool),
+	)
 }

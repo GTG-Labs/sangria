@@ -6,10 +6,17 @@ import (
 
 	"sangria/backend/adminHandlers"
 	"sangria/backend/auth"
+	"sangria/backend/config"
+	"sangria/backend/ratelimit"
 )
 
 func RegisterAdminRoutes(app *fiber.App, pool *pgxpool.Pool) {
-	admin := app.Group("/admin", auth.WorkosAuthMiddleware, auth.RequireAdmin(pool))
+	// Per-admin limiter runs after auth so it keys by WorkOS user ID.
+	admin := app.Group("/admin",
+		auth.WorkosAuthMiddleware,
+		auth.RequireAdmin(pool),
+		ratelimit.PerUserLimiter(config.RateLimit.AdminPerMin, "admin-per-user"),
+	)
 
 	admin.Get("/me", func(c fiber.Ctx) error {
 		return c.JSON(fiber.Map{"admin": true})

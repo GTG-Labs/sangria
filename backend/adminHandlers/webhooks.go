@@ -10,8 +10,20 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/workos/workos-go/v4/pkg/webhooks"
 
+	"sangria/backend/config"
 	dbengine "sangria/backend/dbEngine"
 )
+
+// isWorkOSIPAllowed checks the caller IP against WORKOS_WEBHOOK_ALLOWED_IPS.
+// Empty allowlist = fail-closed: all webhook requests rejected until configured.
+func isWorkOSIPAllowed(ip string) bool {
+	for _, allowed := range config.RateLimit.WorkOSWebhookAllowedIPs {
+		if ip == allowed {
+			return true
+		}
+	}
+	return false
+}
 
 // WorkOS webhook event types
 const (
@@ -29,6 +41,14 @@ type WorkOSWebhookEvent struct {
 // HandleWorkOSWebhook processes incoming WorkOS webhooks
 func HandleWorkOSWebhook(pool *pgxpool.Pool) fiber.Handler {
 	return func(c fiber.Ctx) error {
+		// Reject anything not from WorkOS's published source IPs before any
+		// signature work. Requires Fiber TrustedProxies configured so c.IP()
+		// returns the real client IP on Railway.
+		if !isWorkOSIPAllowed(c.IP()) {
+			slog.Warn("workos webhook: IP not in allowlist", "ip", c.IP())
+			return c.Status(403).JSON(fiber.Map{"error": "forbidden"})
+		}
+
 		// Get raw request body and signature header
 		rawBody := c.Body()
 		signature := c.Get("WorkOS-Signature")

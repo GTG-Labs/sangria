@@ -77,6 +77,7 @@ Use these terms consistently:
 - Match idioms of each host framework (Express middleware vs Fastify plugin vs FastAPI dependency) rather than forcing a single abstraction.
 - Keep TypeScript and Python SDK behavior in lockstep. If you add a feature to one, either add it to the other or explicitly document why it's language-specific.
 - When changing SDK behavior, update the relevant playground examples.
+- **Bump SDK versions in `deployment/SDK_VERSIONS.md`** — it's the single source of truth. CI auto-bumps the patch version if you forget, but explicit edits communicate intent (patch = fix, minor = feature, major = breaking per semver). Never hand-edit `sdk/sdk-typescript/package.json#version` or `sdk/python/pyproject.toml#version` — CI overwrites them at publish time. See `deployment/DEPLOYMENT.md` for the full flow.
 
 ### Process
 - Ask clarifying questions before architectural changes.

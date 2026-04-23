@@ -42,6 +42,14 @@ The server starts on the port specified by the `PORT` environment variable (requ
 | `WITHDRAWAL_AUTO_APPROVE_THRESHOLD` | No | Auto-approve withdrawals up to this amount in microunits (default: `200000000` = $200) |
 | `WITHDRAWAL_MIN_AMOUNT` | No | Minimum withdrawal in microunits (default: `1000000` = $1.00) |
 | `WITHDRAWAL_FEE_FLAT` | No | Flat fee per withdrawal in microunits (default: `0`) |
+| `RATE_LIMIT_V1_PER_MIN` | No | Per-API-key limit on `/v1/*` requests per minute (default: `30`) |
+| `RATE_LIMIT_INTERNAL_PER_MIN` | No | Per-WorkOS-user limit on `/internal/*` requests per minute (default: `60`) |
+| `RATE_LIMIT_ADMIN_PER_MIN` | No | Per-admin limit on `/admin/*` requests per minute (default: `100`) |
+| `RATE_LIMIT_INVITATIONS_PER_MIN` | No | Per-org limit on invitation sends per minute; tighter than general internal bucket because each call dispatches a paid Resend email (default: `10`) |
+| `RATE_LIMIT_ACCEPT_INVITATION_PER_MIN` | No | Per-IP limit on public `/accept-invitation` per minute (default: `20`) |
+| `RATE_LIMIT_AUTH_FAILURES_PER_MIN` | No | Per-IP limit on failed API-key auth attempts per minute; blocks brute force (default: `10`) |
+| `RATE_LIMIT_DISABLED` | No | Emergency kill switch — set to `true` to bypass every rate limiter without redeploying (default: `false`) |
+| `WORKOS_WEBHOOK_ALLOWED_IPS` | Yes | Comma-separated allowlist of WorkOS source IPs for `/webhooks/workos`. Fail-closed: empty value rejects every webhook. See https://workos.com/docs/events/data-syncing/webhooks |
 
 ## API reference
 

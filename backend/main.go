@@ -71,6 +71,20 @@ func main() {
 	slog.Info("payment config loaded",
 		"max_amount_microunits", config.PaymentConfig.MaxAmountMicrounits)
 
+	if err := config.LoadRateLimitConfig(); err != nil {
+		slog.Error("failed to load rate limit config", "error", err)
+		os.Exit(1)
+	}
+	slog.Info("rate limit config loaded",
+		"v1_per_min", config.RateLimit.V1PerMin,
+		"internal_per_min", config.RateLimit.InternalPerMin,
+		"admin_per_min", config.RateLimit.AdminPerMin,
+		"invitations_per_min", config.RateLimit.InvitationsPerMin,
+		"accept_invitation_per_min", config.RateLimit.AcceptInvitationPerMin,
+		"auth_failures_per_min", config.RateLimit.AuthFailuresPerMin,
+		"disabled", config.RateLimit.Disabled,
+		"workos_ip_allowlist_count", len(config.RateLimit.WorkOSWebhookAllowedIPs))
+
 	ctx := context.Background()
 
 	pool, err := config.ConnectDatabase(ctx)
@@ -87,12 +101,15 @@ func main() {
 	}
 
 	app := fiber.New(fiber.Config{
-		// Trust proxy headers for secure Protocol() detection in production
+		// Trust proxy headers so c.IP() returns the real client IP instead
+		// of Railway's edge proxy. 0.0.0.0/0 covers Railway's variable proxy
+		// IPs. Safe because Railway is the only ingress path in production.
 		TrustProxy: true,
 		TrustProxyConfig: fiber.TrustProxyConfig{
-			Loopback: true, // Trust 127.0.0.0/8 and ::1
-			LinkLocal: true, // Trust 169.254.0.0/16 and fe80::/10
-			Private: true, // Trust 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16
+			Loopback:  true,
+			LinkLocal: true,
+			Private:   true,
+			Proxies:   []string{"0.0.0.0/0"},
 		},
 	})
 	utils.SetupCORSMiddleware(app)
