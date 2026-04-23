@@ -3,6 +3,7 @@ package adminHandlers
 import (
 	"errors"
 	"log/slog"
+	"strings"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -28,8 +29,12 @@ func CreateMerchantAPIKey(pool *pgxpool.Pool) fiber.Handler {
 			return c.Status(400).JSON(fiber.Map{"error": "invalid request body"})
 		}
 
-		if req.Name == "" {
+		name := strings.TrimSpace(req.Name)
+		if name == "" {
 			return c.Status(400).JSON(fiber.Map{"error": "name is required"})
+		}
+		if len(name) > 255 {
+			return c.Status(400).JSON(fiber.Map{"error": "name must be 255 characters or fewer"})
 		}
 
 		// Ensure the user exists in the database first
@@ -49,7 +54,7 @@ func CreateMerchantAPIKey(pool *pgxpool.Pool) fiber.Handler {
 			return c.Status(500).JSON(fiber.Map{"error": "failed to create liability account"})
 		}
 
-		merchant, fullKey, err := auth.CreateAPIKey(c.Context(), pool, user.ID, req.Name)
+		merchant, fullKey, err := auth.CreateAPIKey(c.Context(), pool, user.ID, name)
 		if err != nil {
 			if errors.Is(err, auth.ErrMaxAPIKeysReached) {
 				return c.Status(400).JSON(fiber.Map{"error": "maximum number of API keys reached (10)"})

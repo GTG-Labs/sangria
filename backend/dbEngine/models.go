@@ -85,17 +85,17 @@ type LedgerLine struct {
 type Network string
 
 const (
-	NetworkBase         Network = "base"            // eip155:8453
-	NetworkBaseSepolia  Network = "base-sepolia"    // eip155:84532
-	NetworkPolygon      Network = "polygon"         // eip155:137
-	NetworkSolana       Network = "solana"          // solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp
-	NetworkSolanaDevnet Network = "solana-devnet"   // solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1
+	NetworkBase         Network = "base"          // eip155:8453
+	NetworkBaseSepolia  Network = "base-sepolia"  // eip155:84532
+	NetworkPolygon      Network = "polygon"       // eip155:137
+	NetworkSolana       Network = "solana"        // solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp
+	NetworkSolanaDevnet Network = "solana-devnet" // solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1
 )
 
 type Card struct {
 	ID         string     `json:"id"`
 	UserID     string     `json:"user_id"`
-	APIKey     string     `json:"api_key"`
+	APIKey     string     `json:"-"`
 	KeyID      string     `json:"key_id"`
 	Name       string     `json:"name"`
 	IsActive   bool       `json:"is_active"`
@@ -106,7 +106,7 @@ type Card struct {
 type Merchant struct {
 	ID         string     `json:"id"`
 	UserID     string     `json:"user_id"`
-	APIKey     string     `json:"api_key"`
+	APIKey     string     `json:"-"`
 	KeyID      string     `json:"key_id"`
 	Name       string     `json:"name"`
 	IsActive   bool       `json:"is_active"`
@@ -145,7 +145,7 @@ type PaginationMeta struct {
 // TransactionsResponse wraps transaction data with pagination metadata
 type TransactionsResponse struct {
 	Data       []MerchantTransaction `json:"data"`
-	Pagination PaginationMeta    `json:"pagination"`
+	Pagination PaginationMeta        `json:"pagination"`
 }
 
 type WithdrawalStatus string
@@ -186,4 +186,3 @@ type Withdrawal struct {
 	ReversedAt              *time.Time       `json:"reversed_at"`
 	CanceledAt              *time.Time       `json:"canceled_at"`
 }
-

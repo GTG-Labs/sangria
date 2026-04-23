@@ -139,12 +139,11 @@ func AuthenticateAPIKey(ctx context.Context, pool *pgxpool.Pool, providedKey str
 
 	for rows.Next() {
 		var merchant dbengine.Merchant
-		err := rows.Scan(
+		if err := rows.Scan(
 			&merchant.ID, &merchant.UserID, &merchant.APIKey, &merchant.KeyID,
 			&merchant.Name, &merchant.IsActive, &merchant.LastUsedAt, &merchant.CreatedAt,
-		)
-		if err != nil {
-			continue
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan merchant during authentication: %w", err)
 		}
 
 		// Verify the key against this hash

@@ -3,6 +3,7 @@ package merchantHandlers
 import (
 	"errors"
 	"log/slog"
+	"strconv"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -102,6 +103,22 @@ func ListWithdrawals(pool *pgxpool.Pool) fiber.Handler {
 		if merchantID == "" {
 			return c.Status(400).JSON(fiber.Map{"error": "merchant_id query param is required"})
 		}
+		limit := 50
+		offset := 0
+		if limitParam := c.Query("limit"); limitParam != "" {
+			parsed, err := strconv.Atoi(limitParam)
+			if err != nil {
+				return c.Status(400).JSON(fiber.Map{"error": "limit must be an integer"})
+			}
+			limit = parsed
+		}
+		if offsetParam := c.Query("offset"); offsetParam != "" {
+			parsed, err := strconv.Atoi(offsetParam)
+			if err != nil {
+				return c.Status(400).JSON(fiber.Map{"error": "offset must be an integer"})
+			}
+			offset = parsed
+		}
 
 		// Verify this merchant belongs to the authenticated user.
 		merchant, err := dbengine.GetMerchantByID(c.Context(), pool, merchantID)
@@ -116,7 +133,7 @@ func ListWithdrawals(pool *pgxpool.Pool) fiber.Handler {
 			return c.Status(403).JSON(fiber.Map{"error": "Forbidden"})
 		}
 
-		withdrawals, err := dbengine.ListWithdrawalsByMerchant(c.Context(), pool, merchant.ID)
+		withdrawals, err := dbengine.ListWithdrawalsByMerchant(c.Context(), pool, merchant.ID, limit, offset)
 		if err != nil {
 			slog.Error("list withdrawals", "merchant_id", merchant.ID, "error", err)
 			return c.Status(500).JSON(fiber.Map{"error": "failed to list withdrawals"})

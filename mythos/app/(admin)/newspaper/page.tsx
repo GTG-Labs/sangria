@@ -261,7 +261,12 @@ function PaywallModal({
     setPaymentState({ phase: "paying", steps: { ...steps } });
 
     try {
-      const response = await fetch("/api/x402-pay");
+      const response = await fetch("/api/x402-pay", {
+        method: "POST",
+        headers: {
+          "x-idempotency-key": crypto.randomUUID(),
+        },
+      });
       if (!response.body) throw new Error("No response body");
 
       const reader = response.body.getReader();
@@ -349,7 +354,7 @@ function PaywallModal({
         error: message,
       }));
     }
-  }, []);
+  }, [article.slug, onSuccess]);
 
   const steps =
     paymentState.phase === "paying" ||
@@ -856,6 +861,7 @@ export default function NewspaperPage() {
       {/* Paywall modal */}
       {activeArticle && (
         <PaywallModal
+          key={activeArticle.slug}
           article={activeArticle}
           onClose={() => setActiveArticle(null)}
           onSuccess={handlePaymentSuccess}

@@ -7,8 +7,10 @@ import type {
 } from "@x402/core/types";
 import { ExactEvmScheme } from "@x402/evm/exact/client";
 import type { ClientEvmSigner } from "@x402/evm";
+import { withAuth } from "@workos-inc/authkit-nextjs";
 import type { Address } from "viem";
 import { isAddress } from "viem";
+import { verifyAdmin } from "@/lib/admin";
 
 // ---------------------------------------------------------------------------
 // Config
@@ -21,6 +23,21 @@ const MYTHOS_BASE_URL = (
   process.env.MYTHOS_BASE_URL ?? "http://localhost:3001"
 ).replace(/\/+$/, "");
 const DEMO_PRICE_MICROUNITS = 100;
+const MICROUNITS_PER_USDC = BigInt(1_000_000);
+const RATE_LIMIT_WINDOW_MS = 60_000;
+const RATE_LIMIT_MAX_REQUESTS = 5;
+const IDEMPOTENCY_TTL_MS = 5 * 60_000;
+const MIN_IDEMPOTENCY_KEY_LENGTH = 8;
+const MAX_IDEMPOTENCY_KEY_LENGTH = 128;
+
+const paymentRateLimitStore = new Map<
+  string,
+  { windowStart: number; count: number }
+>();
+const idempotencyStore = new Map<
+  string,
+  { status: "in_flight" | "completed"; expiresAt: number }
+>();
 
 function requireEnv(name: string): string {
   const val = process.env[name];
@@ -87,14 +104,112 @@ function toPaymentRequired(
   };
 }
 
+function cleanupStateStores(now: number): void {
+  for (const [key, entry] of paymentRateLimitStore) {
+    if (now - entry.windowStart > RATE_LIMIT_WINDOW_MS) {
+      paymentRateLimitStore.delete(key);
+    }
+  }
+  for (const [key, entry] of idempotencyStore) {
+    if (now > entry.expiresAt) {
+      idempotencyStore.delete(key);
+    }
+  }
+}
+
+function checkRateLimit(userId: string): boolean {
+  const now = Date.now();
+  cleanupStateStores(now);
+
+  const entry = paymentRateLimitStore.get(userId);
+  if (!entry || now - entry.windowStart > RATE_LIMIT_WINDOW_MS) {
+    paymentRateLimitStore.set(userId, { windowStart: now, count: 1 });
+    return true;
+  }
+  if (entry.count >= RATE_LIMIT_MAX_REQUESTS) {
+    return false;
+  }
+  entry.count += 1;
+  return true;
+}
+
+function reserveIdempotency(
+  userId: string,
+  idempotencyKey: string
+): string | null {
+  const now = Date.now();
+  cleanupStateStores(now);
+
+  const storeKey = `${userId}:${idempotencyKey}`;
+  const existing = idempotencyStore.get(storeKey);
+  if (existing && now <= existing.expiresAt) {
+    return null;
+  }
+
+  idempotencyStore.set(storeKey, {
+    status: "in_flight",
+    expiresAt: now + IDEMPOTENCY_TTL_MS,
+  });
+  return storeKey;
+}
+
+function markIdempotencyCompleted(storeKey: string): void {
+  idempotencyStore.set(storeKey, {
+    status: "completed",
+    expiresAt: Date.now() + IDEMPOTENCY_TTL_MS,
+  });
+}
+
+function releaseIdempotency(storeKey: string): void {
+  idempotencyStore.delete(storeKey);
+}
+
 // ---------------------------------------------------------------------------
-// GET /api/x402-pay  — Server-Sent Events payment flow
+// POST /api/x402-pay  — Server-Sent Events payment flow
 // ---------------------------------------------------------------------------
 
-export async function GET() {
+export async function POST(request: Request) {
+  const { user, accessToken } = await withAuth();
+  if (!user || !accessToken) {
+    return Response.json({ error: "Authentication required" }, { status: 401 });
+  }
+
+  const isAdmin = await verifyAdmin(accessToken);
+  if (!isAdmin) {
+    return Response.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  if (!checkRateLimit(user.id)) {
+    return Response.json(
+      { error: "Rate limit exceeded. Try again shortly." },
+      { status: 429 }
+    );
+  }
+
+  const idempotencyKey = request.headers.get("x-idempotency-key");
+  if (
+    !idempotencyKey ||
+    idempotencyKey.length < MIN_IDEMPOTENCY_KEY_LENGTH ||
+    idempotencyKey.length > MAX_IDEMPOTENCY_KEY_LENGTH
+  ) {
+    return Response.json(
+      { error: "Missing or invalid x-idempotency-key header" },
+      { status: 400 }
+    );
+  }
+
+  const idempotencyStoreKey = reserveIdempotency(user.id, idempotencyKey);
+  if (!idempotencyStoreKey) {
+    return Response.json(
+      { error: "Duplicate payment attempt detected for idempotency key" },
+      { status: 409 }
+    );
+  }
+
   const stream = new ReadableStream({
     async start(controller) {
       const send = (event: SseEvent) => controller.enqueue(encode(event));
+      let completed = false;
 
       try {
         const merchantApiKey = requireEnv("SANGRIA_SECRET_KEY");
@@ -138,7 +253,12 @@ export async function GET() {
         const paymentRequired = toPaymentRequired(challenge, demoResource);
         const accepts = paymentRequired.accepts[0];
         if (!accepts) throw new Error("payment requirements missing accepts[]");
-        const amountUsdc = (parseInt(accepts.amount, 10) / 1e6).toFixed(6);
+        const amountMicro = BigInt(accepts.amount);
+        const wholePart = amountMicro / MICROUNITS_PER_USDC;
+        const fractionalPart = (amountMicro % MICROUNITS_PER_USDC)
+          .toString()
+          .padStart(6, "0");
+        const amountUsdc = `${wholePart}.${fractionalPart}`;
 
         send({
           step: "negotiate",
@@ -242,10 +362,16 @@ export async function GET() {
           status: "done",
           data: { result },
         });
+        completed = true;
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         send({ step: "error", status: "error", error: message });
       } finally {
+        if (completed) {
+          markIdempotencyCompleted(idempotencyStoreKey);
+        } else {
+          releaseIdempotency(idempotencyStoreKey);
+        }
         controller.close();
       }
     },
@@ -254,7 +380,7 @@ export async function GET() {
   return new Response(stream, {
     headers: {
       "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
+      "Cache-Control": "no-cache, no-store, max-age=0",
       Connection: "keep-alive",
     },
   });

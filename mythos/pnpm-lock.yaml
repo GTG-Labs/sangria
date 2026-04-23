@@ -17,9 +17,6 @@ dependencies:
   '@x402/evm':
     specifier: ^2.10.0
     version: 2.10.0(typescript@5.9.3)
-  bs58:
-    specifier: ^6.0.0
-    version: 6.0.0
   next:
     specifier: 16.2.3
     version: 16.2.3(@babel/core@7.29.0)(react-dom@19.2.4)(react@19.2.4)
@@ -2261,10 +2258,6 @@ packages:
     engines: {node: 18 || 20 || >=22}
     dev: true
 
-  /base-x@5.0.1:
-    resolution: {integrity: sha512-M7uio8Zt++eg3jPj+rHMfCC+IuygQHHCOU+IYsVtik6FWjuYpVt/+MRKcgsAMHh8mMFAwnB+Bs+mTrFiXjMzKg==}
-    dev: false
-
   /baseline-browser-mapping@2.10.18:
     resolution: {integrity: sha512-VSnGQAOLtP5mib/DPyg2/t+Tlv65NTBz83BJBJvmLVHHuKJVaDOBvJJykiT5TR++em5nfAySPccDZDa4oSrn8A==}
     engines: {node: '>=6.0.0'}
@@ -2301,12 +2294,6 @@ packages:
       electron-to-chromium: 1.5.335
       node-releases: 2.0.37
       update-browserslist-db: 1.2.3(browserslist@4.28.2)
-
-  /bs58@6.0.0:
-    resolution: {integrity: sha512-PD0wEnEYg6ijszw/u8s+iI3H17cTymlrwkKhDhPZq+Sokl3AU4htyBFTjAeNAlCCmg0f53g6ih3jATyCKftTfw==}
-    dependencies:
-      base-x: 5.0.1
-    dev: false
 
   /call-bind-apply-helpers@1.0.2:
     resolution: {integrity: sha512-Sp1ablJ0ivDkSzjcaJdxEunN5/XvksFJ2sMBFfq6x0ryhQV/2b/KwFe21cMpmHtPOSij8K99/wSfoEuTObmuMQ==}

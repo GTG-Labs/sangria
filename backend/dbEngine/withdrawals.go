@@ -215,18 +215,28 @@ func GetWithdrawalByID(ctx context.Context, pool *pgxpool.Pool, id string) (With
 	return w, err
 }
 
-// ListWithdrawalsByMerchant returns all withdrawals for a merchant, ordered by created_at desc.
-func ListWithdrawalsByMerchant(ctx context.Context, pool *pgxpool.Pool, merchantID string) ([]Withdrawal, error) {
+// ListWithdrawalsByMerchant returns withdrawals for a merchant, ordered by created_at desc.
+func ListWithdrawalsByMerchant(ctx context.Context, pool *pgxpool.Pool, merchantID string, limit, offset int) ([]Withdrawal, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	if limit > 200 {
+		limit = 200
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
 	rows, err := pool.Query(ctx,
-		fmt.Sprintf(`SELECT %s FROM withdrawals WHERE merchant_id = $1 ORDER BY created_at DESC`, withdrawalColumns),
-		merchantID,
+		fmt.Sprintf(`SELECT %s FROM withdrawals WHERE merchant_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`, withdrawalColumns),
+		merchantID, limit, offset,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("query withdrawals: %w", err)
 	}
 	defer rows.Close()
 
-	var withdrawals []Withdrawal
+	withdrawals := make([]Withdrawal, 0)
 	for rows.Next() {
 		w, err := scanWithdrawal(rows)
 		if err != nil {
