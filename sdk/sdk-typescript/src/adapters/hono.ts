@@ -12,7 +12,7 @@ type SangriaEnv = {
 type SangriaContext = Parameters<MiddlewareHandler<SangriaEnv>>[0];
 
 export interface HonoConfig {
-  bypassPaymentIf?: (c: SangriaContext) => boolean;
+  bypassPaymentIf?: (c: SangriaContext) => boolean | Promise<boolean>;
 }
 
 // ── Entry point: add as middleware to gate a route behind payment ──
@@ -30,10 +30,11 @@ export function fixedPrice(
     let shouldBypass = false;
     if (config?.bypassPaymentIf) {
       try {
-        shouldBypass = config.bypassPaymentIf(c);
+        // Await handles async callbacks; strict === true rejects Promises/truthy non-booleans.
+        const result = await config.bypassPaymentIf(c);
+        shouldBypass = result === true;
       } catch (err) {
-        // Fail closed: if the merchant's bypass callback throws, enforce
-        // payment rather than risk letting the request through for free.
+        // Fail closed: any throw/reject enforces payment.
         console.error(
           "[sangria-sdk] bypassPaymentIf threw; falling through to payment required",
           err,

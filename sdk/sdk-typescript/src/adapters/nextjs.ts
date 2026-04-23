@@ -22,7 +22,7 @@ type NextRouteHandler = (
 ) => Promise<NextResponse> | NextResponse;
 
 export interface NextJSConfig {
-  bypassPaymentIf?: (request: any) => boolean;
+  bypassPaymentIf?: (request: any) => boolean | Promise<boolean>;
 }
 
 // ── Entry point: wrap a route handler to gate it behind payment ──
@@ -45,10 +45,11 @@ export function fixedPrice(
     let shouldBypass = false;
     if (config?.bypassPaymentIf) {
       try {
-        shouldBypass = config.bypassPaymentIf(request);
+        // Await handles async callbacks; strict === true rejects Promises/truthy non-booleans.
+        const result = await config.bypassPaymentIf(request);
+        shouldBypass = result === true;
       } catch (err) {
-        // Fail closed: if the merchant's bypass callback throws, enforce
-        // payment rather than risk letting the request through for free.
+        // Fail closed: any throw/reject enforces payment.
         console.error(
           "[sangria-sdk] bypassPaymentIf threw; falling through to payment required",
           err,

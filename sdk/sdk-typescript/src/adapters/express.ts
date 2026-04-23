@@ -3,7 +3,7 @@ import type { SangriaRequestData, FixedPriceOptions } from "../types.js";
 import { Sangria, validateFixedPriceOptions } from "../core.js";
 
 export interface ExpressConfig {
-  bypassPaymentIf?: (req: Request) => boolean;
+  bypassPaymentIf?: (req: Request) => boolean | Promise<boolean>;
 }
 
 declare global {
@@ -30,10 +30,11 @@ export function fixedPrice(
       let shouldBypass = false;
       if (config?.bypassPaymentIf) {
         try {
-          shouldBypass = config.bypassPaymentIf(req);
+          // Await handles async callbacks; strict === true rejects Promises/truthy non-booleans.
+          const result = await config.bypassPaymentIf(req);
+          shouldBypass = result === true;
         } catch (err) {
-          // Fail closed: if the merchant's bypass callback throws, enforce
-          // payment rather than risk letting the request through for free.
+          // Fail closed: any throw/reject enforces payment.
           console.error(
             "[sangria-sdk] bypassPaymentIf threw; falling through to payment required",
             err,

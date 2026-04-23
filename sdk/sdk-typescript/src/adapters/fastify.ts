@@ -9,7 +9,7 @@ import type { SangriaRequestData, FixedPriceOptions } from "../types.js";
 import { Sangria, validateFixedPriceOptions } from "../core.js";
 
 export interface FastifyConfig {
-  bypassPaymentIf?: (request: FastifyRequest) => boolean;
+  bypassPaymentIf?: (request: FastifyRequest) => boolean | Promise<boolean>;
 }
 
 declare module "fastify" {
@@ -35,10 +35,11 @@ export function fixedPrice(
     let shouldBypass = false;
     if (config?.bypassPaymentIf) {
       try {
-        shouldBypass = config.bypassPaymentIf(request);
+        // Await handles async callbacks; strict === true rejects Promises/truthy non-booleans.
+        const result = await config.bypassPaymentIf(request);
+        shouldBypass = result === true;
       } catch (err) {
-        // Fail closed: if the merchant's bypass callback throws, enforce
-        // payment rather than risk letting the request through for free.
+        // Fail closed: any throw/reject enforces payment.
         console.error(
           "[sangria-sdk] bypassPaymentIf threw; falling through to payment required",
           err,
