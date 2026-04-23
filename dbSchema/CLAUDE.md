@@ -28,3 +28,4 @@ pnpm studio:prd         # Open Drizzle Studio browser (prod)
 - Some account rows have a nullable org-scope column — system-level rows leave it `NULL`, org-scoped rows set it. Check the schema before assuming non-null.
 - WorkOS IDs use TEXT columns, not UUID, to avoid cast issues with external identifiers.
 - The migration directory (`drizzle/`) has a single initial migration. Subsequent schema changes are applied via `drizzle-kit push` rather than generated migrations.
+- **Do not use `BigInt(0)` as a default on `bigint` columns.** drizzle-kit 0.31.10 can't `JSON.stringify` a BigInt during its schema-diff phase and `pnpm push:dev`/`push:prd` will crash with `TypeError: Do not know how to serialize a BigInt`. Use `` .default(sql`0`) `` instead — same on-disk behaviour (DEFAULT 0 coerced to bigint by Postgres), no serialization bug. Auto-fixers occasionally "correct" it back to `BigInt(0)` because that looks more natural — don't accept that change.

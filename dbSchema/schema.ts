@@ -271,7 +271,7 @@ export const withdrawals = pgTable(
 
     // Money
     amount: bigint({ mode: "bigint" }).notNull(),
-    fee: bigint({ mode: "bigint" }).notNull().default(BigInt(0)),
+    fee: bigint({ mode: "bigint" }).notNull().default(sql`0`),
     netAmount: bigint("net_amount", { mode: "bigint" }).notNull(),
 
     // Status lifecycle
