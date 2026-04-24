@@ -2,6 +2,8 @@ package config
 
 import (
 	"fmt"
+	"log/slog"
+	"net"
 	"os"
 	"strconv"
 	"strings"
@@ -41,10 +43,12 @@ type RateLimitConfig struct {
 	// Use for emergency rollback without redeploying.
 	Disabled bool
 
-	// WorkOSWebhookAllowedIPs is the allowlist for POST /webhooks/workos.
-	// WorkOS publishes a fixed set of source IPs; anything outside this list
-	// is rejected before signature verification runs.
-	WorkOSWebhookAllowedIPs []string
+	// WorkOSWebhookAllowedIPs and WorkOSWebhookAllowedCIDRs are the pre-parsed
+	// allowlist for POST /webhooks/workos. Parsed once at startup so the
+	// per-request check is allocation-free. Invalid entries in the source env
+	// var are logged and dropped during LoadRateLimitConfig.
+	WorkOSWebhookAllowedIPs   []net.IP
+	WorkOSWebhookAllowedCIDRs []*net.IPNet
 }
 
 // LoadRateLimitConfig reads rate-limit configuration from environment variables.
@@ -71,12 +75,31 @@ func LoadRateLimitConfig() error {
 
 	RateLimit.Disabled = strings.EqualFold(os.Getenv("RATE_LIMIT_DISABLED"), "true")
 
-	ipCSV := os.Getenv("WORKOS_WEBHOOK_ALLOWED_IPS")
-	if ipCSV != "" {
-		for _, ip := range strings.Split(ipCSV, ",") {
-			if trimmed := strings.TrimSpace(ip); trimmed != "" {
-				RateLimit.WorkOSWebhookAllowedIPs = append(RateLimit.WorkOSWebhookAllowedIPs, trimmed)
+	RateLimit.WorkOSWebhookAllowedIPs = nil
+	RateLimit.WorkOSWebhookAllowedCIDRs = nil
+	if ipCSV := os.Getenv("WORKOS_WEBHOOK_ALLOWED_IPS"); ipCSV != "" {
+		for _, entry := range strings.Split(ipCSV, ",") {
+			trimmed := strings.TrimSpace(entry)
+			if trimmed == "" {
+				continue
 			}
+			if strings.Contains(trimmed, "/") {
+				_, cidr, cidrErr := net.ParseCIDR(trimmed)
+				if cidrErr != nil {
+					slog.Warn("workos webhook: invalid CIDR in WORKOS_WEBHOOK_ALLOWED_IPS, skipping",
+						"entry", trimmed, "error", cidrErr)
+					continue
+				}
+				RateLimit.WorkOSWebhookAllowedCIDRs = append(RateLimit.WorkOSWebhookAllowedCIDRs, cidr)
+				continue
+			}
+			parsed := net.ParseIP(trimmed)
+			if parsed == nil {
+				slog.Warn("workos webhook: invalid IP in WORKOS_WEBHOOK_ALLOWED_IPS, skipping",
+					"entry", trimmed)
+				continue
+			}
+			RateLimit.WorkOSWebhookAllowedIPs = append(RateLimit.WorkOSWebhookAllowedIPs, parsed)
 		}
 	}
 

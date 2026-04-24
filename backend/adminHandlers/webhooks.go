@@ -15,10 +15,10 @@ import (
 	dbengine "sangria/backend/dbEngine"
 )
 
-// isWorkOSIPAllowed checks the caller IP against WORKOS_WEBHOOK_ALLOWED_IPS.
-// Empty allowlist = fail-closed: all webhook requests rejected until configured.
-// Entries may be bare IPs or CIDR ranges. Parses both sides so IPv4-mapped IPv6
-// (e.g. ::ffff:18.x.x.x from Railway's edge) matches its IPv4 form.
+// isWorkOSIPAllowed checks the caller IP against the pre-parsed allowlist
+// built at startup by config.LoadRateLimitConfig. Empty allowlist = fail-closed:
+// all webhook requests rejected until configured. Only the incoming IP is
+// parsed per-request; config entries are already net.IP / *net.IPNet values.
 func isWorkOSIPAllowed(ip string) bool {
 	// Strip IPv6 zone suffix (e.g. "fe80::1%eth0") before parsing.
 	if i := strings.IndexByte(ip, '%'); i >= 0 {
@@ -28,24 +28,13 @@ func isWorkOSIPAllowed(ip string) bool {
 	if parsed == nil {
 		return false
 	}
-	for _, allowed := range config.RateLimit.WorkOSWebhookAllowedIPs {
-		if strings.Contains(allowed, "/") {
-			_, cidr, err := net.ParseCIDR(allowed)
-			if err != nil {
-				slog.Warn("workos webhook: invalid CIDR in allowlist", "entry", allowed, "error", err)
-				continue
-			}
-			if cidr.Contains(parsed) {
-				return true
-			}
-			continue
-		}
-		allowedIP := net.ParseIP(allowed)
-		if allowedIP == nil {
-			slog.Warn("workos webhook: invalid IP in allowlist", "entry", allowed)
-			continue
-		}
+	for _, allowedIP := range config.RateLimit.WorkOSWebhookAllowedIPs {
 		if allowedIP.Equal(parsed) {
+			return true
+		}
+	}
+	for _, cidr := range config.RateLimit.WorkOSWebhookAllowedCIDRs {
+		if cidr.Contains(parsed) {
 			return true
 		}
 	}
