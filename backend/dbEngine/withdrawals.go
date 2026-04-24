@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -93,7 +94,7 @@ func CreateWithdrawal(
 	var merchantAcctID string
 	err = tx.QueryRow(ctx,
 		`SELECT a.id FROM accounts a
-		 JOIN merchants m ON m.user_id = a.user_id
+		 JOIN merchants m ON m.organization_id = a.organization_id
 		 WHERE m.id = $1 AND a.type = 'LIABILITY' AND a.currency = 'USD'
 		 FOR UPDATE`,
 		merchantID,
@@ -215,36 +216,95 @@ func GetWithdrawalByID(ctx context.Context, pool *pgxpool.Pool, id string) (With
 	return w, err
 }
 
-// ListWithdrawalsByMerchant returns withdrawals for a merchant, ordered by created_at desc.
-func ListWithdrawalsByMerchant(ctx context.Context, pool *pgxpool.Pool, merchantID string, limit, offset int) ([]Withdrawal, error) {
-	if limit <= 0 {
-		limit = 50
-	}
-	if limit > 200 {
-		limit = 200
-	}
-	if offset < 0 {
-		offset = 0
+// GetWithdrawalsByOrganizationPaginated returns paginated withdrawals for an
+// organization (across all its merchants) with total count. Uses created_at as
+// cursor for stable, performant pagination.
+func GetWithdrawalsByOrganizationPaginated(
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	organizationID string,
+	limit int,
+	cursor *time.Time,
+) ([]Withdrawal, *time.Time, int, error) {
+	// Prefix withdrawal columns with w. for the JOIN query.
+	prefixedColumns := `w.id, w.merchant_id, w.amount, w.fee, w.net_amount, w.status,
+		w.debit_transaction_id, w.completion_transaction_id, w.reversal_transaction_id,
+		w.failure_code, w.failure_message,
+		w.reviewed_by, w.reviewed_at, w.review_note,
+		w.completed_by, w.failed_by,
+		w.idempotency_key,
+		w.created_at, w.approved_at, w.processed_at, w.completed_at, w.failed_at, w.reversed_at, w.canceled_at`
+
+	baseWhere := `
+		WHERE m.organization_id = $1
+	`
+	args := []interface{}{organizationID}
+
+	cursorWhere := ""
+	if cursor != nil {
+		cursorWhere = ` AND w.created_at < $2`
+		args = append(args, *cursor)
 	}
 
-	rows, err := pool.Query(ctx,
-		fmt.Sprintf(`SELECT %s FROM withdrawals WHERE merchant_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`, withdrawalColumns),
-		merchantID, limit, offset,
-	)
+	// Fetch limit+1 to determine if more results exist.
+	limitParam := len(args) + 1
+	dataQuery := fmt.Sprintf(`
+		SELECT %s
+		FROM withdrawals w
+		JOIN merchants m ON w.merchant_id = m.id
+		%s%s
+		ORDER BY w.created_at DESC
+		LIMIT $%d
+	`, prefixedColumns, baseWhere, cursorWhere, limitParam)
+
+	// Get total count (separate query, no cursor condition).
+	countQuery := fmt.Sprintf(`
+		SELECT COUNT(*)
+		FROM withdrawals w
+		JOIN merchants m ON w.merchant_id = m.id
+		%s
+	`, baseWhere)
+
+	var total int
+	err := pool.QueryRow(ctx, countQuery, organizationID).Scan(&total)
 	if err != nil {
-		return nil, fmt.Errorf("query withdrawals: %w", err)
+		return nil, nil, 0, fmt.Errorf("count query failed: %w", err)
+	}
+
+	// Fetch data with limit+1.
+	dataArgs := append(args, limit+1)
+	rows, err := pool.Query(ctx, dataQuery, dataArgs...)
+	if err != nil {
+		return nil, nil, 0, fmt.Errorf("query withdrawals: %w", err)
 	}
 	defer rows.Close()
 
-	withdrawals := make([]Withdrawal, 0)
+	var withdrawals []Withdrawal
 	for rows.Next() {
 		w, err := scanWithdrawal(rows)
 		if err != nil {
-			return nil, fmt.Errorf("scan withdrawal: %w", err)
+			return nil, nil, 0, fmt.Errorf("scan withdrawal: %w", err)
 		}
 		withdrawals = append(withdrawals, w)
 	}
-	return withdrawals, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, nil, 0, err
+	}
+
+	// Handle empty results.
+	if len(withdrawals) == 0 {
+		return []Withdrawal{}, nil, total, nil
+	}
+
+	// Determine next cursor.
+	var nextCursor *time.Time
+	if len(withdrawals) > limit {
+		withdrawals = withdrawals[:limit]
+		lastTimestamp := withdrawals[len(withdrawals)-1].CreatedAt
+		nextCursor = &lastTimestamp
+	}
+
+	return withdrawals, nextCursor, total, nil
 }
 
 // ListAllWithdrawals returns all withdrawals, ordered by created_at desc.
@@ -311,7 +371,7 @@ func ApproveWithdrawal(ctx context.Context, pool *pgxpool.Pool, withdrawalID, ad
 func getSystemAccountIDTx(ctx context.Context, tx pgx.Tx, name string) (string, error) {
 	var id string
 	err := tx.QueryRow(ctx,
-		`SELECT id FROM accounts WHERE name = $1 AND currency = 'USD' AND user_id IS NULL`,
+		`SELECT id FROM accounts WHERE name = $1 AND currency = 'USD' AND organization_id IS NULL`,
 		name,
 	).Scan(&id)
 	if err != nil {
@@ -325,7 +385,7 @@ func getMerchantLiabilityAccountIDTx(ctx context.Context, tx pgx.Tx, merchantID 
 	var id string
 	err := tx.QueryRow(ctx,
 		`SELECT a.id FROM accounts a
-		 JOIN merchants m ON m.user_id = a.user_id
+		 JOIN merchants m ON m.organization_id = a.organization_id
 		 WHERE m.id = $1 AND a.type = 'LIABILITY' AND a.currency = 'USD'`,
 		merchantID,
 	).Scan(&id)

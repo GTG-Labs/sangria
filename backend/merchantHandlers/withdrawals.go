@@ -3,7 +3,6 @@ package merchantHandlers
 import (
 	"errors"
 	"log/slog"
-	"strconv"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -11,6 +10,7 @@ import (
 	"sangria/backend/auth"
 	"sangria/backend/config"
 	dbengine "sangria/backend/dbEngine"
+	"sangria/backend/utils"
 )
 
 // RequestWithdrawal handles POST /withdrawals.
@@ -41,7 +41,18 @@ func RequestWithdrawal(pool *pgxpool.Pool) fiber.Handler {
 			return c.Status(400).JSON(fiber.Map{"error": "amount must be a positive integer (microunits)"})
 		}
 
-		// Verify this merchant belongs to the authenticated user.
+		// Get user organizations to validate merchant access
+		memberships, err := dbengine.GetUserOrganizations(c.Context(), pool, user.ID)
+		if err != nil {
+			slog.Error("get user organizations", "user_id", user.ID, "error", err)
+			return c.Status(500).JSON(fiber.Map{"error": "failed to get user organizations"})
+		}
+		if len(memberships) == 0 {
+			slog.Error("user has no organizations", "user_id", user.ID)
+			return c.Status(400).JSON(fiber.Map{"error": "user must belong to an organization"})
+		}
+
+		// Verify this merchant belongs to the authenticated user's organization.
 		merchant, err := dbengine.GetMerchantByID(c.Context(), pool, req.MerchantID)
 		if err != nil {
 			if errors.Is(err, dbengine.ErrMerchantNotFound) {
@@ -50,7 +61,16 @@ func RequestWithdrawal(pool *pgxpool.Pool) fiber.Handler {
 			slog.Error("get merchant", "merchant_id", req.MerchantID, "error", err)
 			return c.Status(500).JSON(fiber.Map{"error": "failed to look up merchant"})
 		}
-		if merchant.UserID != user.ID {
+
+		// Check if user is a member of the organization that owns this merchant
+		userHasAccess := false
+		for _, membership := range memberships {
+			if membership.OrganizationID == merchant.OrganizationID {
+				userHasAccess = true
+				break
+			}
+		}
+		if !userHasAccess {
 			return c.Status(403).JSON(fiber.Map{"error": "Forbidden"})
 		}
 
@@ -90,8 +110,9 @@ func RequestWithdrawal(pool *pgxpool.Pool) fiber.Handler {
 	}
 }
 
-// ListWithdrawals handles GET /withdrawals.
-// Dashboard endpoint — returns withdrawals for a specific merchant owned by the authenticated user.
+// ListWithdrawals handles GET /withdrawals with cursor-based pagination.
+// Dashboard endpoint — returns withdrawals for the user's organization.
+// Query params: ?limit=20&cursor=base64_encoded_timestamp&org_id=optional
 func ListWithdrawals(pool *pgxpool.Pool) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		user, ok := c.Locals("workos_user").(auth.WorkOSUser)
@@ -99,47 +120,54 @@ func ListWithdrawals(pool *pgxpool.Pool) fiber.Handler {
 			return c.Status(500).JSON(fiber.Map{"error": "internal server error"})
 		}
 
-		merchantID := c.Query("merchant_id")
-		if merchantID == "" {
-			return c.Status(400).JSON(fiber.Map{"error": "merchant_id query param is required"})
-		}
-		limit := 50
-		offset := 0
-		if limitParam := c.Query("limit"); limitParam != "" {
-			parsed, err := strconv.Atoi(limitParam)
-			if err != nil {
-				return c.Status(400).JSON(fiber.Map{"error": "limit must be an integer"})
-			}
-			limit = parsed
-		}
-		if offsetParam := c.Query("offset"); offsetParam != "" {
-			parsed, err := strconv.Atoi(offsetParam)
-			if err != nil {
-				return c.Status(400).JSON(fiber.Map{"error": "offset must be an integer"})
-			}
-			offset = parsed
-		}
-
-		// Verify this merchant belongs to the authenticated user.
-		merchant, err := dbengine.GetMerchantByID(c.Context(), pool, merchantID)
+		// Parse pagination params from query string
+		limit, cursor, err := utils.ParsePaginationParams(
+			c.Query("limit"),
+			c.Query("cursor"),
+		)
 		if err != nil {
-			if errors.Is(err, dbengine.ErrMerchantNotFound) {
-				return c.Status(404).JSON(fiber.Map{"error": "merchant not found"})
-			}
-			slog.Error("get merchant", "merchant_id", merchantID, "error", err)
-			return c.Status(500).JSON(fiber.Map{"error": "failed to look up merchant"})
-		}
-		if merchant.UserID != user.ID {
-			return c.Status(403).JSON(fiber.Map{"error": "Forbidden"})
+			return c.Status(400).JSON(fiber.Map{
+				"error": "Invalid pagination parameters: " + err.Error(),
+			})
 		}
 
-		withdrawals, err := dbengine.ListWithdrawalsByMerchant(c.Context(), pool, merchant.ID, limit, offset)
+		// Resolve organization context
+		orgResult := auth.ResolveOrganizationContext(c.Context(), c, pool, user)
+		if orgResult.Error != "" {
+			return c.Status(orgResult.HTTPStatus).JSON(fiber.Map{"error": orgResult.Error})
+		}
+		selectedOrgID := orgResult.OrganizationID
+
+		// Fetch paginated withdrawals for the organization
+		withdrawals, nextCursor, total, err := dbengine.GetWithdrawalsByOrganizationPaginated(
+			c.Context(), pool, selectedOrgID, limit, cursor,
+		)
 		if err != nil {
-			slog.Error("list withdrawals", "merchant_id", merchant.ID, "error", err)
-			return c.Status(500).JSON(fiber.Map{"error": "failed to list withdrawals"})
+			slog.Error("fetch withdrawals: query failed", "user_id", user.ID, "org_id", selectedOrgID, "error", err)
+			return c.Status(500).JSON(fiber.Map{
+				"error": "failed to retrieve withdrawals",
+			})
 		}
 
-		return c.JSON(withdrawals)
+		// Build pagination metadata
+		paginationMeta := dbengine.PaginationMeta{
+			HasMore: nextCursor != nil,
+			Count:   len(withdrawals),
+			Limit:   limit,
+			Total:   total,
+		}
+		if nextCursor != nil {
+			encoded := utils.EncodeCursor(*nextCursor)
+			paginationMeta.NextCursor = &encoded
+		}
+
+		// Return paginated response
+		response := dbengine.WithdrawalsResponse{
+			Data:       withdrawals,
+			Pagination: paginationMeta,
+		}
+
+		return c.JSON(response)
 	}
 }
 
@@ -163,7 +191,18 @@ func CancelWithdrawal(pool *pgxpool.Pool) fiber.Handler {
 			return c.Status(400).JSON(fiber.Map{"error": "merchant_id is required"})
 		}
 
-		// Verify this merchant belongs to the authenticated user.
+		// Get user organizations to validate merchant access
+		memberships, err := dbengine.GetUserOrganizations(c.Context(), pool, user.ID)
+		if err != nil {
+			slog.Error("get user organizations", "user_id", user.ID, "error", err)
+			return c.Status(500).JSON(fiber.Map{"error": "failed to get user organizations"})
+		}
+		if len(memberships) == 0 {
+			slog.Error("user has no organizations", "user_id", user.ID)
+			return c.Status(400).JSON(fiber.Map{"error": "user must belong to an organization"})
+		}
+
+		// Verify this merchant belongs to the authenticated user's organization.
 		merchant, err := dbengine.GetMerchantByID(c.Context(), pool, req.MerchantID)
 		if err != nil {
 			if errors.Is(err, dbengine.ErrMerchantNotFound) {
@@ -172,7 +211,16 @@ func CancelWithdrawal(pool *pgxpool.Pool) fiber.Handler {
 			slog.Error("get merchant", "merchant_id", req.MerchantID, "error", err)
 			return c.Status(500).JSON(fiber.Map{"error": "failed to look up merchant"})
 		}
-		if merchant.UserID != user.ID {
+
+		// Check if user is a member of the organization that owns this merchant
+		userHasAccess := false
+		for _, membership := range memberships {
+			if membership.OrganizationID == merchant.OrganizationID {
+				userHasAccess = true
+				break
+			}
+		}
+		if !userHasAccess {
 			return c.Status(403).JSON(fiber.Map{"error": "Forbidden"})
 		}
 

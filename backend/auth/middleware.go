@@ -92,7 +92,7 @@ func APIKeyAuthMiddleware(pool *pgxpool.Pool) fiber.Handler {
 
 		// Store the authenticated merchant info in context
 		c.Locals("merchant_api_key", merchantKey)
-		c.Locals("merchant_user_id", merchantKey.UserID)
+		c.Locals("merchant_organization_id", merchantKey.OrganizationID)
 
 		return c.Next()
 	}

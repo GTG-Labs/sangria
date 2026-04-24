@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 
 // ---------------------------------------------------------------------------
 // Article data
@@ -137,6 +137,13 @@ interface PaymentSteps {
   settle: { status: StepStatus; data?: SettleData };
 }
 
+interface StreamEvent {
+  step: "negotiate" | "sign" | "settle" | "error";
+  status: StepStatus;
+  data?: Record<string, unknown>;
+  error?: string;
+}
+
 type PaymentState =
   | { phase: "idle" }
   | { phase: "paying"; steps: PaymentSteps }
@@ -250,8 +257,13 @@ function PaywallModal({
   const [paymentState, setPaymentState] = useState<PaymentState>({
     phase: "idle",
   });
+  const idempotencyKeyRef = useRef<string | null>(null);
 
   const startPayment = useCallback(async () => {
+    if (!idempotencyKeyRef.current) {
+      idempotencyKeyRef.current = crypto.randomUUID();
+    }
+
     const steps: PaymentSteps = {
       negotiate: { status: "idle" },
       sign: { status: "idle" },
@@ -264,14 +276,27 @@ function PaywallModal({
       const response = await fetch("/api/x402-pay", {
         method: "POST",
         headers: {
-          "x-idempotency-key": crypto.randomUUID(),
+          "x-idempotency-key": idempotencyKeyRef.current,
         },
       });
+
+      if (!response.ok) {
+        let errorMessage = `Payment request failed (${response.status})`;
+        try {
+          const payload = (await response.json()) as { error?: string };
+          if (payload.error) errorMessage = payload.error;
+        } catch {
+          // Keep status fallback when the response is not JSON.
+        }
+        throw new Error(errorMessage);
+      }
+
       if (!response.body) throw new Error("No response body");
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
+      let receivedTerminalEvent = false;
 
       while (true) {
         const { value, done } = await reader.read();
@@ -285,16 +310,27 @@ function PaywallModal({
           const line = chunk.replace(/^data: /, "").trim();
           if (!line) continue;
 
-          let event: {
-            step: string;
-            status: string;
-            data?: Record<string, unknown>;
-            error?: string;
-          };
+          let event: StreamEvent;
           try {
-            event = JSON.parse(line);
+            const parsed = JSON.parse(line) as StreamEvent;
+            if (
+              parsed.step !== "negotiate" &&
+              parsed.step !== "sign" &&
+              parsed.step !== "settle" &&
+              parsed.step !== "error"
+            ) {
+              continue;
+            }
+            event = parsed;
           } catch {
             continue;
+          }
+
+          if (
+            event.step === "error" ||
+            (event.step === "settle" && event.status === "done")
+          ) {
+            receivedTerminalEvent = true;
           }
 
           setPaymentState((prev) => {
@@ -312,17 +348,34 @@ function PaywallModal({
               };
             }
 
-            if (
-              event.step === "negotiate" ||
-              event.step === "sign" ||
-              event.step === "settle"
-            ) {
-              const stepKey = event.step as keyof PaymentSteps;
+            if (event.step === "negotiate") {
               const updatedSteps: PaymentSteps = {
                 ...prevSteps,
-                [stepKey]: {
-                  status: event.status as StepStatus,
-                  data: event.data,
+                negotiate: {
+                  status: event.status,
+                  data: event.data as NegotiateData | undefined,
+                },
+              };
+              return { phase: "paying", steps: updatedSteps };
+            }
+
+            if (event.step === "sign") {
+              const updatedSteps: PaymentSteps = {
+                ...prevSteps,
+                sign: {
+                  status: event.status,
+                  data: event.data as SignData | undefined,
+                },
+              };
+              return { phase: "paying", steps: updatedSteps };
+            }
+
+            if (event.step === "settle") {
+              const updatedSteps: PaymentSteps = {
+                ...prevSteps,
+                settle: {
+                  status: event.status,
+                  data: event.data as SettleData | undefined,
                 },
               };
 
@@ -331,13 +384,16 @@ function PaywallModal({
                 return { phase: "success", steps: updatedSteps };
               }
 
-              // When a step goes pending, mark the previous one done if not already
+              // Update only the current streamed step.
               return { phase: "paying", steps: updatedSteps };
             }
 
             return prev;
           });
         }
+      }
+      if (!receivedTerminalEvent) {
+        throw new Error("Payment stream ended before settlement completed");
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -393,7 +449,12 @@ function PaywallModal({
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      <div className="relative w-full max-w-xl overflow-hidden rounded-2xl border border-white/10 bg-zinc-900 shadow-2xl">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Paywall for ${article.headline}`}
+        className="relative w-full max-w-xl overflow-hidden rounded-2xl border border-white/10 bg-zinc-900 shadow-2xl"
+      >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
           <div className="flex items-center gap-2">
@@ -404,6 +465,8 @@ function PaywallModal({
             <span className="text-xs text-gray-400">{article.section}</span>
           </div>
           <button
+            type="button"
+            aria-label="Close paywall"
             onClick={onClose}
             className="text-gray-500 transition hover:text-white"
           >

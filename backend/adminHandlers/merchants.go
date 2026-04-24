@@ -29,12 +29,12 @@ func CreateMerchantAPIKey(pool *pgxpool.Pool) fiber.Handler {
 			return c.Status(400).JSON(fiber.Map{"error": "invalid request body"})
 		}
 
-		name := strings.TrimSpace(req.Name)
-		if name == "" {
+		req.Name = strings.TrimSpace(req.Name)
+		if req.Name == "" {
 			return c.Status(400).JSON(fiber.Map{"error": "name is required"})
 		}
-		if len(name) > 255 {
-			return c.Status(400).JSON(fiber.Map{"error": "name must be 255 characters or fewer"})
+		if len(req.Name) > 255 {
+			return c.Status(400).JSON(fiber.Map{"error": "name must be 255 characters or less"})
 		}
 
 		// Ensure the user exists in the database first
@@ -47,31 +47,74 @@ func CreateMerchantAPIKey(pool *pgxpool.Pool) fiber.Handler {
 			return c.Status(500).JSON(fiber.Map{"error": "failed to create user"})
 		}
 
-		// Ensure the user has a USDC LIABILITY account before creating the API key,
+		// Resolve organization context
+		orgResult := auth.ResolveOrganizationContext(c.Context(), c, pool, user)
+		if orgResult.Error != "" {
+			// Convert 400 status to 403 for consistency with existing error handling in this handler
+			status := orgResult.HTTPStatus
+			if status == 400 && orgResult.Error == "user is not a member of the specified organization" {
+				status = 403
+			}
+			return c.Status(status).JSON(fiber.Map{"error": orgResult.Error})
+		}
+		selectedOrgID := orgResult.OrganizationID
+		memberships := orgResult.Memberships
+
+		// Ensure the organization has a USD LIABILITY account before creating the API key,
 		// so we don't end up with an active key but no liability account.
-		if _, err := dbengine.EnsureUSDLiabilityAccount(c.Context(), pool, user.ID); err != nil {
-			slog.Error("ensure USD liability account", "user_id", user.ID, "error", err)
+		if _, err := dbengine.EnsureUSDLiabilityAccount(c.Context(), pool, selectedOrgID); err != nil {
+			slog.Error("ensure USD liability account", "org_id", selectedOrgID, "user_id", user.ID, "error", err)
 			return c.Status(500).JSON(fiber.Map{"error": "failed to create liability account"})
 		}
 
-		merchant, fullKey, err := auth.CreateAPIKey(c.Context(), pool, user.ID, name)
-		if err != nil {
-			if errors.Is(err, auth.ErrMaxAPIKeysReached) {
-				return c.Status(400).JSON(fiber.Map{"error": "maximum number of API keys reached (10)"})
+		// Determine if user is admin for this organization
+		isAdmin := false
+		for _, membership := range memberships {
+			if membership.OrganizationID == selectedOrgID && membership.IsAdmin {
+				isAdmin = true
+				break
 			}
-			slog.Error("create merchant API key", "user_id", user.ID, "error", err)
+		}
+
+		// Set status based on admin status
+		var keyStatus dbengine.APIKeyStatus
+		if isAdmin {
+			keyStatus = dbengine.APIKeyStatusActive // Admin keys are immediately active
+		} else {
+			keyStatus = dbengine.APIKeyStatusPending // Non-admin keys need approval
+		}
+
+		merchant, fullKey, err := auth.CreateAPIKey(c.Context(), pool, selectedOrgID, req.Name, keyStatus)
+		if err != nil {
+			if errors.Is(err, dbengine.ErrMaxAPIKeysReached) {
+				return c.Status(400).JSON(fiber.Map{"error": "maximum number of API keys reached (10). This includes active and pending keys."})
+			}
+			slog.Error("create merchant API key", "org_id", selectedOrgID, "user_id", user.ID, "error", err)
 			return c.Status(500).JSON(fiber.Map{"error": "failed to create merchant"})
 		}
 
-		// Return merchant record + raw key (only shown once).
+		// Different response based on status
+		if keyStatus == dbengine.APIKeyStatusPending {
+			return c.Status(202).JSON(fiber.Map{
+				"message":         "API key created but pending admin approval",
+				"id":              merchant.ID,
+				"organization_id": merchant.OrganizationID,
+				"name":            merchant.Name,
+				"key_id":          merchant.KeyID,
+				"api_key":         fullKey, // User sees the key immediately but it's not active yet
+				"status":          merchant.Status,
+				"created_at":      merchant.CreatedAt,
+			})
+		}
+
 		return c.Status(201).JSON(fiber.Map{
-			"id":         merchant.ID,
-			"user_id":    merchant.UserID,
-			"name":       merchant.Name,
-			"key_id":     merchant.KeyID,
-			"api_key":    fullKey,
-			"is_active":  merchant.IsActive,
-			"created_at": merchant.CreatedAt,
+			"id":              merchant.ID,
+			"organization_id": merchant.OrganizationID,
+			"name":            merchant.Name,
+			"key_id":          merchant.KeyID,
+			"api_key":         fullKey,
+			"status":          merchant.Status,
+			"created_at":      merchant.CreatedAt,
 		})
 	}
 }

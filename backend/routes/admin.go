@@ -15,6 +15,9 @@ func RegisterAdminRoutes(app *fiber.App, pool *pgxpool.Pool) {
 		return c.JSON(fiber.Map{"admin": true})
 	})
 
+	admin.Get("/transactions", adminHandlers.GetAllTransactions(pool))
+	admin.Get("/transactions/:id/ledger", adminHandlers.GetTransactionLedger(pool))
+
 	admin.Post("/wallets/pool", adminHandlers.CreateWalletPool(pool))
 	admin.Post("/treasury/fund", adminHandlers.FundTreasury(pool))
 

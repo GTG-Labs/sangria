@@ -29,13 +29,20 @@ const (
 	AccountTypeExpense   AccountType = "EXPENSE"
 )
 
+type Organization struct {
+	ID         string    `json:"id"`
+	Name       string    `json:"name"`
+	IsPersonal bool      `json:"is_personal"`
+	CreatedAt  time.Time `json:"created_at"`
+}
+
 type Account struct {
-	ID        string      `json:"id"`
-	Name      string      `json:"name"`
-	Type      AccountType `json:"type"`
-	Currency  Currency    `json:"currency"`
-	UserID    *string     `json:"user_id"`
-	CreatedAt time.Time   `json:"created_at"`
+	ID             string      `json:"id"`
+	Name           string      `json:"name"`
+	Type           AccountType `json:"type"`
+	Currency       Currency    `json:"currency"`
+	OrganizationID *string     `json:"organization_id"`
+	CreatedAt      time.Time   `json:"created_at"`
 }
 
 type User struct {
@@ -43,6 +50,47 @@ type User struct {
 	Owner     string    `json:"owner"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
+}
+
+type OrganizationMember struct {
+	UserID         string    `json:"user_id"`
+	OrganizationID string    `json:"organization_id"`
+	IsAdmin        bool      `json:"is_admin"`
+	JoinedAt       time.Time `json:"joined_at"`
+	DisplayName    string    `json:"display_name"` // Contains the display name (FirstName LastName) or email as fallback
+	Email          string    `json:"email,omitempty"` // The email address from WorkOS
+}
+
+// UserOrganization represents a user's membership in an organization with org details included.
+type UserOrganization struct {
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	IsPersonal bool   `json:"is_personal"`
+	IsAdmin    bool   `json:"is_admin"`
+}
+
+type InvitationStatus string
+
+const (
+	InvitationStatusPending  InvitationStatus = "pending"
+	InvitationStatusAccepted InvitationStatus = "accepted"
+	InvitationStatusDeclined InvitationStatus = "declined"
+	InvitationStatusExpired  InvitationStatus = "expired"
+)
+
+type OrganizationInvitation struct {
+	ID              string            `json:"id"`
+	OrganizationID  string            `json:"organization_id"`
+	InviterUserID   string            `json:"inviter_user_id"`
+	InviteeEmail    string            `json:"invitee_email"`
+	InviteeUserID   *string           `json:"invitee_user_id"`
+	Status          InvitationStatus  `json:"status"`
+	Message         *string           `json:"message"`
+	InvitationToken string            `json:"invitation_token"`
+	ExpiresAt       time.Time         `json:"expires_at"`
+	CreatedAt       time.Time         `json:"created_at"`
+	AcceptedAt      *time.Time        `json:"accepted_at"`
+	DeclinedAt      *time.Time        `json:"declined_at"`
 }
 
 type TransactionStatus string
@@ -70,6 +118,16 @@ type LedgerEntry struct {
 	AccountID     string    `json:"account_id"`
 }
 
+// AdminLedgerEntry is a ledger entry enriched with account details for admin views.
+type AdminLedgerEntry struct {
+	ID          string      `json:"id"`
+	Amount      int64       `json:"amount"`
+	Direction   Direction   `json:"direction"`
+	Currency    Currency    `json:"currency"`
+	AccountName string      `json:"account_name"`
+	AccountType AccountType `json:"account_type"`
+}
+
 // LedgerLine is an input struct used when building entries to insert.
 type LedgerLine struct {
 	Currency  Currency  `json:"currency"`
@@ -85,33 +143,41 @@ type LedgerLine struct {
 type Network string
 
 const (
-	NetworkBase         Network = "base"          // eip155:8453
-	NetworkBaseSepolia  Network = "base-sepolia"  // eip155:84532
-	NetworkPolygon      Network = "polygon"       // eip155:137
-	NetworkSolana       Network = "solana"        // solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp
-	NetworkSolanaDevnet Network = "solana-devnet" // solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1
+	NetworkBase         Network = "base"            // eip155:8453
+	NetworkBaseSepolia  Network = "base-sepolia"    // eip155:84532
+	NetworkPolygon      Network = "polygon"         // eip155:137
+	NetworkSolana       Network = "solana"          // solana:5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp
+	NetworkSolanaDevnet Network = "solana-devnet"   // solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1
 )
 
-type Card struct {
-	ID         string     `json:"id"`
-	UserID     string     `json:"user_id"`
-	APIKey     string     `json:"-"`
-	KeyID      string     `json:"key_id"`
-	Name       string     `json:"name"`
-	IsActive   bool       `json:"is_active"`
-	LastUsedAt *time.Time `json:"last_used_at"`
-	CreatedAt  time.Time  `json:"created_at"`
-}
+type APIKeyStatus string
+
+const (
+	APIKeyStatusActive   APIKeyStatus = "active"   // Approved and working
+	APIKeyStatusPending  APIKeyStatus = "pending"  // Awaiting admin approval
+	APIKeyStatusInactive APIKeyStatus = "inactive" // Rejected or revoked
+)
 
 type Merchant struct {
-	ID         string     `json:"id"`
-	UserID     string     `json:"user_id"`
-	APIKey     string     `json:"-"`
-	KeyID      string     `json:"key_id"`
-	Name       string     `json:"name"`
-	IsActive   bool       `json:"is_active"`
-	LastUsedAt *time.Time `json:"last_used_at"`
-	CreatedAt  time.Time  `json:"created_at"`
+	ID             string       `json:"id"`
+	OrganizationID string       `json:"organization_id"`
+	APIKey         string       `json:"api_key"`
+	KeyID          string       `json:"key_id"`
+	Name           string       `json:"name"`
+	Status         APIKeyStatus `json:"status"`
+	LastUsedAt     *time.Time   `json:"last_used_at"`
+	CreatedAt      time.Time    `json:"created_at"`
+}
+
+// MerchantPublic represents a merchant API key without exposing the hashed key
+type MerchantPublic struct {
+	ID             string       `json:"id"`
+	OrganizationID string       `json:"organization_id"`
+	KeyID          string       `json:"key_id"`
+	Name           string       `json:"name"`
+	Status         APIKeyStatus `json:"status"`
+	LastUsedAt     *time.Time   `json:"last_used_at"`
+	CreatedAt      time.Time    `json:"created_at"`
 }
 
 type CryptoWallet struct {
@@ -146,6 +212,40 @@ type PaginationMeta struct {
 type TransactionsResponse struct {
 	Data       []MerchantTransaction `json:"data"`
 	Pagination PaginationMeta        `json:"pagination"`
+}
+
+// AdminTransaction represents a transaction enriched with organization and fee data.
+type AdminTransaction struct {
+	ID               string    `json:"id"`
+	IdempotencyKey   string    `json:"idempotency_key"`
+	CreatedAt        time.Time `json:"created_at"`
+	MerchantName     string    `json:"merchant_name"`      // organization name
+	MerchantID       string    `json:"merchant_id"`        // organization id
+	Amount           int64     `json:"amount"`             // merchant received (microunits)
+	Fee              int64     `json:"fee"`                // platform fee (microunits)
+	Total            int64     `json:"total"`              // amount + fee
+	Currency         Currency  `json:"currency"`
+}
+
+// AdminTransactionsResponse wraps enriched admin transactions with pagination and totals.
+type AdminTransactionsResponse struct {
+	Data       []AdminTransaction `json:"data"`
+	Pagination PaginationMeta     `json:"pagination"`
+	Totals     *AdminTotals       `json:"totals,omitempty"`
+}
+
+// AdminTotals holds aggregate metrics across all transactions.
+type AdminTotals struct {
+	TransactionCount int   `json:"transaction_count"`
+	TotalVolume      int64 `json:"total_volume"`      // sum of all payments (microunits)
+	TotalFees        int64 `json:"total_fees"`         // sum of platform fees (microunits)
+	MerchantCount    int   `json:"merchant_count"`     // distinct merchants
+}
+
+// WithdrawalsResponse wraps withdrawal data with pagination metadata
+type WithdrawalsResponse struct {
+	Data       []Withdrawal   `json:"data"`
+	Pagination PaginationMeta `json:"pagination"`
 }
 
 type WithdrawalStatus string
@@ -186,3 +286,18 @@ type Withdrawal struct {
 	ReversedAt              *time.Time       `json:"reversed_at"`
 	CanceledAt              *time.Time       `json:"canceled_at"`
 }
+
+// ---------------------------------------------------------------------------
+// Request Management Types
+// ---------------------------------------------------------------------------
+
+type RequestStatus string
+
+const (
+	RequestStatusPending  RequestStatus = "pending"
+	RequestStatusApproved RequestStatus = "approved"
+	RequestStatusRejected RequestStatus = "rejected"
+	RequestStatusCanceled RequestStatus = "canceled"
+)
+
+

@@ -21,16 +21,16 @@ const (
 )
 
 // ensureSystemAccount creates a system-level account if it doesn't exist.
-// System accounts have no user_id (nil). Uses advisory lock to prevent
+// System accounts have no organization_id (nil). Uses advisory lock to prevent
 // concurrent startups from creating duplicates.
 func ensureSystemAccount(ctx context.Context, tx pgx.Tx, name string, accountType AccountType, currency Currency) (Account, error) {
 	var a Account
 	err := tx.QueryRow(ctx,
-		`SELECT id, name, type, currency, user_id, created_at
+		`SELECT id, name, type, currency, organization_id, created_at
 		 FROM accounts
-		 WHERE name = $1 AND type = $2 AND currency = $3 AND user_id IS NULL`,
+		 WHERE name = $1 AND type = $2 AND currency = $3 AND organization_id IS NULL`,
 		name, accountType, currency,
-	).Scan(&a.ID, &a.Name, &a.Type, &a.Currency, &a.UserID, &a.CreatedAt)
+	).Scan(&a.ID, &a.Name, &a.Type, &a.Currency, &a.OrganizationID, &a.CreatedAt)
 
 	if err == nil {
 		return a, nil
@@ -40,11 +40,11 @@ func ensureSystemAccount(ctx context.Context, tx pgx.Tx, name string, accountTyp
 	}
 
 	err = tx.QueryRow(ctx,
-		`INSERT INTO accounts (name, type, currency, user_id)
+		`INSERT INTO accounts (name, type, currency, organization_id)
 		 VALUES ($1, $2, $3, NULL)
-		 RETURNING id, name, type, currency, user_id, created_at`,
+		 RETURNING id, name, type, currency, organization_id, created_at`,
 		name, accountType, currency,
-	).Scan(&a.ID, &a.Name, &a.Type, &a.Currency, &a.UserID, &a.CreatedAt)
+	).Scan(&a.ID, &a.Name, &a.Type, &a.Currency, &a.OrganizationID, &a.CreatedAt)
 	if err != nil {
 		return Account{}, fmt.Errorf("create system account %q: %w", name, err)
 	}
@@ -114,10 +114,10 @@ func EnsureSystemAccounts(ctx context.Context, pool *pgxpool.Pool) error {
 func GetSystemAccount(ctx context.Context, pool *pgxpool.Pool, name string, currency Currency) (Account, error) {
 	var a Account
 	err := pool.QueryRow(ctx,
-		`SELECT id, name, type, currency, user_id, created_at
+		`SELECT id, name, type, currency, organization_id, created_at
 		 FROM accounts
-		 WHERE name = $1 AND currency = $2 AND user_id IS NULL`,
+		 WHERE name = $1 AND currency = $2 AND organization_id IS NULL`,
 		name, currency,
-	).Scan(&a.ID, &a.Name, &a.Type, &a.Currency, &a.UserID, &a.CreatedAt)
+	).Scan(&a.ID, &a.Name, &a.Type, &a.Currency, &a.OrganizationID, &a.CreatedAt)
 	return a, err
 }

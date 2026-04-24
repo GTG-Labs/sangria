@@ -34,7 +34,8 @@ Amounts are positive integers in microunits (1 USD = 1,000,000). Direction (`DEB
 | `cryptoWallets.go` | `CreateCryptoWalletWithAccount`, `GetWalletByNetwork`, `GetWalletByAddress` |
 | `transaction.go` | `InsertTransaction` — zero-net enforced ledger writes with idempotency |
 | `withdrawals.go` | `CreateWithdrawal`, `ApproveWithdrawal`, `RejectWithdrawal`, `CompleteWithdrawal`, `FailWithdrawal` |
-| `users.go` | `UpsertUser`, `GetUserByWorkosID` |
+| `users.go` | `UpsertUser`, `GetUserByWorkosID`, `GetUserPersonalOrgID` |
+| `organizations.go` | Organization & invitation management: `CreateOrganization`, `AddUserToOrganization`, `CreateInvitation`, `ProcessAcceptedInvitations` |
 | `queries.go` | Paginated transaction queries with cursor-based pagination |
 
 ## Transaction engine

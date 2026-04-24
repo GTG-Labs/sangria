@@ -36,7 +36,7 @@ const paymentRateLimitStore = new Map<
 >();
 const idempotencyStore = new Map<
   string,
-  { status: "in_flight" | "completed"; expiresAt: number }
+  { status: "in_flight" | "completed" | "unresolved"; expiresAt: number }
 >();
 
 function requireEnv(name: string): string {
@@ -136,26 +136,35 @@ function checkRateLimit(userId: string): boolean {
 function reserveIdempotency(
   userId: string,
   idempotencyKey: string
-): string | null {
+):
+  | { ok: true; storeKey: string }
+  | { ok: false; status: "in_flight" | "completed" | "unresolved" } {
   const now = Date.now();
   cleanupStateStores(now);
 
   const storeKey = `${userId}:${idempotencyKey}`;
   const existing = idempotencyStore.get(storeKey);
   if (existing && now <= existing.expiresAt) {
-    return null;
+    return { ok: false, status: existing.status };
   }
 
   idempotencyStore.set(storeKey, {
     status: "in_flight",
     expiresAt: now + IDEMPOTENCY_TTL_MS,
   });
-  return storeKey;
+  return { ok: true, storeKey };
 }
 
 function markIdempotencyCompleted(storeKey: string): void {
   idempotencyStore.set(storeKey, {
     status: "completed",
+    expiresAt: Date.now() + IDEMPOTENCY_TTL_MS,
+  });
+}
+
+function markIdempotencyUnresolved(storeKey: string): void {
+  idempotencyStore.set(storeKey, {
+    status: "unresolved",
     expiresAt: Date.now() + IDEMPOTENCY_TTL_MS,
   });
 }
@@ -198,18 +207,21 @@ export async function POST(request: Request) {
     );
   }
 
-  const idempotencyStoreKey = reserveIdempotency(user.id, idempotencyKey);
-  if (!idempotencyStoreKey) {
-    return Response.json(
-      { error: "Duplicate payment attempt detected for idempotency key" },
-      { status: 409 }
-    );
+  const idempotencyReservation = reserveIdempotency(user.id, idempotencyKey);
+  if (!idempotencyReservation.ok) {
+    const duplicateMessage =
+      idempotencyReservation.status === "unresolved"
+        ? "A prior settlement attempt with this idempotency key is unresolved. Please use a new payment attempt."
+        : "Duplicate payment attempt detected for idempotency key";
+    return Response.json({ error: duplicateMessage }, { status: 409 });
   }
+  const { storeKey: idempotencyStoreKey } = idempotencyReservation;
 
   const stream = new ReadableStream({
     async start(controller) {
       const send = (event: SseEvent) => controller.enqueue(encode(event));
       let completed = false;
+      let settlementAttempted = false;
 
       try {
         const merchantApiKey = requireEnv("SANGRIA_SECRET_KEY");
@@ -329,6 +341,7 @@ export async function POST(request: Request) {
         // ----------------------------------------------------------------
         send({ step: "settle", status: "pending" });
 
+        settlementAttempted = true;
         const settleResp = await fetch(settlePaymentUrl, {
           method: "POST",
           headers: {
@@ -369,6 +382,8 @@ export async function POST(request: Request) {
       } finally {
         if (completed) {
           markIdempotencyCompleted(idempotencyStoreKey);
+        } else if (settlementAttempted) {
+          markIdempotencyUnresolved(idempotencyStoreKey);
         } else {
           releaseIdempotency(idempotencyStoreKey);
         }

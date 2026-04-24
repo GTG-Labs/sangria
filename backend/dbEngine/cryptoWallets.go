@@ -27,9 +27,9 @@ func CreateCryptoWalletWithAccount(ctx context.Context, pool *pgxpool.Pool, addr
 	err = tx.QueryRow(ctx,
 		`INSERT INTO accounts (name, type, currency)
 		 VALUES ($1, $2, $3)
-		 RETURNING id, name, type, currency, user_id, created_at`,
+		 RETURNING id, name, type, currency, organization_id, created_at`,
 		accountName, AccountTypeAsset, USDC,
-	).Scan(&a.ID, &a.Name, &a.Type, &a.Currency, &a.UserID, &a.CreatedAt)
+	).Scan(&a.ID, &a.Name, &a.Type, &a.Currency, &a.OrganizationID, &a.CreatedAt)
 	if err != nil {
 		return CryptoWallet{}, Account{}, fmt.Errorf("create asset account: %w", err)
 	}
