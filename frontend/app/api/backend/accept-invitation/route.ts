@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { env } from "@/lib/env";
 
 export async function POST(request: Request) {
   try {
@@ -17,9 +18,7 @@ export async function POST(request: Request) {
     const { csrf_token: _csrf_token, ...sanitizedBody } = body;
 
     // Call backend directly (no auth required)
-    const backendUrl = process.env.BACKEND_URL || "http://localhost:8080";
-
-    const response = await fetch(`${backendUrl}/accept-invitation`, {
+    const response = await fetch(`${env.BACKEND_URL}/accept-invitation`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

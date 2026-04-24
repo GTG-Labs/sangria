@@ -2,14 +2,7 @@
 import { NextResponse } from "next/server";
 import { withAuth } from "@workos-inc/authkit-nextjs";
 import { verifyAdmin } from "@/lib/admin";
-
-const BACKEND_URL: string = (() => {
-  const url = process.env.BACKEND_URL;
-  if (!url) {
-    throw new Error("BACKEND_URL is not configured");
-  }
-  return url;
-})();
+import { env } from "@/lib/env";
 
 export async function proxyToBackend(
   method: string,
@@ -42,8 +35,8 @@ export async function proxyToBackend(
     const timeoutId = setTimeout(() => controller.abort(), 10000);
 
     try {
-      const target = new URL(path, BACKEND_URL);
-      if (target.origin !== new URL(BACKEND_URL).origin) {
+      const target = new URL(path, env.BACKEND_URL);
+      if (target.origin !== new URL(env.BACKEND_URL).origin) {
         return NextResponse.json(
           { error: "Invalid proxy target" },
           { status: 400 }

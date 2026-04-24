@@ -1,6 +1,5 @@
 import { NextRequest } from 'next/server';
-
-const BACKEND_URL = process.env.BACKEND_URL;
+import { env } from '@/lib/env';
 
 export async function GET(request: NextRequest) {
   try {
@@ -8,7 +7,7 @@ export async function GET(request: NextRequest) {
     const cookieHeader = request.headers.get('cookie') || '';
 
     // Proxy CSRF token request to Go backend
-    const response = await fetch(`${BACKEND_URL}/csrf-token`, {
+    const response = await fetch(`${env.BACKEND_URL}/csrf-token`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',

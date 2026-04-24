@@ -2,12 +2,13 @@ import { authkitMiddleware } from "@workos-inc/authkit-nextjs";
 import { NextResponse } from "next/server";
 import type { NextRequest, NextFetchEvent } from "next/server";
 import crypto from "crypto";
+import { env } from "@/lib/env";
 
 // Wrap authkit's middleware so we can layer a per-request nonce-based CSP on
 // top of its auth flow. Mirrors frontend/proxy.ts but with a narrower
 // allowlist — mythos loads no external fonts/images/scripts.
 const authMiddleware = authkitMiddleware({
-  redirectUri: process.env.NEXT_PUBLIC_WORKOS_REDIRECT_URI,
+  redirectUri: env.NEXT_PUBLIC_WORKOS_REDIRECT_URI,
   middlewareAuth: {
     enabled: true,
     unauthenticatedPaths: [],
