@@ -7,10 +7,10 @@ import { z } from "zod";
 // scatter process.env.X reads across the codebase.
 export const env = createEnv({
   server: {
-    BACKEND_URL: z.string().url(),
+    BACKEND_URL: z.url(),
   },
   client: {
-    NEXT_PUBLIC_WORKOS_REDIRECT_URI: z.string().url(),
+    NEXT_PUBLIC_WORKOS_REDIRECT_URI: z.url(),
   },
   // Next.js build-time inlines the literal process.env.NEXT_PUBLIC_X, so
   // each NEXT_PUBLIC_* entry must appear verbatim here or the bundle ships
