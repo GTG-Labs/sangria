@@ -23,12 +23,24 @@ func skipIfDisabled(c fiber.Ctx) bool {
 	return config.RateLimit.Disabled
 }
 
+// clientIP returns the unspoofable client IP on Railway. Envoy sets
+// X-Envoy-External-Address from the TCP peer (cannot be forged by the
+// client), while c.IP() trusts X-Forwarded-For which Envoy appends to
+// rather than overwrites — attackers can pre-seed XFF to control c.IP().
+// Falls back to c.IP() for local dev or non-Envoy ingress.
+func clientIP(c fiber.Ctx) string {
+	if ip := c.Get("X-Envoy-External-Address"); ip != "" {
+		return ip
+	}
+	return c.IP()
+}
+
 // rateLimitReached is a shared LimitReached handler that logs and returns 429.
 func rateLimitReached(bucket string) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		slog.Warn("rate limit hit",
 			"bucket", bucket,
-			"ip", c.IP(),
+			"ip", clientIP(c),
 			"path", c.Path(),
 		)
 		return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
@@ -37,13 +49,13 @@ func rateLimitReached(bucket string) fiber.Handler {
 	}
 }
 
-// PerIPLimiter keys by client IP and counts every request. Expects Fiber
-// TrustedProxies configured so c.IP() returns the real client IP.
+// PerIPLimiter keys by the unspoofable client IP (X-Envoy-External-Address
+// on Railway, c.IP() fallback for local dev). See clientIP() docs.
 func PerIPLimiter(max int, bucket string) fiber.Handler {
 	return limiter.New(limiter.Config{
 		Max:          max,
 		Expiration:   time.Minute,
-		KeyGenerator: func(c fiber.Ctx) string { return "ip:" + c.IP() },
+		KeyGenerator: func(c fiber.Ctx) string { return "ip:" + clientIP(c) },
 		LimitReached: rateLimitReached(bucket),
 		Next:         skipIfDisabled,
 	})
@@ -51,12 +63,12 @@ func PerIPLimiter(max int, bucket string) fiber.Handler {
 
 // PerIPFailureLimiter keys by client IP but counts only failed (4xx/5xx)
 // responses. Used to throttle API-key brute-force without affecting
-// legitimate auth'd traffic.
+// legitimate auth'd traffic. Uses the unspoofable client IP (see clientIP()).
 func PerIPFailureLimiter(max int, bucket string) fiber.Handler {
 	return limiter.New(limiter.Config{
 		Max:                    max,
 		Expiration:             time.Minute,
-		KeyGenerator:           func(c fiber.Ctx) string { return "ipfail:" + c.IP() },
+		KeyGenerator:           func(c fiber.Ctx) string { return "ipfail:" + clientIP(c) },
 		LimitReached:           rateLimitReached(bucket),
 		Next:                   skipIfDisabled,
 		SkipSuccessfulRequests: true,
@@ -75,7 +87,7 @@ func PerAPIKeyLimiter(max int, bucket string) fiber.Handler {
 			}
 			// Fall back to IP — shouldn't happen if middleware ordering is correct,
 			// but we don't want a missing key to open the floodgates.
-			return "apikey-fallback:" + c.IP()
+			return "apikey-fallback:" + clientIP(c)
 		},
 		LimitReached: rateLimitReached(bucket),
 		Next:         skipIfDisabled,
@@ -92,7 +104,7 @@ func PerUserLimiter(max int, bucket string) fiber.Handler {
 			if u, ok := c.Locals("workos_user").(auth.WorkOSUser); ok {
 				return "user:" + u.ID
 			}
-			return "user-fallback:" + c.IP()
+			return "user-fallback:" + clientIP(c)
 		},
 		LimitReached: rateLimitReached(bucket),
 		Next:         skipIfDisabled,
@@ -110,7 +122,7 @@ func PerOrgLimiter(max int, bucket string) fiber.Handler {
 			orgID := c.Params("id")
 			if orgID == "" {
 				// Shouldn't happen for /organizations/:id/*, but fail closed.
-				return "org-missing:" + c.IP()
+				return "org-missing:" + clientIP(c)
 			}
 			return "org:" + orgID
 		},

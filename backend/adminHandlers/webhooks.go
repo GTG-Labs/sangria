@@ -3,6 +3,7 @@ package adminHandlers
 import (
 	"encoding/json"
 	"log/slog"
+	"net"
 	"os"
 	"strings"
 
@@ -16,9 +17,35 @@ import (
 
 // isWorkOSIPAllowed checks the caller IP against WORKOS_WEBHOOK_ALLOWED_IPS.
 // Empty allowlist = fail-closed: all webhook requests rejected until configured.
+// Entries may be bare IPs or CIDR ranges. Parses both sides so IPv4-mapped IPv6
+// (e.g. ::ffff:18.x.x.x from Railway's edge) matches its IPv4 form.
 func isWorkOSIPAllowed(ip string) bool {
+	// Strip IPv6 zone suffix (e.g. "fe80::1%eth0") before parsing.
+	if i := strings.IndexByte(ip, '%'); i >= 0 {
+		ip = ip[:i]
+	}
+	parsed := net.ParseIP(ip)
+	if parsed == nil {
+		return false
+	}
 	for _, allowed := range config.RateLimit.WorkOSWebhookAllowedIPs {
-		if ip == allowed {
+		if strings.Contains(allowed, "/") {
+			_, cidr, err := net.ParseCIDR(allowed)
+			if err != nil {
+				slog.Warn("workos webhook: invalid CIDR in allowlist", "entry", allowed, "error", err)
+				continue
+			}
+			if cidr.Contains(parsed) {
+				return true
+			}
+			continue
+		}
+		allowedIP := net.ParseIP(allowed)
+		if allowedIP == nil {
+			slog.Warn("workos webhook: invalid IP in allowlist", "entry", allowed)
+			continue
+		}
+		if allowedIP.Equal(parsed) {
 			return true
 		}
 	}
@@ -42,10 +69,15 @@ type WorkOSWebhookEvent struct {
 func HandleWorkOSWebhook(pool *pgxpool.Pool) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		// Reject anything not from WorkOS's published source IPs before any
-		// signature work. Requires Fiber TrustedProxies configured so c.IP()
-		// returns the real client IP on Railway.
-		if !isWorkOSIPAllowed(c.IP()) {
-			slog.Warn("workos webhook: IP not in allowlist", "ip", c.IP())
+		// signature work. Prefer X-Envoy-External-Address (set by Railway's
+		// Envoy edge from the TCP peer, unspoofable) over c.IP() which trusts
+		// client-supplied X-Forwarded-For. Fall back to c.IP() for local dev.
+		clientIP := c.Get("X-Envoy-External-Address")
+		if clientIP == "" {
+			clientIP = c.IP()
+		}
+		if !isWorkOSIPAllowed(clientIP) {
+			slog.Warn("workos webhook: IP not in allowlist", "ip", clientIP)
 			return c.Status(403).JSON(fiber.Map{"error": "forbidden"})
 		}
 

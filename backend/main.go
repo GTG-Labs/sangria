@@ -101,9 +101,28 @@ func main() {
 	}
 
 	app := fiber.New(fiber.Config{
-		// Trust proxy headers so c.IP() returns the real client IP instead
-		// of Railway's edge proxy. 0.0.0.0/0 covers Railway's variable proxy
-		// IPs. Safe because Railway is the only ingress path in production.
+		// Trust proxy headers so c.IP() returns something closer to the real
+		// client IP than Railway's edge. 0.0.0.0/0 covers Railway's variable
+		// proxy IPs; required because Railway's egress ranges are not fixed.
+		//
+		// CAVEAT — c.IP() is spoofable even behind Railway. Railway's Envoy
+		// edge APPENDS the real client IP to any client-supplied
+		// X-Forwarded-For, so with Proxies: 0.0.0.0/0 the returned IP honors
+		// the leftmost (attacker-controlled) entry. The unspoofable source is
+		// X-Envoy-External-Address, which Envoy derives from the TCP peer.
+		//
+		// Affected call sites (defense-in-depth only; do NOT rely on c.IP()
+		// for security boundaries):
+		//   - ratelimit.PerIPLimiter, PerIPFailureLimiter, and the IP
+		//     fallbacks in PerAPIKeyLimiter / PerUserLimiter — these prefer
+		//     X-Envoy-External-Address via ratelimit.clientIP().
+		//   - adminHandlers/webhooks.go WorkOS IP allowlist — uses
+		//     X-Envoy-External-Address directly.
+		//   - slog logging context — informational only.
+		//
+		// If Railway is ever not the sole ingress, review every c.IP() call
+		// site before shipping — direct ingress bypasses all IP-based
+		// protections listed above.
 		TrustProxy: true,
 		TrustProxyConfig: fiber.TrustProxyConfig{
 			Loopback:  true,
