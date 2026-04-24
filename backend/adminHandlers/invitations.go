@@ -1,6 +1,7 @@
 package adminHandlers
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
@@ -15,8 +16,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/sendgrid/sendgrid-go"
-	sgmail "github.com/sendgrid/sendgrid-go/helpers/mail"
+	"github.com/resend/resend-go/v3"
 
 	"sangria/backend/auth"
 	dbengine "sangria/backend/dbEngine"
@@ -74,26 +74,23 @@ func generateSecureToken() (string, error) {
 	return hex.EncodeToString(bytes), nil
 }
 
-// sendInvitationEmail sends a beautiful invitation email via SendGrid
-func sendInvitationEmail(inviteeEmail, inviterName, orgName, invitationURL, customMessage string) error {
-	// Get SendGrid API key from environment
-	apiKey := os.Getenv("SENDGRID_API_KEY")
+// sendInvitationEmail sends a beautiful invitation email via Resend
+func sendInvitationEmail(ctx context.Context, inviteeEmail, inviterName, orgName, invitationURL, customMessage string) error {
+	// Get Resend API key from environment
+	apiKey := os.Getenv("RESEND_API_KEY")
 	if apiKey == "" {
-		return fmt.Errorf("SENDGRID_API_KEY environment variable not set")
+		return fmt.Errorf("RESEND_API_KEY environment variable not set")
 	}
 
-	// Create SendGrid client
-	client := sendgrid.NewSendClient(apiKey)
+	// Create Resend client
+	client := resend.NewClient(apiKey)
 
 	// Set up sender (you should update this to your verified sender email)
-	fromEmail := os.Getenv("SENDGRID_FROM_EMAIL")
+	fromEmail := strings.TrimSpace(os.Getenv("RESEND_FROM_EMAIL"))
 	if fromEmail == "" {
-		fromEmail = "noreply@yourdomain.com" // TODO: update this to the actual Sangria domain
+		return fmt.Errorf("RESEND_FROM_EMAIL environment variable not set")
+		
 	}
-	from := sgmail.NewEmail("Sangria Team", fromEmail)
-
-	// Set up recipient
-	to := sgmail.NewEmail("", inviteeEmail)
 
 	// Create email subject
 	subject := fmt.Sprintf("You're invited to join %s", orgName)
@@ -203,19 +200,21 @@ Powered by Sangria • Built for teams that ship fast`,
 		}(),
 		invitationURL)
 
-	// Create the email message
-	message := sgmail.NewSingleEmail(from, subject, to, plainContent, htmlContent)
+	// Create and send the email
+	params := &resend.SendEmailRequest{
+		From:    fmt.Sprintf("Sangria Team <%s>", fromEmail),
+		To:      []string{inviteeEmail},
+		Subject: subject,
+		Html:    htmlContent,
+		Text:    plainContent,
+	}
 
-	// Send the email
-	response, err := client.Send(message)
+	sent, err := client.Emails.SendWithContext(ctx, params)
 	if err != nil {
 		return fmt.Errorf("failed to send email: %w", err)
 	}
 
-	if response.StatusCode >= 400 {
-		return fmt.Errorf("sendgrid API error: status %d, body: %s", response.StatusCode, response.Body)
-	}
-
+	_ = sent // Email sent successfully, ID available in sent.Id if needed
 	return nil
 }
 
@@ -319,8 +318,10 @@ func CreateOrganizationInvitation(pool *pgxpool.Pool) fiber.Handler {
 		}
 		invitationURL := fmt.Sprintf("%s/accept-invitation?token=%s", baseURL, invitationToken)
 
-		// Send beautiful invitation email via SendGrid
-		err = sendInvitationEmail(req.Email, inviterName, orgName, invitationURL, message)
+		// Send beautiful invitation email via Resend with timeout
+		emailCtx, cancel := context.WithTimeout(c.Context(), 30*time.Second)
+		defer cancel()
+		err = sendInvitationEmail(emailCtx, req.Email, inviterName, orgName, invitationURL, message)
 		if err != nil {
 			slog.Error("send invitation email", "org_id", orgID, "user_id", user.ID, "email", maskEmail(req.Email), "error", err)
 
@@ -342,7 +343,7 @@ func CreateOrganizationInvitation(pool *pgxpool.Pool) fiber.Handler {
 			)
 
 			return c.Status(500).JSON(fiber.Map{
-				"error": "failed to send invitation email - check SendGrid configuration",
+				"error": "failed to send invitation email - check Resend configuration",
 			})
 		}
 
@@ -359,7 +360,7 @@ func CreateOrganizationInvitation(pool *pgxpool.Pool) fiber.Handler {
 			"invitation_id":  invitationID,
 			"email":          req.Email,
 			"organization":   orgName,
-			"provider":       "sendgrid",
+			"provider":       "resend",
 		})
 	}
 }

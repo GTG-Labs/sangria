@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -25,6 +26,11 @@ var ErrPreviouslyFailed = errors.New("payment previously failed")
 // ErrTransactionNotPending is returned when attempting to confirm or fail a
 // transaction that is not in the pending state.
 var ErrTransactionNotPending = errors.New("transaction is not pending")
+
+// ErrDuplicateTxHash is returned when ConfirmTransaction would violate the
+// partial unique index on tx_hash. Should never happen under correct operation; 
+// surfacing it is preferred, no silent corruption of ledger.
+var ErrDuplicateTxHash = errors.New("tx_hash already bound to another confirmed transaction")
 
 // validCurrencies is the set of currencies accepted by the ledger.
 var validCurrencies = map[Currency]bool{
@@ -288,7 +294,9 @@ func handleExistingTransaction(ctx context.Context, pool *pgxpool.Pool, idempote
 
 // ConfirmTransaction transitions a pending transaction to confirmed and stores
 // the blockchain tx hash. Returns ErrTransactionNotPending if the row is not
-// in pending state (e.g. already confirmed by a concurrent request).
+// in pending state (e.g. already confirmed by a concurrent request), or
+// ErrDuplicateTxHash if the tx_hash is already bound to another confirmed
+// row (enforced by the uq_transactions_tx_hash_confirmed partial unique index).
 func ConfirmTransaction(ctx context.Context, pool *pgxpool.Pool, txnID string, txHash string) error {
 	if strings.TrimSpace(txnID) == "" {
 		return fmt.Errorf("transaction ID must not be empty")
@@ -303,6 +311,10 @@ func ConfirmTransaction(ctx context.Context, pool *pgxpool.Pool, txnID string, t
 		txnID, txHash,
 	)
 	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == "uq_transactions_tx_hash_confirmed" {
+			return ErrDuplicateTxHash
+		}
 		return fmt.Errorf("confirm transaction: %w", err)
 	}
 	if result.RowsAffected() == 0 {

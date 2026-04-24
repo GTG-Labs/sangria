@@ -15,6 +15,10 @@ import (
 // ErrInsufficientBalance is returned when a merchant doesn't have enough balance for a withdrawal.
 var ErrInsufficientBalance = errors.New("insufficient balance")
 
+// ErrInvalidWithdrawalStatus is returned when a caller passes a status value
+// outside the allowed enum. Callers should map this to HTTP 400.
+var ErrInvalidWithdrawalStatus = errors.New("invalid withdrawal status")
+
 // ErrWithdrawalNotFound is returned when a withdrawal does not exist or is not in the expected state.
 var ErrWithdrawalNotFound = errors.New("withdrawal not found or not in expected state")
 
@@ -59,10 +63,17 @@ func getWithdrawalByIdempotencyKey(ctx context.Context, pool *pgxpool.Pool, idem
 // creates a withdrawal record. Auto-approves if the amount is within the
 // threshold. The entire operation runs in a single transaction with a row lock
 // on the merchant's account to prevent overdraw from concurrent requests.
+//
+// Authorization: the caller must be an admin of the organization that owns
+// the merchant. This is enforced atomically inside the merchant-account lock
+// query via a JOIN on organization_members. If the caller is not an admin
+// (or the merchant doesn't exist) the function returns ErrMerchantNotFound.
+// The ambiguity is intentional — don't disclose authorization state separately
+// from existence.
 func CreateWithdrawal(
 	ctx context.Context, pool *pgxpool.Pool,
 	merchantID string, amount int64, fee int64, idempotencyKey string,
-	autoApprove bool,
+	autoApprove bool, userID string,
 ) (Withdrawal, error) {
 	if err := ValidateAmountAndFee(amount, fee); err != nil {
 		return Withdrawal{}, err
@@ -90,16 +101,24 @@ func CreateWithdrawal(
 		return Withdrawal{}, fmt.Errorf("check idempotency: %w", idempErr)
 	}
 
-	// Look up merchant's USD LIABILITY account and lock it.
+	// Look up merchant's USD LIABILITY account and lock it. The JOIN on
+	// organization_members doubles as the authorization check — if the caller
+	// is not an admin of the owning org, zero rows are returned and we surface
+	// ErrMerchantNotFound (see function-level comment on the ambiguity).
 	var merchantAcctID string
 	err = tx.QueryRow(ctx,
 		`SELECT a.id FROM accounts a
 		 JOIN merchants m ON m.organization_id = a.organization_id
-		 WHERE m.id = $1 AND a.type = 'LIABILITY' AND a.currency = 'USD'
+		 JOIN organization_members om ON om.organization_id = m.organization_id
+		 WHERE m.id = $1 AND om.user_id = $2 AND om.is_admin = true
+		   AND a.type = 'LIABILITY' AND a.currency = 'USD'
 		 FOR UPDATE`,
-		merchantID,
+		merchantID, userID,
 	).Scan(&merchantAcctID)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return Withdrawal{}, ErrMerchantNotFound
+		}
 		return Withdrawal{}, fmt.Errorf("lock merchant account: %w", err)
 	}
 
@@ -307,13 +326,86 @@ func GetWithdrawalsByOrganizationPaginated(
 	return withdrawals, nextCursor, total, nil
 }
 
-// ListAllWithdrawals returns all withdrawals, ordered by created_at desc.
-func ListAllWithdrawals(ctx context.Context, pool *pgxpool.Pool) ([]Withdrawal, error) {
-	rows, err := pool.Query(ctx,
-		fmt.Sprintf(`SELECT %s FROM withdrawals ORDER BY created_at DESC`, withdrawalColumns),
-	)
+// GetAllWithdrawalsPaginated returns paginated withdrawals across all merchants
+// with an optional status filter. Used by admin endpoints.
+func GetAllWithdrawalsPaginated(
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	status string,
+	limit int,
+	cursor *time.Time,
+) ([]Withdrawal, *time.Time, int, error) {
+	// Validate status if provided.
+	validStatuses := map[string]bool{
+		string(WithdrawalStatusPendingApproval): true,
+		string(WithdrawalStatusApproved):        true,
+		string(WithdrawalStatusProcessing):      true,
+		string(WithdrawalStatusCompleted):       true,
+		string(WithdrawalStatusFailed):          true,
+		string(WithdrawalStatusReversed):        true,
+		string(WithdrawalStatusCanceled):        true,
+	}
+	if status != "" && !validStatuses[status] {
+		return nil, nil, 0, fmt.Errorf("%w: %s", ErrInvalidWithdrawalStatus, status)
+	}
+
+	// Build WHERE clauses dynamically based on optional filters.
+	var whereClauses []string
+	var args []interface{}
+	paramIdx := 1
+
+	if status != "" {
+		whereClauses = append(whereClauses, fmt.Sprintf("status = $%d", paramIdx))
+		args = append(args, status)
+		paramIdx++
+	}
+
+	if cursor != nil {
+		whereClauses = append(whereClauses, fmt.Sprintf("created_at < $%d", paramIdx))
+		args = append(args, *cursor)
+		paramIdx++
+	}
+
+	whereSQL := ""
+	if len(whereClauses) > 0 {
+		whereSQL = "WHERE " + whereClauses[0]
+		for _, clause := range whereClauses[1:] {
+			whereSQL += " AND " + clause
+		}
+	}
+
+	// Count query uses the same WHERE but without cursor condition.
+	var countWhere string
+	if status != "" {
+		countWhere = "WHERE status = $1"
+	}
+
+	countQuery := fmt.Sprintf(`SELECT COUNT(*) FROM withdrawals %s`, countWhere)
+
+	var total int
+	if status != "" {
+		err := pool.QueryRow(ctx, countQuery, status).Scan(&total)
+		if err != nil {
+			return nil, nil, 0, fmt.Errorf("count query failed: %w", err)
+		}
+	} else {
+		err := pool.QueryRow(ctx, countQuery).Scan(&total)
+		if err != nil {
+			return nil, nil, 0, fmt.Errorf("count query failed: %w", err)
+		}
+	}
+
+	// Fetch limit+1 to determine if more results exist.
+	dataQuery := fmt.Sprintf(`
+		SELECT %s FROM withdrawals %s
+		ORDER BY created_at DESC
+		LIMIT $%d
+	`, withdrawalColumns, whereSQL, paramIdx)
+
+	dataArgs := append(args, limit+1)
+	rows, err := pool.Query(ctx, dataQuery, dataArgs...)
 	if err != nil {
-		return nil, fmt.Errorf("query withdrawals: %w", err)
+		return nil, nil, 0, fmt.Errorf("query withdrawals: %w", err)
 	}
 	defer rows.Close()
 
@@ -321,33 +413,28 @@ func ListAllWithdrawals(ctx context.Context, pool *pgxpool.Pool) ([]Withdrawal, 
 	for rows.Next() {
 		w, err := scanWithdrawal(rows)
 		if err != nil {
-			return nil, fmt.Errorf("scan withdrawal: %w", err)
+			return nil, nil, 0, fmt.Errorf("scan withdrawal: %w", err)
 		}
 		withdrawals = append(withdrawals, w)
 	}
-	return withdrawals, rows.Err()
-}
-
-// ListWithdrawalsByStatus returns all withdrawals with the given status, ordered by created_at asc.
-func ListWithdrawalsByStatus(ctx context.Context, pool *pgxpool.Pool, status WithdrawalStatus) ([]Withdrawal, error) {
-	rows, err := pool.Query(ctx,
-		fmt.Sprintf(`SELECT %s FROM withdrawals WHERE status = $1 ORDER BY created_at ASC`, withdrawalColumns),
-		status,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("query withdrawals: %w", err)
+	if err := rows.Err(); err != nil {
+		return nil, nil, 0, err
 	}
-	defer rows.Close()
 
-	var withdrawals []Withdrawal
-	for rows.Next() {
-		w, err := scanWithdrawal(rows)
-		if err != nil {
-			return nil, fmt.Errorf("scan withdrawal: %w", err)
-		}
-		withdrawals = append(withdrawals, w)
+	// Handle empty results.
+	if len(withdrawals) == 0 {
+		return []Withdrawal{}, nil, total, nil
 	}
-	return withdrawals, rows.Err()
+
+	// Determine next cursor.
+	var nextCursor *time.Time
+	if len(withdrawals) > limit {
+		withdrawals = withdrawals[:limit]
+		lastTimestamp := withdrawals[len(withdrawals)-1].CreatedAt
+		nextCursor = &lastTimestamp
+	}
+
+	return withdrawals, nextCursor, total, nil
 }
 
 // ApproveWithdrawal transitions a withdrawal from pending_approval to approved.
@@ -484,7 +571,13 @@ func RejectWithdrawal(ctx context.Context, pool *pgxpool.Pool, withdrawalID, adm
 
 // CancelWithdrawal allows a merchant to cancel their own pending_approval withdrawal.
 // Verifies the withdrawal belongs to the given merchant before reversing.
-func CancelWithdrawal(ctx context.Context, pool *pgxpool.Pool, withdrawalID, merchantID string) error {
+// CancelWithdrawal atomically cancels a pending withdrawal if the caller is an
+// admin of the organization that owns the merchant.
+//
+// Returns ErrWithdrawalNotFound if: the withdrawal doesn't exist, it's not in
+// pending_approval status, OR the caller is not an org admin. The ambiguity is
+// intentional — don't disclose authorization state separately from existence.
+func CancelWithdrawal(ctx context.Context, pool *pgxpool.Pool, withdrawalID, merchantID, userID string) error {
 	tx, err := pool.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("begin transaction: %w", err)
@@ -493,8 +586,16 @@ func CancelWithdrawal(ctx context.Context, pool *pgxpool.Pool, withdrawalID, mer
 
 	var w Withdrawal
 	w, err = scanWithdrawal(tx.QueryRow(ctx,
-		fmt.Sprintf(`SELECT %s FROM withdrawals WHERE id = $1 AND merchant_id = $2 AND status = 'pending_approval' FOR UPDATE`, withdrawalColumns),
-		withdrawalID, merchantID,
+		fmt.Sprintf(`
+			SELECT %s FROM withdrawals
+			WHERE id = $1 AND merchant_id = $2 AND status = 'pending_approval'
+			  AND EXISTS (
+			    SELECT 1 FROM organization_members om
+			    JOIN merchants m ON m.organization_id = om.organization_id
+			    WHERE m.id = $2 AND om.user_id = $3 AND om.is_admin = true
+			  )
+			FOR UPDATE`, withdrawalColumns),
+		withdrawalID, merchantID, userID,
 	))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {

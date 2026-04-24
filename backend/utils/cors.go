@@ -43,9 +43,12 @@ func SetupCORSMiddleware(app *fiber.App) {
 
 		if IsOriginAllowed(origin, allowedOrigins) {
 			c.Set("Access-Control-Allow-Origin", origin)
-			c.Set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
-			c.Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-API-Key")
-			c.Set("Access-Control-Max-Age", "600")
+			c.Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS")
+			c.Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-API-Key, X-CSRF-Token")
+			c.Set("Access-Control-Allow-Credentials", "true") // Required for cookies
+			c.Set("Access-Control-Max-Age", "86400") // 24 hours
+			c.Set("Vary", "Origin, Access-Control-Request-Method, Access-Control-Request-Headers")
+
 		}
 
 		if c.Method() == "OPTIONS" {

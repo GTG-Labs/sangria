@@ -64,6 +64,13 @@ func main() {
 		"min_microunits", config.WithdrawalConfig.MinAmount,
 		"fee_flat_microunits", config.WithdrawalConfig.FeeFlat)
 
+	if err := config.LoadPaymentConfig(); err != nil {
+		slog.Error("failed to load payment config", "error", err)
+		os.Exit(1)
+	}
+	slog.Info("payment config loaded",
+		"max_amount_microunits", config.PaymentConfig.MaxAmountMicrounits)
+
 	ctx := context.Background()
 
 	pool, err := config.ConnectDatabase(ctx)
@@ -79,7 +86,15 @@ func main() {
 		os.Exit(1)
 	}
 
-	app := fiber.New()
+	app := fiber.New(fiber.Config{
+		// Trust proxy headers for secure Protocol() detection in production
+		TrustProxy: true,
+		TrustProxyConfig: fiber.TrustProxyConfig{
+			Loopback: true, // Trust 127.0.0.0/8 and ::1
+			LinkLocal: true, // Trust 169.254.0.0/16 and fe80::/10
+			Private: true, // Trust 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16
+		},
+	})
 	utils.SetupCORSMiddleware(app)
 	setupRoutes(app, pool)
 

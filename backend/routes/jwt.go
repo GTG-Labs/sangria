@@ -14,8 +14,8 @@ func RegisterJWTRoutes(app *fiber.App, pool *pgxpool.Pool) {
 	app.Post("/webhooks/workos", adminHandlers.HandleWorkOSWebhook(pool))
 	app.Post("/accept-invitation", adminHandlers.AcceptOrganizationInvitation(pool))
 
-	// Authenticated endpoints (require WorkOS JWT token)
-	internal := app.Group("/internal", auth.WorkosAuthMiddleware)
+	// Authenticated endpoints (require WorkOS JWT token + CSRF protection)
+	internal := app.Group("/internal", auth.WorkosAuthMiddleware, auth.CSRFMiddleware())
 
 	internal.Post("/users", auth.CreateUser(pool))
 	internal.Get("/me", auth.GetCurrentUser(pool))

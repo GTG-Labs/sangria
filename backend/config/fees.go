@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"math"
+	"math/big"
 	"os"
 	"strconv"
 )
@@ -19,17 +20,29 @@ type PlatformFeeConfig struct {
 }
 
 // CalculateFee returns the platform fee for a given payment amount in microunits.
-// Uses pure integer arithmetic to avoid float rounding.
-func (c PlatformFeeConfig) CalculateFee(amountMicrounits int64) int64 {
-	// fee = amount * rateBP / 10000
-	fee := amountMicrounits * c.RateBasisPoints / 10000
-	// Apply minimum fee only when the payment is large enough to cover it.
+// Uses big.Int internally so the intermediate multiplication cannot overflow int64.
+func (c PlatformFeeConfig) CalculateFee(amountMicrounits int64) (int64, error) {
+	// fee = amount * rateBP / 10000, computed in big.Int to avoid overflow.
+	amount := new(big.Int).SetInt64(amountMicrounits)
+	rate := new(big.Int).SetInt64(c.RateBasisPoints)
+	product := new(big.Int).Mul(amount, rate)
+	product.Quo(product, big.NewInt(10000))
+
+	if !product.IsInt64() {
+		return 0, fmt.Errorf(
+			"fee calculation overflow: amount=%d rate_bp=%d",
+			amountMicrounits, c.RateBasisPoints,
+		)
+	}
+	fee := product.Int64()
+
+	// NOTE: Apply minimum fee only when the payment is large enough to cover it.
 	// For micropayments smaller than the minimum, just use the percentage fee
-	// so the merchant still receives something.
+	// so merchant still receives something.
 	if fee < c.MinMicrounits && c.MinMicrounits <= amountMicrounits {
 		fee = c.MinMicrounits
 	}
-	return fee
+	return fee, nil
 }
 
 // LoadPlatformFees reads fee configuration from environment variables.
