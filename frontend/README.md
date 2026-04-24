@@ -20,12 +20,10 @@ pnpm install
 ### Environment Setup
 ```bash
 cp .env.example .env.local
-# Fill in required environment variables:
-# - WORKOS_CLIENT_ID
-# - WORKOS_API_KEY
-# - NEXT_PUBLIC_WORKOS_REDIRECT_URI
-# - BACKEND_URL
+# Fill in required environment variables — see § Environment Variables below.
 ```
+
+All env var reads live in `lib/env.ts` (Zod-validated via `@t3-oss/env-nextjs`). Missing or malformed vars fail `pnpm build` with a clear validation error instead of shipping to production with a silent fallback. Add new env vars there, never directly via `process.env`.
 
 ### Development
 ```bash
@@ -176,18 +174,17 @@ pnpm audit --audit-level high # Critical/high vulnerabilities only
 
 ## 🔧 Environment Variables
 
-```bash
-# Authentication (WorkOS)
-WORKOS_CLIENT_ID=your_client_id
-WORKOS_API_KEY=your_api_key
-NEXT_PUBLIC_WORKOS_REDIRECT_URI=http://localhost:3000/auth/callback
+All env vars are validated at build time by `lib/env.ts` via `@t3-oss/env-nextjs` + Zod. `pnpm build` fails on any missing or malformed var — no silent localhost fallbacks reach production.
 
-# Backend API
-BACKEND_URL=http://localhost:8080
+| Variable | Required | Scope | Description |
+|---|---|---|---|
+| `BACKEND_URL` | Yes | Server | Go backend base URL (e.g. `https://api.getsangria.com`). Must be a valid URL. |
+| `BASE_URL` | Yes | Server | Public URL of this app, used by WorkOS AuthKit's OAuth callback (`app/auth/callback/route.ts`). Must be a valid URL. |
+| `NEXT_PUBLIC_WORKOS_REDIRECT_URI` | Yes | Client | WorkOS redirect URI, inlined at build time. Must be a valid URL. |
+| `WORKOS_CLIENT_ID` | Yes | Server | WorkOS client ID (consumed by AuthKit internally). |
+| `WORKOS_API_KEY` | Yes | Server | WorkOS API key (consumed by AuthKit internally). |
 
-# Environment
-NODE_ENV=development|production
-```
+**Adding a new var:** edit `lib/env.ts` — add it to the appropriate `server` or `client` schema block *and* to the `runtimeEnv` mapping (Next.js's build-time inlining requires the literal `process.env.NEXT_PUBLIC_X` reference there). Do not add `process.env` reads elsewhere.
 
 ## 🚀 Deployment
 

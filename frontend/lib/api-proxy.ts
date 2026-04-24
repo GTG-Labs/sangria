@@ -2,8 +2,7 @@
 import { NextResponse } from "next/server";
 import { withAuth } from "@workos-inc/authkit-nextjs";
 import { JSONSecurity } from "./security";
-
-const BACKEND_URL = process.env.BACKEND_URL;
+import { env } from "./env";
 
 /**
  * Proxy a request to the backend API with auth, timeout, and error handling.
@@ -81,7 +80,7 @@ export async function proxyToBackend(
         headers["Cookie"] = `csrf_token=${csrfToken}`;
       }
 
-      const response = await fetch(`${BACKEND_URL}${path}`, {
+      const response = await fetch(`${env.BACKEND_URL}${path}`, {
         method,
         headers,
         ...(requestBody && { body: requestBody }),

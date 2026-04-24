@@ -1,12 +1,13 @@
 import { handleAuth } from "@workos-inc/authkit-nextjs";
+import { env } from "@/lib/env";
 
 export const GET = handleAuth({
-  baseURL: process.env.BASE_URL,
+  baseURL: env.BASE_URL,
   returnPathname: "/dashboard/api-keys",
   onSuccess: async (authData: { user?: any; accessToken?: string }) => {
     const accessToken = authData.accessToken;
-    if (!accessToken || !process.env.BACKEND_URL) {
-      console.warn("Skipping user upsert: missing access token or BACKEND_URL");
+    if (!accessToken) {
+      console.warn("Skipping user upsert: missing access token");
       return;
     }
 
@@ -15,7 +16,7 @@ export const GET = handleAuth({
     const timeoutId = setTimeout(() => controller.abort(), 5000);
 
     try {
-      const response = await fetch(`${process.env.BACKEND_URL}/internal/users`, {
+      const response = await fetch(`${env.BACKEND_URL}/internal/users`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${accessToken}`,

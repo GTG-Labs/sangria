@@ -2,10 +2,11 @@ import { authkitMiddleware } from "@workos-inc/authkit-nextjs";
 import { NextResponse } from 'next/server';
 import type { NextRequest, NextFetchEvent } from 'next/server';
 import crypto from 'crypto';
+import { env } from '@/lib/env';
 
 // Enhanced middleware that adds CSP nonce to authkit middleware
 const authMiddleware = authkitMiddleware({
-  redirectUri: process.env.NEXT_PUBLIC_WORKOS_REDIRECT_URI,
+  redirectUri: env.NEXT_PUBLIC_WORKOS_REDIRECT_URI,
 });
 
 // Headers.forEach() in undici joins multiple Set-Cookie values into one
