@@ -261,7 +261,12 @@ function PaywallModal({
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const shouldUnlockRef = useRef(false);
+  const onCloseRef = useRef(onClose);
   const previouslyFocusedRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     previouslyFocusedRef.current = document.activeElement as HTMLElement | null;
@@ -289,7 +294,7 @@ function PaywallModal({
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
-        onClose();
+        onCloseRef.current();
         return;
       }
 
@@ -323,7 +328,7 @@ function PaywallModal({
       document.removeEventListener("keydown", onKeyDown);
       previouslyFocusedRef.current?.focus();
     };
-  }, [onClose]);
+  }, []);
 
   useEffect(() => {
     if (paymentState.phase === "success" && shouldUnlockRef.current) {

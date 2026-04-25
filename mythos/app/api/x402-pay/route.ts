@@ -309,9 +309,11 @@ export async function POST(request: Request) {
 
         if (initialResp.status !== 200) {
           const body = await initialResp.text();
-          throw new Error(
-            `Expected 200 from generate-payment, got ${initialResp.status}. Body: ${body}`
-          );
+          console.error("x402-pay negotiate failed", {
+            status: initialResp.status,
+            body,
+          });
+          throw new Error("Payment service returned an error");
         }
 
         const challenge =
@@ -326,10 +328,14 @@ export async function POST(request: Request) {
           );
         }
         const wholePart = amountMicro / MICROUNITS_PER_USDC;
-        const fractionalPart = (amountMicro % MICROUNITS_PER_USDC)
+        const rawFractionalPart = (amountMicro % MICROUNITS_PER_USDC)
           .toString()
           .padStart(6, "0");
-        const amountUsdc = `${wholePart}.${fractionalPart}`;
+        const fractionalPart = rawFractionalPart.replace(/0+$/, "");
+        const amountUsdc =
+          fractionalPart.length > 0
+            ? `${wholePart}.${fractionalPart}`
+            : wholePart.toString();
 
         send({
           step: "negotiate",
@@ -428,11 +434,11 @@ export async function POST(request: Request) {
           } catch {
             errBody = await settleResp.text();
           }
-          throw new Error(
-            `Settlement failed (HTTP ${settleResp.status}): ${JSON.stringify(
-              errBody
-            )}`
-          );
+          console.error("x402-pay settle failed", {
+            status: settleResp.status,
+            body: errBody,
+          });
+          throw new Error("Payment service returned an error");
         }
 
         const result = (await settleResp.json()) as Record<string, unknown>;
