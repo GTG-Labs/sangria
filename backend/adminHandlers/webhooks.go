@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net"
-	"os"
 	"strings"
 
 	"github.com/gofiber/fiber/v3"
@@ -79,15 +78,8 @@ func HandleWorkOSWebhook(pool *pgxpool.Pool) fiber.Handler {
 			return c.Status(400).JSON(fiber.Map{"error": "missing signature header"})
 		}
 
-		// Get webhook secret from environment
-		webhookSecret := os.Getenv("WORKOS_WEBHOOK_SECRET")
-		if webhookSecret == "" {
-			slog.Error("WORKOS_WEBHOOK_SECRET not configured")
-			return c.Status(500).JSON(fiber.Map{"error": "webhook validation not configured"})
-		}
-
-		// Initialize WorkOS webhook client and validate signature
-		webhookClient := webhooks.NewClient(webhookSecret)
+		// Webhook secret is validated at startup via config.LoadWorkOSConfig.
+		webhookClient := webhooks.NewClient(config.WorkOS.WebhookSecret)
 		validatedPayload, err := webhookClient.ValidatePayload(signature, string(rawBody))
 		if err != nil {
 			slog.Error("invalid webhook signature", "error", err)

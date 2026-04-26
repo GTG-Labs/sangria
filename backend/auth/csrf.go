@@ -3,11 +3,16 @@ package auth
 import (
 	"crypto/rand"
 	"encoding/hex"
-	"os"
 	"time"
 
 	"github.com/gofiber/fiber/v3"
 )
+
+// IsDevelopmentEnv is the env-check used by cookie/security helpers in this
+// package. It's a package-level function pointer so the config package can
+// override it at startup (keeping auth ← config dependency direction intact).
+// Default returns false (assume production) until config wires it up.
+var IsDevelopmentEnv = func() bool { return false }
 
 // CSRFToken represents a CSRF token with expiration
 type CSRFToken struct {
@@ -26,17 +31,14 @@ func GenerateCSRFToken() (string, error) {
 
 // SetCSRFTokenCookie sets a secure CSRF token cookie
 func SetCSRFTokenCookie(c fiber.Ctx, token string) {
-	// Determine environment-based cookie settings
-	isDev := os.Getenv("APP_ENV") == "development" || os.Getenv("NODE_ENV") == "development"
-
 	// Production defaults: strict security
 	sameSite := "Strict"
 	secure := c.Protocol() == "https"
 
 	// Development settings: relaxed for local development
-	if isDev {
-		sameSite = "Lax"  // Allow cross-origin for localhost frontend
-		secure = false    // Allow HTTP in development
+	if IsDevelopmentEnv() {
+		sameSite = "Lax" // Allow cross-origin for localhost frontend
+		secure = false   // Allow HTTP in development
 	}
 
 	c.Cookie(&fiber.Cookie{

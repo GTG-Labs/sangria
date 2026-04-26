@@ -9,6 +9,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"sangria/backend/auth"
 	"sangria/backend/config"
 	dbengine "sangria/backend/dbEngine"
 	"sangria/backend/routes"
@@ -18,29 +19,53 @@ import (
 func main() {
 	config.LoadEnvironment()
 
-	// Configure structured logger.
-	// LOG_LEVEL: debug | info (default) | warn | error
-	// LOG_FORMAT: json | text (default)
-	var level slog.Level
-	switch os.Getenv("LOG_LEVEL") {
-	case "debug":
-		level = slog.LevelDebug
-	case "warn":
-		level = slog.LevelWarn
-	case "error":
-		level = slog.LevelError
-	default:
-		level = slog.LevelInfo
+	// Logging must load first so every subsequent loader logs through
+	// the configured slog handler.
+	if err := config.LoadLoggingConfig(); err != nil {
+		// Fall back to the default stdlib logger since slog isn't configured yet.
+		log.Fatalf("failed to load logging config: %v", err)
 	}
+	slog.Info("logging config loaded",
+		"level", config.Logging.Level.String(),
+		"format", config.Logging.Format,
+		"app_env", config.Logging.AppEnv)
 
-	opts := &slog.HandlerOptions{Level: level}
-	var handler slog.Handler
-	if os.Getenv("LOG_FORMAT") == "json" {
-		handler = slog.NewJSONHandler(os.Stdout, opts)
-	} else {
-		handler = slog.NewTextHandler(os.Stdout, opts)
+	// Wire the auth package's dev-env check against the canonical config.
+	auth.IsDevelopmentEnv = config.Logging.IsDevelopment
+
+	if err := config.LoadWorkOSConfig(); err != nil {
+		slog.Error("failed to load WorkOS config", "error", err)
+		os.Exit(1)
 	}
-	slog.SetDefault(slog.New(handler))
+	slog.Info("workos config loaded",
+		"client_id", config.WorkOS.ClientID,
+		"token_issuer", config.WorkOS.TokenIssuer)
+
+	if err := config.LoadCDPConfig(); err != nil {
+		slog.Error("failed to load CDP config", "error", err)
+		os.Exit(1)
+	}
+	slog.Info("cdp config loaded")
+
+	if err := config.LoadEmailConfig(); err != nil {
+		slog.Error("failed to load email config", "error", err)
+		os.Exit(1)
+	}
+	slog.Info("email config loaded",
+		"from_email", config.Email.ResendFromEmail,
+		"frontend_url", config.Email.FrontendURL)
+
+	if err := config.LoadCORSConfig(); err != nil {
+		slog.Error("failed to load CORS config", "error", err)
+		os.Exit(1)
+	}
+	slog.Info("cors config loaded", "allowed_origins_count", len(config.CORS.AllowedOrigins))
+
+	if err := config.LoadX402Config(); err != nil {
+		slog.Error("failed to load x402 config", "error", err)
+		os.Exit(1)
+	}
+	slog.Info("x402 config loaded", "facilitator_url", config.X402.FacilitatorURL)
 
 	if err := config.SetupWorkOS(); err != nil {
 		slog.Error("failed to setup WorkOS", "error", err)
