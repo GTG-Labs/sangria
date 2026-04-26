@@ -12,11 +12,12 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
 	cdpauth "github.com/coinbase/cdp-sdk/go/auth"
+
+	"sangria/backend/config"
 )
 
 var httpClient = &http.Client{Timeout: 30 * time.Second}
@@ -110,14 +111,12 @@ func doFacilitatorRequestIdempotent(ctx context.Context, method, url, authPath, 
 	return nil, 0, fmt.Errorf("all attempts failed: %w", lastErr)
 }
 
-// FacilitatorURL returns the configured facilitator URL from the
-// X402_FACILITATOR_URL environment variable. Returns an error if unset.
-func FacilitatorURL() (string, error) {
-	url := os.Getenv("X402_FACILITATOR_URL")
-	if url == "" {
-		return "", fmt.Errorf("X402_FACILITATOR_URL environment variable is not set")
-	}
-	return url, nil
+// FacilitatorURL returns the configured facilitator URL. Value is
+// validated and required at startup via config.LoadX402Config — the
+// process exits if it's unset — so this function cannot return an
+// empty string in a running server.
+func FacilitatorURL() string {
+	return config.X402.FacilitatorURL
 }
 
 // addCDPAuth adds a CDP JWT Authorization header to the request if the
@@ -128,15 +127,10 @@ func addCDPAuth(req *http.Request, facilitatorURL, path string) error {
 		return nil
 	}
 
-	apiKeyID := os.Getenv("CDP_API_KEY")
-	apiKeySecret := os.Getenv("CDP_API_SECRET")
-	if apiKeyID == "" || apiKeySecret == "" {
-		return fmt.Errorf("CDP_API_KEY and CDP_API_SECRET are required for Coinbase facilitator")
-	}
-
+	// CDP credentials are validated at startup via config.LoadCDPConfig.
 	token, err := cdpauth.GenerateJWT(cdpauth.JwtOptions{
-		KeyID:         apiKeyID,
-		KeySecret:     apiKeySecret,
+		KeyID:         config.CDP.APIKey,
+		KeySecret:     config.CDP.APISecret,
 		RequestMethod: "POST",
 		RequestHost:   "api.cdp.coinbase.com",
 		RequestPath:   path,
@@ -192,10 +186,7 @@ func buildFacilitatorRequestBody(payload json.RawMessage, requirements PaymentRe
 // Verify calls the facilitator /verify endpoint to validate a payment
 // authorization (EIP-712 signature, balance, nonce, etc.).
 func Verify(ctx context.Context, payload json.RawMessage, requirements PaymentRequirements) (*VerifyResponse, error) {
-	facilitatorURL, err := FacilitatorURL()
-	if err != nil {
-		return nil, err
-	}
+	facilitatorURL := FacilitatorURL()
 
 	body, err := buildFacilitatorRequestBody(payload, requirements)
 	if err != nil {
@@ -228,10 +219,7 @@ func Verify(ctx context.Context, payload json.RawMessage, requirements PaymentRe
 // Settle calls the facilitator /settle endpoint to submit the
 // transferWithAuthorization (EIP-3009) on-chain and move USDC.
 func Settle(ctx context.Context, payload json.RawMessage, requirements PaymentRequirements) (*SettleResponse, error) {
-	facilitatorURL, err := FacilitatorURL()
-	if err != nil {
-		return nil, err
-	}
+	facilitatorURL := FacilitatorURL()
 
 	body, err := buildFacilitatorRequestBody(payload, requirements)
 	if err != nil {

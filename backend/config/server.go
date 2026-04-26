@@ -21,20 +21,14 @@ func LoadEnvironment() {
 	godotenv.Load()
 }
 
-// SetupWorkOS initializes WorkOS configuration and JWKS cache
+// SetupWorkOS initializes the WorkOS SDK and JWKS cache from pre-loaded
+// WorkOSConfig values. Caller must have invoked LoadWorkOSConfig() first.
 func SetupWorkOS() error {
-	workosAPIKey := os.Getenv("WORKOS_API_KEY")
-	if workosAPIKey == "" {
-		return fmt.Errorf("WORKOS_API_KEY environment variable is required")
+	if WorkOS.APIKey == "" || WorkOS.ClientID == "" {
+		return fmt.Errorf("SetupWorkOS called before LoadWorkOSConfig — WorkOS config not populated")
 	}
-	workosClientID := os.Getenv("WORKOS_CLIENT_ID")
-	if workosClientID == "" {
-		return fmt.Errorf("WORKOS_CLIENT_ID environment variable is required")
-	}
-
-	usermanagement.SetAPIKey(workosAPIKey)
-
-	return auth.InitJWKSCache(workosClientID)
+	usermanagement.SetAPIKey(WorkOS.APIKey)
+	return auth.InitJWKSCache(WorkOS.ClientID, WorkOS.TokenIssuer)
 }
 
 // ConnectDatabase establishes database connection

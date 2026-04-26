@@ -30,7 +30,8 @@ All database queries live in `dbEngine/`. Handlers call dbEngine functions, neve
 
 ## Conventions
 
-- Startup sequence in `main.go`: load env → setup WorkOS → load fee/withdrawal config → connect DB → ensure system accounts → register routes → listen
+- Startup sequence in `main.go`: load env → load logging → load every other config module → setup WorkOS → connect DB → ensure system accounts → register routes → listen. Logging must load first so subsequent loaders log through the configured `slog` handler.
+- All env var reads live in `backend/config/`. Add a new var by extending the appropriate `Config` struct + `LoadXConfig` function; do not add `os.Getenv` calls in handlers, middleware, or utility packages. The grep `os\.Getenv` outside `config/` should always return zero matches.
 - API key format lives in `auth/merchantKeys.go` — use the helpers there, don't hand-roll parsing
 - All handler functions return `fiber.Handler` (closure over `*pgxpool.Pool`)
 - Organization context resolved via `ResolveOrganizationContext()` helper — checks `?org_id=` param, falls back to single membership or personal org
