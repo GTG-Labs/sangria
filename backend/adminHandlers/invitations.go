@@ -9,7 +9,6 @@ import (
 	"html"
 	"log/slog"
 	"net/mail"
-	"os"
 	"strings"
 	"time"
 
@@ -19,6 +18,7 @@ import (
 	"github.com/resend/resend-go/v3"
 
 	"sangria/backend/auth"
+	"sangria/backend/config"
 	dbengine "sangria/backend/dbEngine"
 )
 
@@ -76,21 +76,9 @@ func generateSecureToken() (string, error) {
 
 // sendInvitationEmail sends a beautiful invitation email via Resend
 func sendInvitationEmail(ctx context.Context, inviteeEmail, inviterName, orgName, invitationURL, customMessage string) error {
-	// Get Resend API key from environment
-	apiKey := os.Getenv("RESEND_API_KEY")
-	if apiKey == "" {
-		return fmt.Errorf("RESEND_API_KEY environment variable not set")
-	}
-
-	// Create Resend client
-	client := resend.NewClient(apiKey)
-
-	// Set up sender (you should update this to your verified sender email)
-	fromEmail := strings.TrimSpace(os.Getenv("RESEND_FROM_EMAIL"))
-	if fromEmail == "" {
-		return fmt.Errorf("RESEND_FROM_EMAIL environment variable not set")
-		
-	}
+	// Resend credentials + sender are validated at startup via config.LoadEmailConfig.
+	client := resend.NewClient(config.Email.ResendAPIKey)
+	fromEmail := config.Email.ResendFromEmail
 
 	// Create email subject
 	subject := fmt.Sprintf("You're invited to join %s", orgName)
@@ -303,20 +291,8 @@ func CreateOrganizationInvitation(pool *pgxpool.Pool) fiber.Handler {
 			inviterName = inviterUser.Owner
 		}
 
-		// Build invitation acceptance URL that includes our token
-		baseURL := os.Getenv("FRONTEND_URL")
-		if baseURL == "" {
-			slog.Error("FRONTEND_URL environment variable not set - cannot create invitation URL", "org_id", orgID, "user_id", user.ID)
-
-			// Clean up the invitation since we can't send it
-			cleanupErr := dbengine.DeleteInvitation(c.Context(), pool, invitationID)
-			if cleanupErr != nil {
-				slog.Error("failed to clean up invitation after FRONTEND_URL error", "invitation_id", invitationID, "error", cleanupErr)
-			}
-
-			return c.Status(500).JSON(fiber.Map{"error": "FRONTEND_URL configuration is missing - cannot send invitation"})
-		}
-		invitationURL := fmt.Sprintf("%s/accept-invitation?token=%s", baseURL, invitationToken)
+		// FRONTEND_URL is validated at startup via config.LoadEmailConfig.
+		invitationURL := fmt.Sprintf("%s/accept-invitation?token=%s", config.Email.FrontendURL, invitationToken)
 
 		// Send beautiful invitation email via Resend with timeout
 		emailCtx, cancel := context.WithTimeout(c.Context(), 30*time.Second)

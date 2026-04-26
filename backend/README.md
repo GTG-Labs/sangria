@@ -31,6 +31,10 @@ The server starts on the port specified by the `PORT` environment variable (requ
 >
 > Operators: set this before deploying. Reviewers/release managers: mirror this note in the PR description and release notes so downstream deployments don't silently drop webhooks.
 
+> **Also required before this revision rolls out:** `ALLOWED_ORIGINS` no longer falls back to `http://localhost:3000`. Prod deploys that previously relied on the silent fallback must set this variable explicitly; unset values log a warning and reject cross-origin requests. Set it before deploying.
+
+> All env var reads are centralized in [`backend/config/`](config/). Each loader (`LoadWorkOSConfig`, `LoadCDPConfig`, `LoadEmailConfig`, etc.) runs at startup and fails the process on missing required values — no silent production fallbacks. Add a new env var by extending the appropriate `Config` struct + `LoadX` function; do not read `os.Getenv` from handlers, middleware, or utility packages.
+
 ### Environment variables
 
 | Variable | Required | Description |
@@ -43,7 +47,10 @@ The server starts on the port specified by the `PORT` environment variable (requ
 | `RESEND_API_KEY` | Yes | Resend API key for sending invitation emails |
 | `RESEND_FROM_EMAIL` | Yes | Email address used as sender for Resend invitation emails |
 | `FRONTEND_URL` | Yes | Public URL of frontend application (used to build invitation accept links) |
-| `ALLOWED_ORIGINS` | No | CORS allowed origins, comma-separated (default: `http://localhost:3000`) |
+| `ALLOWED_ORIGINS` | No | CORS allowed origins, comma-separated. No default — unset logs a warning at startup and rejects every cross-origin request. Set in prod. |
+| `LOG_LEVEL` | No | `debug` \| `info` (default) \| `warn` \| `error`. Sets the `slog` threshold. |
+| `LOG_FORMAT` | No | `json` \| `text` (default). Sets the `slog` handler. |
+| `APP_ENV` | No | `development` relaxes CSRF cookie settings (SameSite=Lax, non-secure) for local dev. Anything else — including unset — is treated as production. `NODE_ENV` is read as a legacy fallback; prefer `APP_ENV`. |
 | `CDP_API_KEY` | Yes | Coinbase Developer Platform API key |
 | `CDP_API_SECRET` | Yes | CDP API secret |
 | `CDP_WALLET_SECRET` | Yes | Encryption key for CDP wallet keys |

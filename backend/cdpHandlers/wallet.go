@@ -6,11 +6,12 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"os"
 	"sync"
 
 	cdpsdk "github.com/coinbase/cdp-sdk/go"
 	"github.com/coinbase/cdp-sdk/go/openapi"
+
+	"sangria/backend/config"
 )
 
 var (
@@ -20,22 +21,13 @@ var (
 )
 
 // GetClient returns the singleton CDP client. Thread-safe via sync.Once.
-// Requires CDP_API_KEY, CDP_SECRET_KEY, and CDP_WALLET_SECRET env vars.
+// Credentials are validated at startup via config.LoadCDPConfig.
 func GetClient() (*openapi.ClientWithResponses, error) {
 	once.Do(func() {
-		apiKeyID := os.Getenv("CDP_API_KEY")
-		apiKeySecret := os.Getenv("CDP_API_SECRET")
-		walletSecret := os.Getenv("CDP_WALLET_SECRET")
-
-		if apiKeyID == "" || apiKeySecret == "" || walletSecret == "" {
-			initErr = fmt.Errorf("CDP_API_KEY, CDP_API_SECRET, and CDP_WALLET_SECRET environment variables are required")
-			return
-		}
-
 		client, initErr = cdpsdk.NewClient(cdpsdk.ClientOptions{
-			APIKeyID:     apiKeyID,
-			APIKeySecret: apiKeySecret,
-			WalletSecret: walletSecret,
+			APIKeyID:     config.CDP.APIKey,
+			APIKeySecret: config.CDP.APISecret,
+			WalletSecret: config.CDP.WalletSecret,
 		})
 	})
 	return client, initErr
