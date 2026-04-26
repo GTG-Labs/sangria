@@ -441,12 +441,10 @@ export async function POST(request: Request) {
           throw new Error("Payment service returned an error");
         }
 
-        const result = (await settleResp.json()) as Record<string, unknown>;
-
         send({
           step: "settle",
           status: "done",
-          data: { result },
+          data: { confirmed: true },
         });
         completed = true;
       } catch (err) {
