@@ -8,6 +8,18 @@
 
 ---
 
+## Development
+
+```bash
+make dev          # Build and start all services (backend, frontend, mythos)
+make dev-clean    # Full rebuild — removes cached volumes (node_modules, .next) and rebuilds
+make down         # Stop all services
+```
+
+Requires Docker. Services: backend on `:8080`, frontend on `:3000`, mythos (admin) on `:3001`.
+
+---
+
 ## Quick Start
 
 ### TypeScript (Express)
