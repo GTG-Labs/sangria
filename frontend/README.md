@@ -183,6 +183,7 @@ App-managed env vars (those whose `Validated` column is `Yes`) are checked at bu
 | `NEXT_PUBLIC_WORKOS_REDIRECT_URI` | Yes | Client | Yes | WorkOS redirect URI, inlined at build time. Must be a valid URL. |
 | `WORKOS_CLIENT_ID` | Yes | Server | No | WorkOS client ID. Consumed by AuthKit internally; not in `lib/env.ts`. |
 | `WORKOS_API_KEY` | Yes | Server | No | WorkOS API key. Consumed by AuthKit internally; not in `lib/env.ts`. |
+| `WORKOS_COOKIE_PASSWORD` | Yes | Server | No | 32-byte secret used by AuthKit to encrypt session cookies. Consumed internally. Generate via `openssl rand -base64 32`. |
 
 **Adding a new var:** edit `lib/env.ts` — add it to the appropriate `server` or `client` schema block *and* to the `runtimeEnv` mapping (Next.js's build-time inlining requires the literal `process.env.NEXT_PUBLIC_X` reference there). Do not add `process.env` reads elsewhere.
 
