@@ -12,6 +12,9 @@ import type { Address } from "viem";
 import { isAddress } from "viem";
 import { verifyAdmin } from "@/lib/admin";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 // ---------------------------------------------------------------------------
 // Config
 // ---------------------------------------------------------------------------
@@ -223,6 +226,13 @@ export async function POST(request: Request) {
     );
   }
 
+  if (!checkRateLimit(user.id)) {
+    return Response.json(
+      { error: "Rate limit exceeded. Try again shortly." },
+      { status: 429 }
+    );
+  }
+
   maybeSweepStateStores();
   const idempotencyReservation = reserveIdempotency(user.id, idempotencyKey);
   if (!idempotencyReservation.ok) {
@@ -233,14 +243,6 @@ export async function POST(request: Request) {
     return Response.json({ error: duplicateMessage }, { status: 409 });
   }
   const { storeKey: idempotencyStoreKey } = idempotencyReservation;
-
-  if (!checkRateLimit(user.id)) {
-    releaseIdempotency(idempotencyStoreKey);
-    return Response.json(
-      { error: "Rate limit exceeded. Try again shortly." },
-      { status: 429 }
-    );
-  }
 
   const mythosBaseURL = resolveMythosBaseURL(request);
   const demoResource = `${mythosBaseURL}/newspaper`;
@@ -415,7 +417,6 @@ export async function POST(request: Request) {
           throw new Error("Request aborted before settlement");
         }
 
-        settlementAttempted = true;
         const settleSignal = AbortSignal.any([
           request.signal,
           AbortSignal.timeout(120_000),
@@ -431,6 +432,7 @@ export async function POST(request: Request) {
           }),
           signal: settleSignal,
         });
+        settlementAttempted = true;
 
         if (settleResp.status !== 200) {
           let errBody: unknown;
