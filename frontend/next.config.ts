@@ -4,6 +4,7 @@ import { createMDX } from "fumadocs-mdx/next";
 const nextConfig: NextConfig = {
   output: "standalone",
   reactStrictMode: true,
+  devIndicators: false,
 
   // Security headers (CSP is handled in middleware.ts with nonces)
   async headers() {
