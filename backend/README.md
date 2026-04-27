@@ -39,6 +39,7 @@ The server starts on the port specified by the `PORT` environment variable (requ
 
 | Variable | Required | Description |
 |---|---|---|
+| `PORT` | Yes | TCP port the server listens on. Must be an integer in `1..65535`. |
 | `DATABASE_URL` | Yes | Postgres connection string (`sslmode=verify-full&sslrootcert=system`) |
 | `WORKOS_API_KEY` | Yes | WorkOS API key |
 | `WORKOS_CLIENT_ID` | Yes | WorkOS client ID |
