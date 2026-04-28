@@ -12,7 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// ErrInsufficientBalance is returned when a merchant doesn't have enough balance for a withdrawal.
+// ErrInsufficientBalance is returned when an organization doesn't have enough balance for a withdrawal.
 var ErrInsufficientBalance = errors.New("insufficient balance")
 
 // ErrInvalidWithdrawalStatus is returned when a caller passes a status value
@@ -23,7 +23,7 @@ var ErrInvalidWithdrawalStatus = errors.New("invalid withdrawal status")
 var ErrWithdrawalNotFound = errors.New("withdrawal not found or not in expected state")
 
 // withdrawalColumns is the shared SELECT column list for scanning into a Withdrawal.
-const withdrawalColumns = `id, merchant_id, amount, fee, net_amount, status,
+const withdrawalColumns = `id, organization_id, amount, fee, net_amount, status,
 	debit_transaction_id, completion_transaction_id, reversal_transaction_id,
 	failure_code, failure_message,
 	reviewed_by, reviewed_at, review_note,
@@ -35,7 +35,7 @@ const withdrawalColumns = `id, merchant_id, amount, fee, net_amount, status,
 func scanWithdrawal(row interface{ Scan(dest ...any) error }) (Withdrawal, error) {
 	var w Withdrawal
 	err := row.Scan(
-		&w.ID, &w.MerchantID, &w.Amount, &w.Fee, &w.NetAmount, &w.Status,
+		&w.ID, &w.OrganizationID, &w.Amount, &w.Fee, &w.NetAmount, &w.Status,
 		&w.DebitTransactionID, &w.CompletionTransactionID, &w.ReversalTransactionID,
 		&w.FailureCode, &w.FailureMessage,
 		&w.ReviewedBy, &w.ReviewedAt, &w.ReviewNote,
@@ -47,11 +47,11 @@ func scanWithdrawal(row interface{ Scan(dest ...any) error }) (Withdrawal, error
 }
 
 // getWithdrawalByIdempotencyKey returns an existing withdrawal matching the
-// given idempotency key and merchant. Used for idempotent replay.
-func getWithdrawalByIdempotencyKey(ctx context.Context, pool *pgxpool.Pool, idempotencyKey, merchantID string) (Withdrawal, error) {
+// given idempotency key and organization. Used for idempotent replay.
+func getWithdrawalByIdempotencyKey(ctx context.Context, pool *pgxpool.Pool, idempotencyKey, organizationID string) (Withdrawal, error) {
 	w, err := scanWithdrawal(pool.QueryRow(ctx,
-		fmt.Sprintf(`SELECT %s FROM withdrawals WHERE idempotency_key = $1 AND merchant_id = $2`, withdrawalColumns),
-		idempotencyKey, merchantID,
+		fmt.Sprintf(`SELECT %s FROM withdrawals WHERE idempotency_key = $1 AND organization_id = $2`, withdrawalColumns),
+		idempotencyKey, organizationID,
 	))
 	if err != nil {
 		return Withdrawal{}, fmt.Errorf("fetch existing withdrawal for idempotency replay: %w", err)
@@ -59,20 +59,19 @@ func getWithdrawalByIdempotencyKey(ctx context.Context, pool *pgxpool.Pool, idem
 	return w, nil
 }
 
-// CreateWithdrawal atomically checks the merchant's balance, debits it, and
-// creates a withdrawal record. Auto-approves if the amount is within the
+// CreateWithdrawal atomically checks the organization's balance, debits it,
+// and creates a withdrawal record. Auto-approves if the amount is within the
 // threshold. The entire operation runs in a single transaction with a row lock
-// on the merchant's account to prevent overdraw from concurrent requests.
+// on the organization's account to prevent overdraw from concurrent requests.
 //
-// Authorization: the caller must be an admin of the organization that owns
-// the merchant. This is enforced atomically inside the merchant-account lock
-// query via a JOIN on organization_members. If the caller is not an admin
-// (or the merchant doesn't exist) the function returns ErrMerchantNotFound.
-// The ambiguity is intentional — don't disclose authorization state separately
-// from existence.
+// Authorization: the caller must be an admin of the organization. This is
+// enforced atomically inside the account lock query via a JOIN on
+// organization_members. If the caller is not an admin (or the organization
+// doesn't exist) the function returns ErrWithdrawalNotFound. The ambiguity is
+// intentional — don't disclose authorization state separately from existence.
 func CreateWithdrawal(
 	ctx context.Context, pool *pgxpool.Pool,
-	merchantID string, amount int64, fee int64, idempotencyKey string,
+	organizationID string, amount int64, fee int64, idempotencyKey string,
 	autoApprove bool, userID string,
 ) (Withdrawal, error) {
 	if err := ValidateAmountAndFee(amount, fee); err != nil {
@@ -88,10 +87,10 @@ func CreateWithdrawal(
 	defer tx.Rollback(ctx)
 
 	// Idempotency: if a withdrawal with this key already exists for this
-	// merchant, return it immediately without doing any ledger work.
+	// organization, return it immediately without doing any ledger work.
 	existing, idempErr := scanWithdrawal(tx.QueryRow(ctx,
-		fmt.Sprintf(`SELECT %s FROM withdrawals WHERE idempotency_key = $1 AND merchant_id = $2`, withdrawalColumns),
-		idempotencyKey, merchantID,
+		fmt.Sprintf(`SELECT %s FROM withdrawals WHERE idempotency_key = $1 AND organization_id = $2`, withdrawalColumns),
+		idempotencyKey, organizationID,
 	))
 	if idempErr == nil {
 		tx.Rollback(ctx)
@@ -101,25 +100,24 @@ func CreateWithdrawal(
 		return Withdrawal{}, fmt.Errorf("check idempotency: %w", idempErr)
 	}
 
-	// Look up merchant's USD LIABILITY account and lock it. The JOIN on
+	// Look up organization's USD LIABILITY account and lock it. The JOIN on
 	// organization_members doubles as the authorization check — if the caller
-	// is not an admin of the owning org, zero rows are returned and we surface
-	// ErrMerchantNotFound (see function-level comment on the ambiguity).
-	var merchantAcctID string
+	// is not an admin, zero rows are returned and we surface
+	// ErrWithdrawalNotFound (see function-level comment on the ambiguity).
+	var orgAcctID string
 	err = tx.QueryRow(ctx,
 		`SELECT a.id FROM accounts a
-		 JOIN merchants m ON m.organization_id = a.organization_id
-		 JOIN organization_members om ON om.organization_id = m.organization_id
-		 WHERE m.id = $1 AND om.user_id = $2 AND om.is_admin = true
+		 JOIN organization_members om ON om.organization_id = a.organization_id
+		 WHERE a.organization_id = $1 AND om.user_id = $2 AND om.is_admin = true
 		   AND a.type = 'LIABILITY' AND a.currency = 'USD'
-		 FOR UPDATE`,
-		merchantID, userID,
-	).Scan(&merchantAcctID)
+		 FOR UPDATE OF a`,
+		organizationID, userID,
+	).Scan(&orgAcctID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return Withdrawal{}, ErrMerchantNotFound
+			return Withdrawal{}, ErrWithdrawalNotFound
 		}
-		return Withdrawal{}, fmt.Errorf("lock merchant account: %w", err)
+		return Withdrawal{}, fmt.Errorf("lock organization account: %w", err)
 	}
 
 	// Compute balance under the lock. Only count confirmed transactions
@@ -136,7 +134,7 @@ func CreateWithdrawal(
 		JOIN transactions t ON t.id = le.transaction_id
 		WHERE le.account_id = $1 AND le.currency = 'USD'
 		  AND t.status = 'confirmed'`,
-		merchantAcctID,
+		orgAcctID,
 	).Scan(&balance)
 	if err != nil {
 		return Withdrawal{}, fmt.Errorf("compute balance: %w", err)
@@ -162,7 +160,7 @@ func CreateWithdrawal(
 		status = WithdrawalStatusApproved
 	}
 
-	// Insert the ledger transaction: debit merchant, credit clearing.
+	// Insert the ledger transaction: debit organization, credit clearing.
 	var txnID string
 	err = tx.QueryRow(ctx,
 		`INSERT INTO transactions (idempotency_key)
@@ -174,11 +172,11 @@ func CreateWithdrawal(
 		return Withdrawal{}, fmt.Errorf("insert transaction: %w", err)
 	}
 
-	// DEBIT merchant USD LIABILITY (balance goes down).
+	// DEBIT organization USD LIABILITY (balance goes down).
 	_, err = tx.Exec(ctx,
 		`INSERT INTO ledger_entries (transaction_id, currency, amount, direction, account_id)
 		 VALUES ($1, 'USD', $2, 'DEBIT', $3)`,
-		txnID, amount, merchantAcctID,
+		txnID, amount, orgAcctID,
 	)
 	if err != nil {
 		return Withdrawal{}, fmt.Errorf("insert debit entry: %w", err)
@@ -202,12 +200,12 @@ func CreateWithdrawal(
 	}
 
 	query := fmt.Sprintf(
-		`INSERT INTO withdrawals (id, merchant_id, amount, fee, net_amount, status, debit_transaction_id, idempotency_key, approved_at)
+		`INSERT INTO withdrawals (id, organization_id, amount, fee, net_amount, status, debit_transaction_id, idempotency_key, approved_at)
 		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, %s)
 		 RETURNING %s`, approvedAt, withdrawalColumns)
 
 	w, err = scanWithdrawal(tx.QueryRow(ctx, query,
-		withdrawalID, merchantID, amount, fee, netAmount, status, txnID, idempotencyKey,
+		withdrawalID, organizationID, amount, fee, netAmount, status, txnID, idempotencyKey,
 	))
 	if err != nil {
 		// Unique constraint on idempotency_key — concurrent retry slipped past
@@ -215,7 +213,7 @@ func CreateWithdrawal(
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
 			tx.Rollback(ctx)
-			return getWithdrawalByIdempotencyKey(ctx, pool, idempotencyKey, merchantID)
+			return getWithdrawalByIdempotencyKey(ctx, pool, idempotencyKey, organizationID)
 		}
 		return Withdrawal{}, fmt.Errorf("insert withdrawal: %w", err)
 	}
@@ -236,8 +234,8 @@ func GetWithdrawalByID(ctx context.Context, pool *pgxpool.Pool, id string) (With
 }
 
 // GetWithdrawalsByOrganizationPaginated returns paginated withdrawals for an
-// organization (across all its merchants) with total count. Uses created_at as
-// cursor for stable, performant pagination.
+// organization with total count. Uses created_at as the cursor for stable,
+// performant pagination.
 func GetWithdrawalsByOrganizationPaginated(
 	ctx context.Context,
 	pool *pgxpool.Pool,
@@ -245,23 +243,11 @@ func GetWithdrawalsByOrganizationPaginated(
 	limit int,
 	cursor *time.Time,
 ) ([]Withdrawal, *time.Time, int, error) {
-	// Prefix withdrawal columns with w. for the JOIN query.
-	prefixedColumns := `w.id, w.merchant_id, w.amount, w.fee, w.net_amount, w.status,
-		w.debit_transaction_id, w.completion_transaction_id, w.reversal_transaction_id,
-		w.failure_code, w.failure_message,
-		w.reviewed_by, w.reviewed_at, w.review_note,
-		w.completed_by, w.failed_by,
-		w.idempotency_key,
-		w.created_at, w.approved_at, w.processed_at, w.completed_at, w.failed_at, w.reversed_at, w.canceled_at`
-
-	baseWhere := `
-		WHERE m.organization_id = $1
-	`
 	args := []interface{}{organizationID}
 
 	cursorWhere := ""
 	if cursor != nil {
-		cursorWhere = ` AND w.created_at < $2`
+		cursorWhere = ` AND created_at < $2`
 		args = append(args, *cursor)
 	}
 
@@ -269,20 +255,14 @@ func GetWithdrawalsByOrganizationPaginated(
 	limitParam := len(args) + 1
 	dataQuery := fmt.Sprintf(`
 		SELECT %s
-		FROM withdrawals w
-		JOIN merchants m ON w.merchant_id = m.id
-		%s%s
-		ORDER BY w.created_at DESC
+		FROM withdrawals
+		WHERE organization_id = $1%s
+		ORDER BY created_at DESC
 		LIMIT $%d
-	`, prefixedColumns, baseWhere, cursorWhere, limitParam)
+	`, withdrawalColumns, cursorWhere, limitParam)
 
 	// Get total count (separate query, no cursor condition).
-	countQuery := fmt.Sprintf(`
-		SELECT COUNT(*)
-		FROM withdrawals w
-		JOIN merchants m ON w.merchant_id = m.id
-		%s
-	`, baseWhere)
+	countQuery := `SELECT COUNT(*) FROM withdrawals WHERE organization_id = $1`
 
 	var total int
 	err := pool.QueryRow(ctx, countQuery, organizationID).Scan(&total)
@@ -467,27 +447,26 @@ func getSystemAccountIDTx(ctx context.Context, tx pgx.Tx, name string) (string, 
 	return id, nil
 }
 
-// getMerchantLiabilityAccountIDTx looks up a merchant's USD LIABILITY account ID within an existing transaction.
-func getMerchantLiabilityAccountIDTx(ctx context.Context, tx pgx.Tx, merchantID string) (string, error) {
+// getOrgLiabilityAccountIDTx looks up an organization's USD LIABILITY account ID within an existing transaction.
+func getOrgLiabilityAccountIDTx(ctx context.Context, tx pgx.Tx, organizationID string) (string, error) {
 	var id string
 	err := tx.QueryRow(ctx,
-		`SELECT a.id FROM accounts a
-		 JOIN merchants m ON m.organization_id = a.organization_id
-		 WHERE m.id = $1 AND a.type = 'LIABILITY' AND a.currency = 'USD'`,
-		merchantID,
+		`SELECT id FROM accounts
+		 WHERE organization_id = $1 AND type = 'LIABILITY' AND currency = 'USD'`,
+		organizationID,
 	).Scan(&id)
 	if err != nil {
-		return "", fmt.Errorf("get merchant liability account: %w", err)
+		return "", fmt.Errorf("get organization liability account: %w", err)
 	}
 	return id, nil
 }
 
 // writeReversalLedgerEntries is the shared reversal logic used by reject, cancel,
-// and fail. Looks up the merchant and clearing accounts, then writes the reversal
-// ledger entries (debit clearing, credit merchant). Returns the reversal
-// transaction ID. Must be called within an existing DB transaction.
+// and fail. Looks up the organization and clearing accounts, then writes the
+// reversal ledger entries (debit clearing, credit organization). Returns the
+// reversal transaction ID. Must be called within an existing DB transaction.
 func writeReversalLedgerEntries(ctx context.Context, tx pgx.Tx, w Withdrawal, idempotencyKey string) (string, error) {
-	merchantAcctID, err := getMerchantLiabilityAccountIDTx(ctx, tx, w.MerchantID)
+	orgAcctID, err := getOrgLiabilityAccountIDTx(ctx, tx, w.OrganizationID)
 	if err != nil {
 		return "", err
 	}
@@ -516,11 +495,11 @@ func writeReversalLedgerEntries(ctx context.Context, tx pgx.Tx, w Withdrawal, id
 		return "", fmt.Errorf("insert reversal debit: %w", err)
 	}
 
-	// CREDIT merchant (restore balance).
+	// CREDIT organization (restore balance).
 	_, err = tx.Exec(ctx,
 		`INSERT INTO ledger_entries (transaction_id, currency, amount, direction, account_id)
 		 VALUES ($1, 'USD', $2, 'CREDIT', $3)`,
-		txnID, w.Amount, merchantAcctID,
+		txnID, w.Amount, orgAcctID,
 	)
 	if err != nil {
 		return "", fmt.Errorf("insert reversal credit: %w", err)
@@ -569,15 +548,13 @@ func RejectWithdrawal(ctx context.Context, pool *pgxpool.Pool, withdrawalID, adm
 	return tx.Commit(ctx)
 }
 
-// CancelWithdrawal allows a merchant to cancel their own pending_approval withdrawal.
-// Verifies the withdrawal belongs to the given merchant before reversing.
 // CancelWithdrawal atomically cancels a pending withdrawal if the caller is an
-// admin of the organization that owns the merchant.
+// admin of the organization that owns it.
 //
 // Returns ErrWithdrawalNotFound if: the withdrawal doesn't exist, it's not in
 // pending_approval status, OR the caller is not an org admin. The ambiguity is
 // intentional — don't disclose authorization state separately from existence.
-func CancelWithdrawal(ctx context.Context, pool *pgxpool.Pool, withdrawalID, merchantID, userID string) error {
+func CancelWithdrawal(ctx context.Context, pool *pgxpool.Pool, withdrawalID, organizationID, userID string) error {
 	tx, err := pool.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("begin transaction: %w", err)
@@ -588,14 +565,13 @@ func CancelWithdrawal(ctx context.Context, pool *pgxpool.Pool, withdrawalID, mer
 	w, err = scanWithdrawal(tx.QueryRow(ctx,
 		fmt.Sprintf(`
 			SELECT %s FROM withdrawals
-			WHERE id = $1 AND merchant_id = $2 AND status = 'pending_approval'
+			WHERE id = $1 AND organization_id = $2 AND status = 'pending_approval'
 			  AND EXISTS (
 			    SELECT 1 FROM organization_members om
-			    JOIN merchants m ON m.organization_id = om.organization_id
-			    WHERE m.id = $2 AND om.user_id = $3 AND om.is_admin = true
+			    WHERE om.organization_id = $2 AND om.user_id = $3 AND om.is_admin = true
 			  )
 			FOR UPDATE`, withdrawalColumns),
-		withdrawalID, merchantID, userID,
+		withdrawalID, organizationID, userID,
 	))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {

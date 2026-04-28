@@ -14,8 +14,8 @@ import (
 )
 
 // RequestWithdrawal handles POST /withdrawals.
-// Dashboard endpoint — only an admin of the organization that owns the merchant
-// may initiate a withdrawal. Authorization is enforced atomically in SQL (see
+// Dashboard endpoint — only an admin of the organization may initiate a
+// withdrawal. Authorization is enforced atomically in SQL (see
 // dbengine.CreateWithdrawal) to prevent TOCTOU.
 func RequestWithdrawal(pool *pgxpool.Pool) fiber.Handler {
 	return func(c fiber.Ctx) error {
@@ -25,7 +25,7 @@ func RequestWithdrawal(pool *pgxpool.Pool) fiber.Handler {
 		}
 
 		var req struct {
-			MerchantID     string `json:"merchant_id"`
+			OrganizationID string `json:"organization_id"`
 			Amount         int64  `json:"amount"`
 			IdempotencyKey string `json:"idempotency_key"`
 		}
@@ -33,8 +33,8 @@ func RequestWithdrawal(pool *pgxpool.Pool) fiber.Handler {
 			return c.Status(400).JSON(fiber.Map{"error": "invalid request body"})
 		}
 
-		if req.MerchantID == "" {
-			return c.Status(400).JSON(fiber.Map{"error": "merchant_id is required"})
+		if req.OrganizationID == "" {
+			return c.Status(400).JSON(fiber.Map{"error": "organization_id is required"})
 		}
 		if req.IdempotencyKey == "" {
 			return c.Status(400).JSON(fiber.Map{"error": "idempotency_key is required"})
@@ -57,17 +57,17 @@ func RequestWithdrawal(pool *pgxpool.Pool) fiber.Handler {
 
 		withdrawal, err := dbengine.CreateWithdrawal(
 			c.Context(), pool,
-			req.MerchantID, req.Amount, fee, req.IdempotencyKey,
+			req.OrganizationID, req.Amount, fee, req.IdempotencyKey,
 			autoApprove, user.ID,
 		)
 		if err != nil {
 			if errors.Is(err, dbengine.ErrInsufficientBalance) {
 				return c.Status(400).JSON(fiber.Map{"error": "insufficient balance"})
 			}
-			if errors.Is(err, dbengine.ErrMerchantNotFound) {
-				return c.Status(400).JSON(fiber.Map{"error": "merchant not found or access denied"})
+			if errors.Is(err, dbengine.ErrWithdrawalNotFound) {
+				return c.Status(404).JSON(fiber.Map{"error": "organization not found or access denied"})
 			}
-			slog.Error("create withdrawal", "merchant_id", req.MerchantID, "error", err)
+			slog.Error("create withdrawal", "organization_id", req.OrganizationID, "error", err)
 			return c.Status(500).JSON(fiber.Map{"error": "failed to create withdrawal"})
 		}
 
@@ -144,9 +144,9 @@ func ListWithdrawals(pool *pgxpool.Pool) fiber.Handler {
 }
 
 // CancelWithdrawal handles POST /withdrawals/:id/cancel.
-// Dashboard endpoint — only an admin of the organization that owns the merchant
-// may cancel a pending withdrawal. Authorization is enforced atomically in SQL
-// (see dbengine.CancelWithdrawal) to prevent TOCTOU.
+// Dashboard endpoint — only an admin of the organization may cancel a pending
+// withdrawal. Authorization is enforced atomically in SQL (see
+// dbengine.CancelWithdrawal) to prevent TOCTOU.
 func CancelWithdrawal(pool *pgxpool.Pool) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		user, ok := c.Locals("workos_user").(auth.WorkOSUser)
@@ -156,18 +156,18 @@ func CancelWithdrawal(pool *pgxpool.Pool) fiber.Handler {
 		withdrawalID := c.Params("id")
 
 		var req struct {
-			MerchantID string `json:"merchant_id"`
+			OrganizationID string `json:"organization_id"`
 		}
 		if err := c.Bind().JSON(&req); err != nil {
 			return c.Status(400).JSON(fiber.Map{"error": "invalid request body"})
 		}
-		if req.MerchantID == "" {
-			return c.Status(400).JSON(fiber.Map{"error": "merchant_id is required"})
+		if req.OrganizationID == "" {
+			return c.Status(400).JSON(fiber.Map{"error": "organization_id is required"})
 		}
 
-		if err := dbengine.CancelWithdrawal(c.Context(), pool, withdrawalID, req.MerchantID, user.ID); err != nil {
+		if err := dbengine.CancelWithdrawal(c.Context(), pool, withdrawalID, req.OrganizationID, user.ID); err != nil {
 			if errors.Is(err, dbengine.ErrWithdrawalNotFound) {
-				return c.Status(400).JSON(fiber.Map{"error": "withdrawal not found, not pending approval, or access denied"})
+				return c.Status(404).JSON(fiber.Map{"error": "withdrawal not found, not pending approval, or access denied"})
 			}
 			slog.Error("cancel withdrawal", "withdrawal_id", withdrawalID, "error", err)
 			return c.Status(500).JSON(fiber.Map{"error": "failed to cancel withdrawal"})

@@ -14,7 +14,7 @@ type DialogConfig = {
 
 interface Withdrawal {
   id: string;
-  merchant_id: string;
+  organization_id: string;
   amount: number;
   fee: number;
   net_amount: number;
@@ -404,7 +404,7 @@ export default function AdminWithdrawalsContent() {
           "Identifiers",
           <>
             {detailRow("ID", w.id, true)}
-            {detailRow("Merchant ID", w.merchant_id, true)}
+            {detailRow("Organization ID", w.organization_id, true)}
           </>
         )}
         {detailSection(
@@ -531,7 +531,7 @@ export default function AdminWithdrawalsContent() {
         <div>
           <h1 className="text-2xl font-bold text-white">Withdrawals</h1>
           <p className="mt-1 text-sm text-gray-500">
-            Manage withdrawal requests across all merchants.
+            Manage withdrawal requests across all organizations.
           </p>
         </div>
         <select
@@ -571,7 +571,7 @@ export default function AdminWithdrawalsContent() {
           <p className="text-sm text-gray-600">
             {statusFilter
               ? "Try a different status filter."
-              : "Withdrawals will appear here once merchants request payouts."}
+              : "Withdrawals will appear here once organizations request payouts."}
           </p>
         </div>
       ) : (
@@ -583,7 +583,7 @@ export default function AdminWithdrawalsContent() {
                   ID
                 </th>
                 <th className="pb-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Merchant
+                  Organization
                 </th>
                 <th className="pb-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Amount
@@ -642,7 +642,7 @@ export default function AdminWithdrawalsContent() {
                         </div>
                       </td>
                       <td className="py-4 px-4 font-mono text-xs text-gray-500">
-                        {truncateId(w.merchant_id)}
+                        {truncateId(w.organization_id)}
                       </td>
                       <td className="py-4 px-4 text-sm text-gray-300 font-mono">
                         {formatAmount(w.amount)}

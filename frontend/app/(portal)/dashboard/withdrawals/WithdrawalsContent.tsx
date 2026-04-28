@@ -9,7 +9,7 @@ import WithdrawModal from "./WithdrawModal";
 
 interface Withdrawal {
   id: string;
-  merchant_id: string;
+  organization_id: string;
   amount: number;
   fee: number;
   net_amount: number;
@@ -34,15 +34,6 @@ interface PaginatedWithdrawalsResponse {
   };
 }
 
-interface APIKey {
-  id: string;
-  organization_id: string;
-  name: string;
-  key_id: string;
-  status: "active" | "pending" | "inactive";
-  created_at: string;
-}
-
 export default function WithdrawalsContent() {
   const { selectedOrgId } = useOrganization();
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
@@ -54,7 +45,6 @@ export default function WithdrawalsContent() {
   const [total, setTotal] = useState<number | null>(null);
   const [balance, setBalance] = useState<number | null>(null);
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
-  const [merchants, setMerchants] = useState<APIKey[]>([]);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
 
   // Clear list + pagination metadata after an initial-load failure so a stale
@@ -140,22 +130,7 @@ export default function WithdrawalsContent() {
     }
   };
 
-  const fetchMerchants = async (signal?: AbortSignal) => {
-    try {
-      const orgParam = selectedOrgId ? `?org_id=${selectedOrgId}` : "";
-      const response = await internalFetch(`/api/backend/api-keys${orgParam}`, { signal });
-      if (signal?.aborted) return;
-      if (response.ok) {
-        const keys = await response.json();
-        setMerchants(Array.isArray(keys) ? keys : []);
-      }
-    } catch (err) {
-      if (err instanceof Error && err.name === "AbortError") return;
-      console.error("Failed to load merchants:", err);
-    }
-  };
-
-  const cancelWithdrawal = async (withdrawalId: string, merchantId: string) => {
+  const cancelWithdrawal = async (withdrawalId: string) => {
     if (!confirm("Are you sure you want to cancel this withdrawal?")) return;
 
     setCancellingId(withdrawalId);
@@ -163,7 +138,7 @@ export default function WithdrawalsContent() {
       const response = await internalFetch(`/api/backend/withdrawals/${withdrawalId}/cancel`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ merchant_id: merchantId }),
+        body: JSON.stringify({ organization_id: selectedOrgId }),
       });
 
       if (response.ok) {
@@ -194,7 +169,6 @@ export default function WithdrawalsContent() {
     setCancellingId(null);
 
     fetchBalance(controller.signal);
-    fetchMerchants(controller.signal);
     fetchWithdrawals(undefined, controller.signal);
 
     return () => controller.abort();
@@ -251,8 +225,6 @@ export default function WithdrawalsContent() {
     );
   };
 
-  const activeMerchants = merchants.filter((m) => m.status === "active");
-
   if (loading) {
     return (
       <div className="mx-auto max-w-6xl">
@@ -277,7 +249,7 @@ export default function WithdrawalsContent() {
             <div className="mt-1 h-12 w-48 animate-pulse rounded-lg bg-gray-200" />
           )}
         </div>
-        {activeMerchants.length > 0 && (
+        {selectedOrgId && balance !== null && balance > 0 && (
           <ArcadeButton
             onClick={() => setShowWithdrawModal(true)}
             size="sm"
@@ -353,7 +325,7 @@ export default function WithdrawalsContent() {
                   <td className="py-4 pl-6 pr-4 text-right">
                     {w.status === "pending_approval" && (
                       <button
-                        onClick={() => cancelWithdrawal(w.id, w.merchant_id)}
+                        onClick={() => cancelWithdrawal(w.id)}
                         disabled={cancellingId === w.id}
                         className="text-sm text-red-600 hover:text-red-800 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
@@ -390,9 +362,9 @@ export default function WithdrawalsContent() {
         </div>
       )}
 
-      {showWithdrawModal && (
+      {showWithdrawModal && selectedOrgId && (
         <WithdrawModal
-          merchants={activeMerchants}
+          selectedOrgId={selectedOrgId}
           balance={balance}
           onClose={() => setShowWithdrawModal(false)}
           onSuccess={handleWithdrawSuccess}

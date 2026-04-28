@@ -262,7 +262,7 @@ const (
 
 type Withdrawal struct {
 	ID                      string           `json:"id"`
-	MerchantID              string           `json:"merchant_id"`
+	OrganizationID          string           `json:"organization_id"`
 	Amount                  int64            `json:"amount"`
 	Fee                     int64            `json:"fee"`
 	NetAmount               int64            `json:"net_amount"`

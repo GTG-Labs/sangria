@@ -7,17 +7,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { createWithdrawalSchema, type WithdrawalData } from "@/lib/validation";
 import { internalFetch } from "@/lib/fetch";
 
-interface APIKey {
-  id: string;
-  organization_id: string;
-  name: string;
-  key_id: string;
-  status: "active" | "pending" | "inactive";
-  created_at: string;
-}
-
 interface WithdrawModalProps {
-  merchants: APIKey[];
+  selectedOrgId: string;
   balance: number | null;
   onClose: () => void;
   onSuccess: () => Promise<void>;
@@ -25,7 +16,7 @@ interface WithdrawModalProps {
 }
 
 export default function WithdrawModal({
-  merchants,
+  selectedOrgId,
   balance,
   onClose,
   onSuccess,
@@ -42,7 +33,6 @@ export default function WithdrawModal({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Memoized resolver to prevent recreation on every render
   const memoizedResolver = useMemo(() => {
     return zodResolver(createWithdrawalSchema(balance));
   }, [balance]);
@@ -55,7 +45,6 @@ export default function WithdrawModal({
     resolver: memoizedResolver,
     mode: "onChange",
     defaultValues: {
-      merchantId: merchants.length === 1 ? merchants[0].id : "",
       amount: "",
     },
   });
@@ -64,7 +53,6 @@ export default function WithdrawModal({
     setError(null);
     setSubmitting(true);
 
-    // Safe conversion - amount already validated by Zod schema
     const microunits = Math.round(Number(data.amount) * 1_000_000);
 
     try {
@@ -72,7 +60,7 @@ export default function WithdrawModal({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          merchant_id: data.merchantId,
+          organization_id: selectedOrgId,
           amount: microunits,
           idempotency_key: crypto.randomUUID(),
         }),
@@ -120,42 +108,6 @@ export default function WithdrawModal({
               <p className="text-lg font-semibold text-gray-900">
                 ${formatBalance(balance)} USD
               </p>
-            </div>
-          )}
-
-          {merchants.length > 1 && (
-            <div>
-              <label
-                htmlFor="merchant"
-                className="block text-sm font-medium text-gray-700 mb-1.5"
-              >
-                Merchant
-              </label>
-              <select
-                id="merchant"
-                {...register("merchantId")}
-                className={`w-full px-3 py-2 border rounded-md bg-white text-gray-900 ${errors.merchantId ? "border-red-500" : "border-gray-300"
-                  }`}
-              >
-                <option value="">Select a merchant</option>
-                {merchants.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.name}
-                  </option>
-                ))}
-              </select>
-              {errors.merchantId && (
-                <p className="mt-1 text-sm text-red-600">{errors.merchantId.message}</p>
-              )}
-            </div>
-          )}
-
-          {merchants.length === 1 && (
-            <div>
-              <p className="text-sm font-medium text-gray-700 mb-1.5">
-                Merchant
-              </p>
-              <p className="text-sm text-gray-900">{merchants[0].name}</p>
             </div>
           )}
 

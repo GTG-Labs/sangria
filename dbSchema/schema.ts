@@ -115,6 +115,9 @@ export const accounts = pgTable(
   (table) => [
     index("idx_accounts_organization_id").on(table.organizationId),
     index("idx_accounts_type").on(table.type),
+    uniqueIndex("uq_accounts_org_liability_usd")
+      .on(table.organizationId)
+      .where(sql`type = 'LIABILITY' AND currency = 'USD'`),
   ],
 );
 
@@ -268,16 +271,16 @@ export const cryptoWallets = pgTable(
 );
 
 // ---------------------------------------------------------------------------
-// Withdrawals — merchant payout requests
+// Withdrawals — organization payout requests
 // ---------------------------------------------------------------------------
 
 export const withdrawals = pgTable(
   "withdrawals",
   {
     id: uuid().primaryKey().defaultRandom(),
-    merchantId: uuid("merchant_id")
+    organizationId: uuid("organization_id")
       .notNull()
-      .references(() => merchants.id),
+      .references(() => organizations.id),
 
     // Money
     amount: bigint({ mode: "bigint" }).notNull(),
@@ -326,7 +329,7 @@ export const withdrawals = pgTable(
     canceledAt: timestamp("canceled_at", { withTimezone: true }),
   },
   (table) => [
-    index("idx_withdrawals_merchant_id").on(table.merchantId),
+    index("idx_withdrawals_organization_id").on(table.organizationId),
     index("idx_withdrawals_status").on(table.status),
     unique("uq_withdrawals_idempotency_key").on(table.idempotencyKey),
     check("chk_withdrawals_amount_positive", sql`${table.amount} > 0`),

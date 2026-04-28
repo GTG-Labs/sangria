@@ -147,14 +147,6 @@ const safeCurrencyRegex = /^\d{1,8}(\.\d{1,2})?$/;
 
 // Withdrawal validation with bulletproof financial security
 export const withdrawalSchema = z.object({
-  merchantId: z
-    .string()
-    .min(1, "Please select a merchant")
-    .refine((val) => {
-      // UUID v4 validation
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[4][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-      return uuidRegex.test(val);
-    }, "Invalid merchant ID"),
   amount: z
     .string()
     .min(1, "Amount is required")
