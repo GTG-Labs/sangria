@@ -75,46 +75,29 @@ export default function OrganizationDropdown() {
 
   if (!userInfo || !selectedOrg) {
     return (
-      <div className="px-2 py-2">
-        <div className="text-sm text-gray-500">Loading...</div>
+      <div className="flex items-center gap-3 px-2 py-2">
+        <span className="text-sm text-gray-500">Loading...</span>
       </div>
     );
   }
 
   return (
-    <div ref={dropdownRef} className="relative px-2 py-2">
-      {/* Organization Dropdown Button */}
+    <div ref={dropdownRef} className="relative">
       <button
         onClick={() => setIsOpen(!isOpen)}
         aria-label="Switch organization"
         aria-expanded={isOpen}
         aria-haspopup="true"
-        className="w-full flex items-center justify-between gap-3 px-3 py-2.5 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors text-left"
+        className="flex w-full items-center gap-3 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-zinc-100"
       >
-        <div className="flex items-center gap-3 flex-1 min-w-0">
-          {selectedOrg.isPersonal ? (
-            <Users className="h-4 w-4 flex-shrink-0 text-blue-600" />
-          ) : (
-            <Building className="h-4 w-4 flex-shrink-0 text-green-600" />
-          )}
-          <div className="flex-1 min-w-0">
-            <div className="truncate text-sm font-medium text-gray-900">
-              {selectedOrg.name}
-              {selectedOrg.isPersonal && (
-                <span className="text-xs text-gray-400 ml-1">(Personal)</span>
-              )}
-            </div>
-            {selectedOrg.isAdmin && (
-              <div className="text-xs text-blue-600 font-medium">Admin</div>
-            )}
-          </div>
-        </div>
-        <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        <p className="truncate text-sm font-medium text-gray-900 flex-1 min-w-0">
+          {selectedOrg.name}
+        </p>
+        <ChevronDown className={`h-4 w-4 text-gray-400 flex-shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
-      {/* Dropdown Menu */}
       {isOpen && (
-        <div className="absolute top-full left-2 right-2 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-50">
+        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-50">
           <div className="py-2">
             {/* Organization List */}
             {userInfo.organizations.map((org) => (

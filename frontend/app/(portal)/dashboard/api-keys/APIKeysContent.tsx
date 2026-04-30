@@ -358,15 +358,15 @@ export default function APIKeysContent() {
                 </button>
               </div>
               <div className="mt-4 flex gap-3">
-                <button
+                <ArcadeButton
                   onClick={() => {
                     setShowNewKey(false);
                     setNewKeyResult(null);
                   }}
-                  className="px-4 py-2 bg-amber-600 text-white rounded-md hover:bg-amber-700 transition-colors text-sm font-medium"
+                  size="sm"
                 >
                   I&apos;ve saved this key
-                </button>
+                </ArcadeButton>
                 <button
                   onClick={copyNewKey}
                   className="px-4 py-2 border border-amber-300 text-amber-700 rounded-md hover:bg-amber-50 transition-colors text-sm"
@@ -405,13 +405,9 @@ export default function APIKeysContent() {
               )}
             </div>
             <div className="flex gap-3">
-              <button
-                type="submit"
-                disabled={createLoading || !isValid}
-                className="px-4 py-2 bg-sangria-500 text-white rounded-md hover:bg-sangria-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
+              <ArcadeButton type="submit" disabled={createLoading || !isValid} size="sm">
                 {createLoading ? "Creating..." : "Create Key"}
-              </button>
+              </ArcadeButton>
               <button
                 type="button"
                 onClick={resetCreateForm}
@@ -433,12 +429,9 @@ export default function APIKeysContent() {
             <p className="text-xs text-gray-400 mb-4">
               API keys are shown in full only once during creation for security.
             </p>
-            <button
-              onClick={() => setShowCreateForm(true)}
-              className="px-4 py-2 bg-sangria-500 text-white rounded-lg hover:bg-sangria-600 transition-colors"
-            >
+            <ArcadeButton onClick={() => setShowCreateForm(true)} size="sm">
               Create API Key
-            </button>
+            </ArcadeButton>
           </div>
         ) : (
           <div className="overflow-x-auto">

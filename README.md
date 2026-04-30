@@ -12,7 +12,8 @@
 
 ```bash
 make dev          # Build and start all services (backend, frontend, mythos)
-make dev-clean    # Full rebuild — removes cached volumes (node_modules, .next) and rebuilds
+make dev-clean    # Full rebuild — removes all dev compose volumes and rebuilds from scratch
+
 make down         # Stop all services
 ```
 

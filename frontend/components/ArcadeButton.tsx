@@ -49,7 +49,9 @@ export default function ArcadeButton({
     .filter(Boolean)
     .join(" ");
 
-  const face = <span className={sizeStyles[size]}>{children}</span>;
+  const hasFullWidth = className?.split(/\s+/).includes("w-full");
+  const faceClass = [sizeStyles[size], hasFullWidth && "w-full"].filter(Boolean).join(" ");
+  const face = <span className={faceClass}>{children}</span>;
 
   if ("href" in rest && rest.href != null) {
     return (

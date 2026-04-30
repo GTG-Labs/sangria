@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Building, Users, Plus, Settings, UserPlus } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import ArcadeButton from "@/components/ArcadeButton";
 import { organizationSchema, type OrganizationData } from "@/lib/validation";
 import { internalFetch } from "@/lib/fetch";
 
@@ -96,13 +97,10 @@ export default function OrganizationsPage() {
             Manage your organizations and invite team members
           </p>
         </div>
-        <button
-          onClick={() => setIsCreating(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          <Plus className="h-4 w-4" />
+        <ArcadeButton onClick={() => setIsCreating(true)} variant="blue" size="sm">
+          <Plus className="h-4 w-4 mr-1.5 inline" />
           Create Organization
-        </button>
+        </ArcadeButton>
       </div>
 
       {/* Create Organization Form */}
@@ -132,13 +130,9 @@ export default function OrganizationsPage() {
               )}
             </div>
             <div className="flex items-center gap-3">
-              <button
-                type="submit"
-                disabled={!isValid}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
+              <ArcadeButton type="submit" disabled={!isValid} variant="blue" size="sm">
                 Create
-              </button>
+              </ArcadeButton>
               <button
                 type="button"
                 onClick={() => {
@@ -214,12 +208,9 @@ export default function OrganizationsPage() {
           <p className="text-gray-600 mb-6">
             Create your first organization to get started with team collaboration.
           </p>
-          <button
-            onClick={() => setIsCreating(true)}
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
+          <ArcadeButton onClick={() => setIsCreating(true)} variant="blue" size="sm">
             Create Organization
-          </button>
+          </ArcadeButton>
         </div>
       )}
     </div>

@@ -19,6 +19,15 @@ pnpm format             # Prettier
 - `api/backend/` — proxy routes that forward to the Go backend via `proxyToBackend()` in `lib/api-proxy.ts`
 - `accept-invitation/` — public invitation acceptance page (no auth, token-based)
 
+## ArcadeButton
+
+All action/CTA buttons in the portal must use the `ArcadeButton` component (`components/ArcadeButton.tsx`). It renders a raised 3D "arcade" button with CSS-driven hover/active/disabled states defined in `globals.css` (`btn-raised`, `btn-raised-secondary`, `btn-raised-blue`).
+
+- **Variants**: `primary` (sangria red — default), `secondary` (neutral/light), `blue`
+- **Sizes**: `sm`, `md` (default)
+- **Usage**: Renders as `<Link>` when `href` is passed, `<button>` otherwise. Supports all standard button/link props (`disabled`, `type`, `onClick`, etc.).
+- Cancel/dismiss buttons and small icon-only actions (approve, reject, revoke, delete) are exempt — they stay as plain text/icon buttons for visual hierarchy.
+
 ## Conventions
 
 - Backend returns camelCase JSON (`isPersonal`, `isAdmin`). Frontend interfaces must match.
