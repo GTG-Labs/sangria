@@ -88,6 +88,16 @@ Use these terms consistently:
 
 Schema changes follow a specific workflow — see `dbSchema/CLAUDE.md` § Schema-First Workflow.
 
+## SDK Deployment
+
+SDK version updates use `deployment/SDK_VERSIONS.md` as the single source of truth. See `deployment/DEPLOYMENT.md` for the complete workflow. To update SDK versions before pushing:
+
+1. Edit version numbers in `deployment/SDK_VERSIONS.md`
+2. Make SDK code changes in `sdk/sdk-typescript/` or `sdk/python/`
+3. Push to main — CI auto-deploys changed SDKs
+
+CI auto-bumps patch versions if SDK code changes without version updates.
+
 ## Next.js App Conventions
 
 Applies to both `frontend/` (merchant portal) and `mythos/` (admin dashboard) — both are Next.js 16 apps with server-side proxy routes forwarding to the Go backend. These rules exist because the patterns are easy to get wrong in subtle ways.
