@@ -23,7 +23,8 @@ export const dynamic = "force-dynamic";
 // All required env vars are validated at build time via `mythos/lib/env.ts`.
 // Strip any trailing slash so callers can append paths without doubling up.
 const BACKEND_URL = env.BACKEND_URL.replace(/\/+$/, "");
-const DEMO_PRICE_MICROUNITS = 10_000;
+const DEMO_PRICE_MICROUNITS = BigInt(10_000);
+const DEMO_PRICE_MICROUNITS_WIRE = Number(DEMO_PRICE_MICROUNITS);
 const MICROUNITS_PER_USDC = BigInt(1_000_000);
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX_REQUESTS = 5;
@@ -334,7 +335,7 @@ export async function POST(request: Request) {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            amount: DEMO_PRICE_MICROUNITS,
+            amount: DEMO_PRICE_MICROUNITS_WIRE,
             description: "Access premium newspaper content",
             resource: demoResource,
           }),
@@ -356,7 +357,7 @@ export async function POST(request: Request) {
         const accepts = paymentRequired.accepts[0];
         if (!accepts) throw new Error("payment requirements missing accepts[]");
         const amountMicro = BigInt(accepts.amount);
-        if (amountMicro !== BigInt(DEMO_PRICE_MICROUNITS)) {
+        if (amountMicro !== DEMO_PRICE_MICROUNITS) {
           throw new Error(
             "Negotiated amount does not match configured demo price"
           );
