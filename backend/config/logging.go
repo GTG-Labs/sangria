@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"log/slog"
 	"os"
 	"strings"
@@ -21,26 +22,34 @@ type LoggingConfig struct {
 	AppEnv string // "development" | "staging" | "production" (lowercased)
 }
 
-// LoadLoggingConfig reads LOG_LEVEL, LOG_FORMAT, APP_ENV (falling back to
-// NODE_ENV). Installs the result as slog's default logger. Safe defaults for
-// missing values: info level, text format, empty AppEnv (treated as prod by
-// IsProduction so "unset" doesn't silently relax security).
+// LoadLoggingConfig installs slog's default handler. Empty LOG_LEVEL/LOG_FORMAT
+// take safe defaults (info/text); typos return an error so misconfigs like
+// LOG_LEVEL=warning don't fall through silently. APP_ENV (NODE_ENV fallback) is unvalidated.
 func LoadLoggingConfig() error {
-	switch strings.ToLower(strings.TrimSpace(os.Getenv("LOG_LEVEL"))) {
+	rawLevel := strings.ToLower(strings.TrimSpace(os.Getenv("LOG_LEVEL")))
+	switch rawLevel {
+	case "":
+		Logging.Level = slog.LevelInfo
 	case "debug":
 		Logging.Level = slog.LevelDebug
+	case "info":
+		Logging.Level = slog.LevelInfo
 	case "warn":
 		Logging.Level = slog.LevelWarn
 	case "error":
 		Logging.Level = slog.LevelError
 	default:
-		Logging.Level = slog.LevelInfo
+		return fmt.Errorf("invalid LOG_LEVEL %q: must be one of debug | info | warn | error", rawLevel)
 	}
 
-	if strings.EqualFold(strings.TrimSpace(os.Getenv("LOG_FORMAT")), "json") {
-		Logging.Format = "json"
-	} else {
+	rawFormat := strings.ToLower(strings.TrimSpace(os.Getenv("LOG_FORMAT")))
+	switch rawFormat {
+	case "", "text":
 		Logging.Format = "text"
+	case "json":
+		Logging.Format = "json"
+	default:
+		return fmt.Errorf("invalid LOG_FORMAT %q: must be one of text | json", rawFormat)
 	}
 
 	appEnv := strings.ToLower(strings.TrimSpace(os.Getenv("APP_ENV")))

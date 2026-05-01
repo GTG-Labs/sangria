@@ -22,6 +22,21 @@ import (
 	dbengine "sangria/backend/dbEngine"
 )
 
+// Package-level Resend client + sender. Initialized once via InitEmailClient
+// after config.LoadEmailConfig validates credentials at startup. Reused across
+// every invitation send rather than re-allocating on each call.
+var (
+	resendClient    *resend.Client
+	resendFromEmail string
+)
+
+// InitEmailClient builds the package-level Resend client from validated
+// config. Must be called after config.LoadEmailConfig.
+func InitEmailClient() {
+	resendClient = resend.NewClient(config.Email.ResendAPIKey)
+	resendFromEmail = config.Email.ResendFromEmail
+}
+
 // maskEmail masks an email address for logging purposes, preserving first char and domain
 func maskEmail(email string) string {
 	parts := strings.Split(email, "@")
@@ -76,9 +91,10 @@ func generateSecureToken() (string, error) {
 
 // sendInvitationEmail sends a beautiful invitation email via Resend
 func sendInvitationEmail(ctx context.Context, inviteeEmail, inviterName, orgName, invitationURL, customMessage string) error {
-	// Resend credentials + sender are validated at startup via config.LoadEmailConfig.
-	client := resend.NewClient(config.Email.ResendAPIKey)
-	fromEmail := config.Email.ResendFromEmail
+	// Resend client + sender are package-level singletons set up by
+	// InitEmailClient at startup; see config.LoadEmailConfig for validation.
+	client := resendClient
+	fromEmail := resendFromEmail
 
 	// Create email subject
 	subject := fmt.Sprintf("You're invited to join %s", orgName)

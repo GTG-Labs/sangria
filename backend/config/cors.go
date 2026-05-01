@@ -9,18 +9,12 @@ import (
 // CORS holds the parsed CORS allowlist.
 var CORS CORSConfig
 
-// CORSConfig holds the ALLOWED_ORIGINS allowlist. Empty list means
-// no origins are permitted (and CORS middleware will 403 every
-// cross-origin request). A missing env var logs a loud warning at
-// startup rather than silently falling back to localhost — the
-// previous behavior hid misconfigured prod deploys.
+// CORSConfig holds the ALLOWED_ORIGINS allowlist. Empty list means no origins are permitted 
 type CORSConfig struct {
 	AllowedOrigins []string
 }
 
-// LoadCORSConfig reads ALLOWED_ORIGINS (comma-separated). Unset is
-// permitted but logged loudly, since same-origin traffic can still
-// serve; cross-origin will be rejected.
+// LoadCORSConfig reads ALLOWED_ORIGINS (comma-separated). Unset is permitted but logged loudly
 func LoadCORSConfig() error {
 	raw := strings.TrimSpace(os.Getenv("ALLOWED_ORIGINS"))
 	if raw == "" {
@@ -35,6 +29,9 @@ func LoadCORSConfig() error {
 		if trimmed := strings.TrimSpace(origin); trimmed != "" {
 			cleaned = append(cleaned, trimmed)
 		}
+	}
+	if len(cleaned) == 0 {
+		slog.Warn("ALLOWED_ORIGINS is set but contains no valid origins after trimming — cross-origin requests will be rejected. Check for stray commas/whitespace in the env var.", "raw", raw)
 	}
 	CORS.AllowedOrigins = cleaned
 	return nil

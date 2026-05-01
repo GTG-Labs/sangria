@@ -9,6 +9,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"sangria/backend/adminHandlers"
 	"sangria/backend/auth"
 	"sangria/backend/config"
 	dbengine "sangria/backend/dbEngine"
@@ -30,8 +31,9 @@ func main() {
 		"format", config.Logging.Format,
 		"app_env", config.Logging.AppEnv)
 
-	// Wire the auth package's dev-env check against the canonical config.
-	auth.IsDevelopmentEnv = config.Logging.IsDevelopment
+	// Wire the auth package's dev-env flag from the canonical config. Set once
+	// here; config.Logging isn't mutated after this point.
+	auth.IsDevelopmentEnv = config.Logging.IsDevelopment()
 
 	if err := config.LoadWorkOSConfig(); err != nil {
 		slog.Error("failed to load WorkOS config", "error", err)
@@ -51,6 +53,7 @@ func main() {
 		slog.Error("failed to load email config", "error", err)
 		os.Exit(1)
 	}
+	adminHandlers.InitEmailClient()
 	slog.Info("email config loaded",
 		"from_email", config.Email.ResendFromEmail,
 		"frontend_url", config.Email.FrontendURL)

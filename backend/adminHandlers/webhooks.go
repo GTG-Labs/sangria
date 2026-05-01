@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net"
 	"strings"
+	"sync"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -13,6 +14,21 @@ import (
 	"sangria/backend/config"
 	dbengine "sangria/backend/dbEngine"
 )
+
+// Package-level WorkOS webhook signature client. Lazy-init on first request
+// via sync.Once so the secret is read after config.LoadWorkOSConfig has run.
+// Reused across every webhook hit rather than re-allocating per request.
+var (
+	webhookClient     *webhooks.Client
+	webhookClientOnce sync.Once
+)
+
+func getWebhookClient() *webhooks.Client {
+	webhookClientOnce.Do(func() {
+		webhookClient = webhooks.NewClient(config.WorkOS.WebhookSecret)
+	})
+	return webhookClient
+}
 
 // isWorkOSIPAllowed checks the caller IP against the pre-parsed allowlist
 // built at startup by config.LoadRateLimitConfig. Empty allowlist = fail-closed:
@@ -78,9 +94,9 @@ func HandleWorkOSWebhook(pool *pgxpool.Pool) fiber.Handler {
 			return c.Status(400).JSON(fiber.Map{"error": "missing signature header"})
 		}
 
-		// Webhook secret is validated at startup via config.LoadWorkOSConfig.
-		webhookClient := webhooks.NewClient(config.WorkOS.WebhookSecret)
-		validatedPayload, err := webhookClient.ValidatePayload(signature, string(rawBody))
+		// Webhook secret is validated at startup via config.LoadWorkOSConfig;
+		// signing client is built lazily once via sync.Once.
+		validatedPayload, err := getWebhookClient().ValidatePayload(signature, string(rawBody))
 		if err != nil {
 			slog.Error("invalid webhook signature", "error", err)
 			return c.Status(400).JSON(fiber.Map{"error": "invalid webhook signature"})

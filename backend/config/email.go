@@ -36,5 +36,8 @@ func LoadEmailConfig() error {
 	if Email.FrontendURL == "" {
 		return fmt.Errorf("FRONTEND_URL environment variable is required")
 	}
+	// Strip a single trailing slash so callers can append paths (e.g.
+	// "/accept-invitation?token=...") without producing "//".
+	Email.FrontendURL = strings.TrimSuffix(Email.FrontendURL, "/")
 	return nil
 }

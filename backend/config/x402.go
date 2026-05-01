@@ -2,8 +2,7 @@ package config
 
 import (
 	"fmt"
-	"os"
-	"strings"
+	"net/url"
 )
 
 // X402 holds x402-protocol-related configuration.
@@ -16,11 +15,25 @@ type X402Config struct {
 	FacilitatorURL string
 }
 
-// LoadX402Config reads and validates X402_FACILITATOR_URL.
+// LoadX402Config reads X402_FACILITATOR_URL and validates it's a well-formed
+// http(s) URL. Parsing here means a typo like "htps://..." fails startup
+// rather than every facilitator call, where the error would be a confusing
+// "no such host" or "missing scheme" mid-request.
 func LoadX402Config() error {
-	X402.FacilitatorURL = strings.TrimSpace(os.Getenv("X402_FACILITATOR_URL"))
-	if X402.FacilitatorURL == "" {
-		return fmt.Errorf("X402_FACILITATOR_URL environment variable is required")
+	raw, err := requireEnv("X402_FACILITATOR_URL")
+	if err != nil {
+		return err
 	}
+	parsed, err := url.Parse(raw)
+	if err != nil {
+		return fmt.Errorf("invalid X402_FACILITATOR_URL %q: %w", raw, err)
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return fmt.Errorf("invalid X402_FACILITATOR_URL %q: scheme must be http or https, got %q", raw, parsed.Scheme)
+	}
+	if parsed.Host == "" {
+		return fmt.Errorf("invalid X402_FACILITATOR_URL %q: missing host", raw)
+	}
+	X402.FacilitatorURL = raw
 	return nil
 }
