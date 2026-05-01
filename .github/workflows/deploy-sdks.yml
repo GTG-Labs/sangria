@@ -59,16 +59,32 @@ jobs:
             echo "${parts[0]}.${parts[1]}.${parts[2]}"
           }
 
-          # Read current versions
+          # Read current versions using section-aware awk parser
           if [ "${{ needs.detect-changes.outputs.typescript-changed }}" == "true" ]; then
-            TS_VERSION=$(grep -A 2 "## TypeScript SDK" deployment/SDK_VERSIONS.md | grep "VERSION:" | sed 's/VERSION: //')
+            TS_VERSION=$(awk '
+              /^## TypeScript SDK/ { in_section=1; next }
+              /^##/ && in_section { exit }
+              in_section && /^VERSION:/ {
+                gsub(/^VERSION:[ \t]*/, "");
+                print;
+                exit
+              }
+            ' deployment/SDK_VERSIONS.md)
             NEW_TS_VERSION=$(bump_patch $TS_VERSION)
             echo "📦 TypeScript SDK: $TS_VERSION → $NEW_TS_VERSION"
             sed -i "s/VERSION: $TS_VERSION/VERSION: $NEW_TS_VERSION/" deployment/SDK_VERSIONS.md
           fi
 
           if [ "${{ needs.detect-changes.outputs.python-changed }}" == "true" ]; then
-            PY_VERSION=$(grep -A 2 "## Python SDK" deployment/SDK_VERSIONS.md | grep "VERSION:" | sed 's/VERSION: //')
+            PY_VERSION=$(awk '
+              /^## Python SDK/ { in_section=1; next }
+              /^##/ && in_section { exit }
+              in_section && /^VERSION:/ {
+                gsub(/^VERSION:[ \t]*/, "");
+                print;
+                exit
+              }
+            ' deployment/SDK_VERSIONS.md)
             NEW_PY_VERSION=$(bump_patch $PY_VERSION)
             echo "📦 Python SDK: $PY_VERSION → $NEW_PY_VERSION"
             sed -i "s/VERSION: $PY_VERSION/VERSION: $NEW_PY_VERSION/" deployment/SDK_VERSIONS.md
