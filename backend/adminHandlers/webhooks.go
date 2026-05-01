@@ -43,7 +43,11 @@ func isWorkOSIPAllowed(ip string) bool {
 
 // WorkOS webhook event types
 const (
-	EventTypeInvitationAccepted = "invitation.accepted"
+	EventTypeInvitationAccepted      = "invitation.accepted"
+	EventTypeAuthPasswordSucceeded   = "authentication.password_succeeded"
+	EventTypeAuthOAuthSucceeded      = "authentication.oauth_succeeded"
+	EventTypeAuthPasswordFailed      = "authentication.password_failed"
+	EventTypeSessionCreated          = "session.created"
 )
 
 // WorkOS webhook event structure
@@ -107,6 +111,12 @@ func HandleWorkOSWebhook(pool *pgxpool.Pool) fiber.Handler {
 		switch event.Event {
 		case EventTypeInvitationAccepted:
 			return handleInvitationAccepted(c, pool, event)
+		case EventTypeAuthPasswordSucceeded, EventTypeAuthOAuthSucceeded:
+			return handleAuthenticationSucceeded(c, pool, event)
+		case EventTypeAuthPasswordFailed:
+			return handleAuthenticationFailed(c, pool, event)
+		case EventTypeSessionCreated:
+			return handleSessionCreated(c, pool, event)
 		default:
 			slog.Info("unhandled webhook event type", "event_type", event.Event)
 			return c.Status(200).JSON(fiber.Map{"message": "event type not handled"})
@@ -204,6 +214,128 @@ func handleInvitationAccepted(c fiber.Ctx, pool *pgxpool.Pool, event WorkOSWebho
 
 	return c.Status(200).JSON(fiber.Map{
 		"message": "invitation acceptance processed successfully",
+		"event_id": event.ID,
+	})
+}
+
+// handleAuthenticationSucceeded processes authentication.password_succeeded and authentication.oauth_succeeded events
+func handleAuthenticationSucceeded(c fiber.Ctx, pool *pgxpool.Pool, event WorkOSWebhookEvent) error {
+	// Extract user data from the event payload
+	userData, ok := event.Data["user_id"].(string)
+	if !ok {
+		slog.Error("authentication webhook: missing or invalid user_id", "event_id", event.ID)
+		return c.Status(400).JSON(fiber.Map{"error": "missing user_id in webhook payload"})
+	}
+
+	userEmail, ok := event.Data["email"].(string)
+	if !ok {
+		slog.Error("authentication webhook: missing or invalid email", "event_id", event.ID)
+		return c.Status(400).JSON(fiber.Map{"error": "missing email in webhook payload"})
+	}
+
+	// Normalize email
+	userEmail = strings.TrimSpace(strings.ToLower(userEmail))
+
+	slog.Info("processing authentication success",
+		"event_id", event.ID,
+		"workos_user_id", userData,
+		"email", maskEmail(userEmail),
+		"event_type", event.Event,
+	)
+
+	// Start transaction for atomic user creation and organization linking
+	tx, err := pool.Begin(c.Context())
+	if err != nil {
+		slog.Error("failed to begin transaction", "error", err)
+		return c.Status(500).JSON(fiber.Map{"error": "failed to begin transaction"})
+	}
+	defer func() {
+		if err := tx.Rollback(c.Context()); err != nil && !strings.Contains(err.Error(), "already been committed") {
+			slog.Error("failed to rollback transaction", "error", err)
+		}
+	}()
+
+	// Create or update user record using existing function
+	user, err := dbengine.UpsertUserTx(c.Context(), tx, userEmail, userData)
+	if err != nil {
+		slog.Error("failed to create or update user",
+			"workos_user_id", userData,
+			"email", maskEmail(userEmail),
+			"error", err,
+		)
+		return c.Status(500).JSON(fiber.Map{"error": "failed to create or update user"})
+	}
+
+	// Commit the transaction first
+	if err := tx.Commit(c.Context()); err != nil {
+		slog.Error("failed to commit transaction", "error", err)
+		return c.Status(500).JSON(fiber.Map{"error": "failed to commit transaction"})
+	}
+
+	// Process any accepted invitations for this user (uses pool, not tx)
+	err = dbengine.ProcessAcceptedInvitations(c.Context(), pool, user.WorkosID, userEmail)
+	organizationsLinked := 0
+	if err != nil {
+		slog.Warn("failed to process accepted invitations",
+			"workos_user_id", userData,
+			"email", maskEmail(userEmail),
+			"error", err,
+		)
+		// Don't fail the webhook - user was created successfully
+	} else {
+		// The ProcessAcceptedInvitations function doesn't return count, so we log success
+		slog.Info("processed accepted invitations for user",
+			"workos_user_id", userData,
+			"email", maskEmail(userEmail),
+		)
+	}
+
+	slog.Info("successfully processed authentication success",
+		"workos_user_id", userData,
+		"email", maskEmail(userEmail),
+		"organizations_linked", organizationsLinked,
+		"event_id", event.ID,
+	)
+
+	return c.Status(200).JSON(fiber.Map{
+		"message":              "authentication success processed",
+		"workos_user_id":       userData,
+		"organizations_linked": organizationsLinked,
+		"event_id":             event.ID,
+	})
+}
+
+// handleAuthenticationFailed processes authentication.password_failed events (for logging)
+func handleAuthenticationFailed(c fiber.Ctx, pool *pgxpool.Pool, event WorkOSWebhookEvent) error {
+	userEmail, _ := event.Data["email"].(string)
+	if userEmail != "" {
+		userEmail = strings.TrimSpace(strings.ToLower(userEmail))
+	}
+
+	slog.Info("authentication failed",
+		"event_id", event.ID,
+		"email", maskEmail(userEmail),
+		"event_type", event.Event,
+	)
+
+	return c.Status(200).JSON(fiber.Map{
+		"message":  "authentication failure logged",
+		"event_id": event.ID,
+	})
+}
+
+// handleSessionCreated processes session.created events (for logging/analytics)
+func handleSessionCreated(c fiber.Ctx, pool *pgxpool.Pool, event WorkOSWebhookEvent) error {
+	userID, _ := event.Data["user_id"].(string)
+
+	slog.Info("session created",
+		"event_id", event.ID,
+		"workos_user_id", userID,
+		"event_type", event.Event,
+	)
+
+	return c.Status(200).JSON(fiber.Map{
+		"message":  "session creation logged",
 		"event_id": event.ID,
 	})
 }
