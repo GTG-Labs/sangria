@@ -23,7 +23,7 @@ export const dynamic = "force-dynamic";
 // All required env vars are validated at build time via `mythos/lib/env.ts`.
 // Strip any trailing slash so callers can append paths without doubling up.
 const BACKEND_URL = env.BACKEND_URL.replace(/\/+$/, "");
-const DEMO_PRICE_MICROUNITS = 100;
+const DEMO_PRICE_MICROUNITS = 10_000;
 const MICROUNITS_PER_USDC = BigInt(1_000_000);
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX_REQUESTS = 5;
@@ -31,6 +31,7 @@ const IDEMPOTENCY_TTL_MS = 5 * 60_000;
 const MIN_IDEMPOTENCY_KEY_LENGTH = 8;
 const MAX_IDEMPOTENCY_KEY_LENGTH = 128;
 const SWEEP_EVERY_N_REQUESTS = 50;
+const SIGN_TIMEOUT_MS = 30_000;
 
 const paymentRateLimitStore = new Map<
   string,
@@ -190,6 +191,29 @@ function resolveMythosBaseURL(request: Request): string {
     return new URL(request.url).origin.replace(/\/+$/, "");
   } catch {
     return "http://localhost:3001";
+  }
+}
+
+async function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  timeoutMessage: string
+): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timeoutId = setTimeout(
+          () => reject(new Error(timeoutMessage)),
+          timeoutMs
+        );
+      }),
+    ]);
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
   }
 }
 
@@ -369,9 +393,28 @@ export async function POST(request: Request) {
           new ExactEvmScheme(signer)
         );
         const httpClient = new x402HTTPClient(client);
-        const paymentPayload = await httpClient.createPaymentPayload(
-          paymentRequired
-        );
+        if (request.signal.aborted) {
+          throw new Error("Request aborted before signing");
+        }
+        let paymentPayload: Awaited<
+          ReturnType<typeof httpClient.createPaymentPayload>
+        >;
+        try {
+          paymentPayload = await withTimeout(
+            httpClient.createPaymentPayload(paymentRequired),
+            SIGN_TIMEOUT_MS,
+            `Signing timed out after ${SIGN_TIMEOUT_MS / 1000}s`
+          );
+        } catch (err) {
+          console.error("x402-pay sign failed", {
+            error: err,
+            signer: signer.address,
+            network: accepts.network,
+            payTo: accepts.payTo,
+            amount: accepts.amount,
+          });
+          throw err;
+        }
         const signatureHeaders =
           httpClient.encodePaymentSignatureHeader(paymentPayload);
         const paymentSignature = signatureHeaders["PAYMENT-SIGNATURE"];

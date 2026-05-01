@@ -144,14 +144,14 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "fastapi" },
-    { name = "sangria-merchant-sdk" },
+    { name = "sangria-core" },
     { name = "uvicorn" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "fastapi", specifier = ">=0.135.1" },
-    { name = "sangria-merchant-sdk", editable = "../../sdk/python" },
+    { name = "sangria-core", editable = "../../sdk/python" },
     { name = "uvicorn", specifier = ">=0.41.0" },
 ]
 
@@ -289,8 +289,8 @@ wheels = [
 ]
 
 [[package]]
-name = "sangria-merchant-sdk"
-version = "0.1.0"
+name = "sangria-core"
+version = "0.1.1"
 source = { editable = "../../sdk/python" }
 dependencies = [
     { name = "httpx" },
