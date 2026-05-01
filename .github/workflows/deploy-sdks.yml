@@ -70,9 +70,16 @@ jobs:
                 exit
               }
             ' deployment/SDK_VERSIONS.md)
+
+            # Validate TS_VERSION is a valid semantic version
+            if [[ ! "$TS_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "❌ Error: Invalid or missing TS_VERSION '$TS_VERSION' - expected semantic version format (major.minor.patch)"
+              exit 1
+            fi
+
             NEW_TS_VERSION=$(bump_patch $TS_VERSION)
             echo "📦 TypeScript SDK: $TS_VERSION → $NEW_TS_VERSION"
-            sed -i "s/VERSION: $TS_VERSION/VERSION: $NEW_TS_VERSION/" deployment/SDK_VERSIONS.md
+            sed -i "/^## TypeScript SDK/,/^## /s/VERSION: $TS_VERSION/VERSION: $NEW_TS_VERSION/" deployment/SDK_VERSIONS.md
           fi
 
           if [ "${{ needs.detect-changes.outputs.python-changed }}" == "true" ]; then
@@ -85,9 +92,16 @@ jobs:
                 exit
               }
             ' deployment/SDK_VERSIONS.md)
+
+            # Validate PY_VERSION is a valid semantic version
+            if [[ ! "$PY_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "❌ Error: Invalid or missing PY_VERSION '$PY_VERSION' - expected semantic version format (major.minor.patch)"
+              exit 1
+            fi
+
             NEW_PY_VERSION=$(bump_patch $PY_VERSION)
             echo "📦 Python SDK: $PY_VERSION → $NEW_PY_VERSION"
-            sed -i "s/VERSION: $PY_VERSION/VERSION: $NEW_PY_VERSION/" deployment/SDK_VERSIONS.md
+            sed -i "/^## Python SDK/,$ s/VERSION: $PY_VERSION/VERSION: $NEW_PY_VERSION/" deployment/SDK_VERSIONS.md
           fi
 
       - name: Commit auto-bumped versions
