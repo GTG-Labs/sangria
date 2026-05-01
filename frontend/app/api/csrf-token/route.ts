@@ -1,17 +1,11 @@
-import { NextRequest } from 'next/server';
 import { env } from '@/lib/env';
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    // Forward cookies from frontend to backend
-    const cookieHeader = request.headers.get('cookie') || '';
-
-    // Proxy CSRF token request to Go backend
     const response = await fetch(`${env.BACKEND_URL}/csrf-token`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        'Cookie': cookieHeader, // Forward existing cookies
       },
     });
 
