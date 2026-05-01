@@ -1,11 +1,5 @@
 package config
 
-import (
-	"fmt"
-	"os"
-	"strings"
-)
-
 // CDP holds Coinbase Developer Platform credentials.
 var CDP CDPConfig
 
@@ -23,17 +17,15 @@ type CDPConfig struct {
 // CDP_WALLET_SECRET. All three are required because every current CDP
 // caller (wallet creation, facilitator JWT signing) needs them.
 func LoadCDPConfig() error {
-	CDP.APIKey = strings.TrimSpace(os.Getenv("CDP_API_KEY"))
-	if CDP.APIKey == "" {
-		return fmt.Errorf("CDP_API_KEY environment variable is required")
+	var err error
+	if CDP.APIKey, err = requireEnv("CDP_API_KEY"); err != nil {
+		return err
 	}
-	CDP.APISecret = strings.TrimSpace(os.Getenv("CDP_API_SECRET"))
-	if CDP.APISecret == "" {
-		return fmt.Errorf("CDP_API_SECRET environment variable is required")
+	if CDP.APISecret, err = requireEnv("CDP_API_SECRET"); err != nil {
+		return err
 	}
-	CDP.WalletSecret = strings.TrimSpace(os.Getenv("CDP_WALLET_SECRET"))
-	if CDP.WalletSecret == "" {
-		return fmt.Errorf("CDP_WALLET_SECRET environment variable is required")
+	if CDP.WalletSecret, err = requireEnv("CDP_WALLET_SECRET"); err != nil {
+		return err
 	}
 	return nil
 }

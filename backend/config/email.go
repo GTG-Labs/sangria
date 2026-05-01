@@ -1,8 +1,6 @@
 package config
 
 import (
-	"fmt"
-	"os"
 	"strings"
 )
 
@@ -24,17 +22,15 @@ type EmailConfig struct {
 // LoadEmailConfig reads and validates RESEND_API_KEY, RESEND_FROM_EMAIL,
 // and FRONTEND_URL. All three are required.
 func LoadEmailConfig() error {
-	Email.ResendAPIKey = strings.TrimSpace(os.Getenv("RESEND_API_KEY"))
-	if Email.ResendAPIKey == "" {
-		return fmt.Errorf("RESEND_API_KEY environment variable is required")
+	var err error
+	if Email.ResendAPIKey, err = requireEnv("RESEND_API_KEY"); err != nil {
+		return err
 	}
-	Email.ResendFromEmail = strings.TrimSpace(os.Getenv("RESEND_FROM_EMAIL"))
-	if Email.ResendFromEmail == "" {
-		return fmt.Errorf("RESEND_FROM_EMAIL environment variable is required")
+	if Email.ResendFromEmail, err = requireEnv("RESEND_FROM_EMAIL"); err != nil {
+		return err
 	}
-	Email.FrontendURL = strings.TrimSpace(os.Getenv("FRONTEND_URL"))
-	if Email.FrontendURL == "" {
-		return fmt.Errorf("FRONTEND_URL environment variable is required")
+	if Email.FrontendURL, err = requireEnv("FRONTEND_URL"); err != nil {
+		return err
 	}
 	// Strip a single trailing slash so callers can append paths (e.g.
 	// "/accept-invitation?token=...") without producing "//".
