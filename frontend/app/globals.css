@@ -269,3 +269,16 @@ h6 {
   outline: 2px solid #2563eb;
   outline-offset: 2px;
 }
+
+.btn-raised:disabled,
+.btn-raised-secondary:disabled,
+.btn-raised-blue:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-raised:disabled > span,
+.btn-raised-secondary:disabled > span,
+.btn-raised-blue:disabled > span {
+  transform: translateY(-2px);
+}

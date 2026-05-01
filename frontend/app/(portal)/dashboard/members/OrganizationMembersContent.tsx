@@ -7,6 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useOrganization } from "@/contexts/OrganizationContext";
 import { inviteSchema, type InviteData } from "@/lib/validation";
 import { useSecureSubmit } from "@/lib/security-hooks";
+import ArcadeButton from "@/components/ArcadeButton";
 import { internalFetch } from "@/lib/fetch";
 
 interface Member {
@@ -200,13 +201,10 @@ export default function OrganizationMembersContent() {
           </p>
         </div>
         {selectedOrg?.isAdmin && (
-          <button
-            onClick={() => setIsInviting(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            <UserPlus className="h-4 w-4" />
+          <ArcadeButton onClick={() => setIsInviting(true)} variant="blue" size="sm">
+            <UserPlus className="h-4 w-4 mr-1.5 inline" />
             Add Member
-          </button>
+          </ArcadeButton>
         )}
       </div>
 
@@ -294,16 +292,17 @@ export default function OrganizationMembersContent() {
             )}
 
             <div className="flex items-center gap-3">
-              <button
+              <ArcadeButton
                 type="submit"
                 disabled={!isValid || secureSubmit.isSubmitting || secureSubmit.isBlocked}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                variant="blue"
+                size="sm"
               >
                 {secureSubmit.isSubmitting && (
-                  <div className="w-4 h-4 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
+                  <span className="w-4 h-4 animate-spin rounded-full border-2 border-white border-t-transparent inline-block mr-2" />
                 )}
                 {secureSubmit.isSubmitting ? "Sending..." : "Send Invitation"}
-              </button>
+              </ArcadeButton>
               <button
                 type="button"
                 onClick={() => {
@@ -336,12 +335,9 @@ export default function OrganizationMembersContent() {
               Invite team members to collaborate on this organization.
             </p>
             {selectedOrg?.isAdmin && (
-              <button
-                onClick={() => setIsInviting(true)}
-                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
+              <ArcadeButton onClick={() => setIsInviting(true)} variant="blue" size="sm">
                 Add First Member
-              </button>
+              </ArcadeButton>
             )}
           </div>
         ) : (

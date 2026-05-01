@@ -2,13 +2,13 @@
 
 import { handleSignOut } from "@/lib/auth-actions";
 import { useState } from "react";
+import ArcadeButton from "@/components/ArcadeButton";
 
 interface SignOutButtonProps {
-  className?: string;
   children?: React.ReactNode;
 }
 
-export function SignOutButton({ className, children }: SignOutButtonProps) {
+export function SignOutButton({ children }: SignOutButtonProps) {
   const [isSigningOut, setIsSigningOut] = useState(false);
 
   const handleSubmit = async () => {
@@ -17,10 +17,10 @@ export function SignOutButton({ className, children }: SignOutButtonProps) {
   };
 
   return (
-    <form action={handleSubmit}>
-      <button type="submit" disabled={isSigningOut} className={className}>
+    <form action={handleSubmit} className="w-full">
+      <ArcadeButton type="submit" disabled={isSigningOut} variant="secondary" size="sm" className="w-full">
         {isSigningOut ? "Signing out..." : children || "Sign Out"}
-      </button>
+      </ArcadeButton>
     </form>
   );
 }

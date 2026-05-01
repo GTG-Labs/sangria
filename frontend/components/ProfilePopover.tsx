@@ -111,9 +111,9 @@ export default function ProfilePopover({
               <p className="truncate text-xs text-gray-500">{email}</p>
             </div>
           </div>
-          <div className="border-t border-zinc-200 pt-2">
-            <SignOutButton className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-gray-600 transition-colors hover:bg-zinc-100 hover:text-gray-900">
-              <LogOut className="h-4 w-4" />
+          <div className="pt-2">
+            <SignOutButton>
+              <LogOut className="h-4 w-4 mr-1.5 inline" />
               Sign Out
             </SignOutButton>
           </div>

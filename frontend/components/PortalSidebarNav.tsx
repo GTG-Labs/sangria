@@ -4,7 +4,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { KeyRound, LayoutDashboard, ExternalLink, Users, Wallet } from "lucide-react";
-import OrganizationDropdown from "./OrganizationDropdown";
 import { useOrganization } from "@/contexts/OrganizationContext";
 
 interface NavItem {
@@ -28,7 +27,7 @@ export default function PortalSidebarNav() {
 
     // Add Members tab for all organization members (admins get additional controls within the page)
     if (selectedOrg) {
-      baseItems.push({ href: "/dashboard/members", label: "Organization Members", icon: Users });
+      baseItems.push({ href: "/dashboard/members", label: "Team", icon: Users });
     }
 
     baseItems.push({ href: "/docs", label: "Docs", icon: ExternalLink, external: true });
@@ -37,26 +36,8 @@ export default function PortalSidebarNav() {
   };
 
   return (
-    <div className="mt-8 space-y-6">
-      {/* Organization Dropdown */}
-      <OrganizationDropdown />
-
-      {/* Navigation Items */}
+    <div className="mt-3">
       <nav className="space-y-1">
-        {selectedOrg && (
-          <div className="px-3 py-2 mb-2">
-            <div className="text-xs font-medium text-gray-500 uppercase tracking-wider">
-              {selectedOrg.name}
-            </div>
-            <div className="text-xs text-gray-400">
-              {selectedOrg.isPersonal ? "Personal" : "Organization"}
-              {selectedOrg.isAdmin && " • Admin"}
-            </div>
-          </div>
-        )}
-        <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wider px-3">
-          Navigation
-        </h3>
         {getNavItems().map((item) => {
           const Icon = item.icon;
           const isExternal = "external" in item && item.external;

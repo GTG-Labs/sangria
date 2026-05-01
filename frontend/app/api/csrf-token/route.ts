@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { env } from "@/lib/env";
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     // Forward only the CSRF cookie. Passing the full browser cookie jar can
     // exceed backend header limits (431) due to large auth/session cookies.

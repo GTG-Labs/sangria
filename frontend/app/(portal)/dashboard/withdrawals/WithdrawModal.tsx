@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { X as XIcon, AlertCircle } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import ArcadeButton from "@/components/ArcadeButton";
 import { createWithdrawalSchema, type WithdrawalData } from "@/lib/validation";
 import { internalFetch } from "@/lib/fetch";
 
@@ -146,13 +147,9 @@ export default function WithdrawModal({
           )}
 
           <div className="flex gap-3 pt-2">
-            <button
-              type="submit"
-              disabled={submitting || !isValid}
-              className="flex-1 px-4 py-2 bg-sangria-500 text-white rounded-md hover:bg-sangria-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
-            >
+            <ArcadeButton type="submit" disabled={submitting || !isValid} size="sm" className="flex-1">
               {submitting ? "Submitting..." : "Submit Withdrawal"}
-            </button>
+            </ArcadeButton>
             <button
               type="button"
               onClick={onClose}

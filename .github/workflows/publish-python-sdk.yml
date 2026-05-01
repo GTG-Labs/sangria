@@ -47,8 +47,16 @@ jobs:
         id: version
         working-directory: sdk/python
         run: |
-          # Extract version from deployment/SDK_VERSIONS.md
-          VERSION=$(grep -A 2 "## Python SDK" ../../deployment/SDK_VERSIONS.md | grep "VERSION:" | sed 's/VERSION: //')
+          # Extract Python SDK section from deployment/SDK_VERSIONS.md in a section-aware way
+          VERSION=$(awk '
+            /^## Python SDK/ { in_section=1; next }
+            /^##/ && in_section { exit }
+            in_section && /^VERSION:/ {
+              gsub(/^VERSION:[ \t]*/, "");
+              print;
+              exit
+            }
+          ' ../../deployment/SDK_VERSIONS.md)
           echo "📖 Version from SDK_VERSIONS.md: $VERSION"
 
           # Verify VERSION is non-empty
