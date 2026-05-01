@@ -198,9 +198,11 @@ function resolveMythosBaseURL(request: Request): string {
 async function withTimeout<T>(
   promise: Promise<T>,
   timeoutMs: number,
-  timeoutMessage: string
+  timeoutMessage: string,
+  signal?: AbortSignal
 ): Promise<T> {
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  let onAbort: (() => void) | undefined;
   try {
     return await Promise.race([
       promise,
@@ -210,10 +212,26 @@ async function withTimeout<T>(
           timeoutMs
         );
       }),
+      new Promise<T>((_, reject) => {
+        if (!signal) {
+          return;
+        }
+        if (signal.aborted) {
+          reject(new Error("Request aborted during timed operation"));
+          return;
+        }
+        onAbort = () => {
+          reject(new Error("Request aborted during timed operation"));
+        };
+        signal.addEventListener("abort", onAbort, { once: true });
+      }),
     ]);
   } finally {
     if (timeoutId) {
       clearTimeout(timeoutId);
+    }
+    if (signal && onAbort) {
+      signal.removeEventListener("abort", onAbort);
     }
   }
 }
@@ -404,7 +422,8 @@ export async function POST(request: Request) {
           paymentPayload = await withTimeout(
             httpClient.createPaymentPayload(paymentRequired),
             SIGN_TIMEOUT_MS,
-            `Signing timed out after ${SIGN_TIMEOUT_MS / 1000}s`
+            `Signing timed out after ${SIGN_TIMEOUT_MS / 1000}s`,
+            request.signal
           );
         } catch (err) {
           console.error("x402-pay sign failed", {
