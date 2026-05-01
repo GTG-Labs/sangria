@@ -5,7 +5,7 @@ requires-python = ">=3.10"
 dependencies = [
   "fastapi>=0.135.1",
   "uvicorn>=0.41.0",
-  "sangria-merchant-sdk",
+  "sangria-core",
 ]
 
 [build-system]
@@ -13,4 +13,4 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.uv.sources]
-sangria-merchant-sdk = { path = "../../sdk/python", editable = true }
+sangria-core = { path = "../../sdk/python", editable = true }
