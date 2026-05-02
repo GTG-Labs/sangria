@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 const NAV_ITEMS = [
   { href: "/transactions", label: "Transactions" },
   { href: "/withdrawals", label: "Withdrawals" },
+  { href: "/wallets", label: "Wallets" },
 ];
 
 export default function NavLinks() {
