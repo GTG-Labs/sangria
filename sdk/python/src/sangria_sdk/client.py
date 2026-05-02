@@ -98,10 +98,22 @@ class SangriaMerchantClient:
                 },
             )
 
+        payment_response = base64.b64encode(
+            json.dumps({
+                "success": True,
+                "transaction": result.get("transaction"),
+                "network": result.get("network"),
+                "payer": result.get("payer"),
+            }).encode()
+        ).decode()
+
         return PaymentProceeded(
             paid=True,
             amount=options.price,
             transaction=result.get("transaction"),
+            network=result.get("network"),
+            payer=result.get("payer"),
+            headers={"PAYMENT-RESPONSE": payment_response},
         )
 
     async def aclose(self) -> None:

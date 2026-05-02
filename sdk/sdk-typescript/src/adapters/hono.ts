@@ -68,6 +68,11 @@ export function fixedPrice(
       );
     }
 
+    if (result.headers) {
+      for (const [key, value] of Object.entries(result.headers)) {
+        c.header(key, value);
+      }
+    }
     c.set("sangria", result.data);
     return next();
   };

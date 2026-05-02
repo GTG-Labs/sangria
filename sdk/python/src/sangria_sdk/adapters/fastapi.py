@@ -7,6 +7,7 @@ from typing import Any
 
 from fastapi import HTTPException, Request
 from fastapi.responses import JSONResponse
+from starlette.responses import Response
 
 from ..client import SangriaMerchantClient, validate_fixed_price_options
 from ..models import FixedPriceOptions, PaymentResponse
@@ -76,7 +77,13 @@ def require_sangria_payment(
                 )
 
             request.state.sangria_payment = result
-            return await func(*args, **kwargs)
+            response = await func(*args, **kwargs)
+
+            if result.headers and isinstance(response, Response):
+                for k, v in result.headers.items():
+                    response.headers[k] = v
+
+            return response
 
         return wrapper
 

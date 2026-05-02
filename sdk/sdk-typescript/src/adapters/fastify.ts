@@ -69,6 +69,9 @@ export function fixedPrice(
       return reply.status(result.status).send(result.body);
     }
 
+    if (result.headers) {
+      reply.headers(result.headers);
+    }
     request.sangria = result.data;
   };
 }

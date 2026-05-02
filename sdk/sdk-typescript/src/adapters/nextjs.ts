@@ -87,7 +87,21 @@ export function fixedPrice(
 
     // 5. Proceed: attach payment data to request, run handler
     request.sangria = result.data;
-    return handler(request, context);
+    const handlerResponse = await handler(request, context);
+
+    if (result.headers && handlerResponse instanceof Response) {
+      const merged = new Headers(handlerResponse.headers);
+      for (const [k, v] of Object.entries(result.headers)) {
+        merged.set(k, v);
+      }
+      return new Response(handlerResponse.body, {
+        status: handlerResponse.status,
+        statusText: handlerResponse.statusText,
+        headers: merged,
+      });
+    }
+
+    return handlerResponse;
   };
 }
 

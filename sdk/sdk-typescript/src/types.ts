@@ -14,6 +14,10 @@ export interface SangriaRequestData {
   /** Amount charged in dollars. */
   amount: number;
   transaction?: string;
+  /** CAIP-2 network identifier (e.g. "eip155:8453"). */
+  network?: string;
+  /** Payer wallet address. */
+  payer?: string;
 }
 
 /** Number of microunits in 1 USD. */
@@ -60,4 +64,4 @@ export type PaymentResult =
       body: X402ChallengePayload | { error: string; error_reason?: string };
       headers?: Record<string, string>;
     }
-  | { action: "proceed"; data: SangriaRequestData };
+  | { action: "proceed"; data: SangriaRequestData; headers?: Record<string, string> };
