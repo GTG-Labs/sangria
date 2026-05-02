@@ -6,7 +6,8 @@ import { useOrganization } from "@/contexts/OrganizationContext";
 import { internalFetch } from "@/lib/fetch";
 
 export default function OrganizationDropdown() {
-  const { userInfo, selectedOrgId, selectedOrg, setSelectedOrgId, refreshUserInfo } = useOrganization();
+  const { userInfo, selectedOrgId, selectedOrg, setSelectedOrgId, refreshUserInfo } =
+    useOrganization();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -60,7 +61,7 @@ export default function OrganizationDropdown() {
         setIsOpen(false);
       } else {
         const data = await response.json().catch((error) => {
-          console.error('Failed to parse organization creation response:', error);
+          console.error("Failed to parse organization creation response:", error);
           return null;
         });
         setCreateError(data?.error || "Failed to create organization");
@@ -93,7 +94,9 @@ export default function OrganizationDropdown() {
         <p className="truncate text-sm font-medium text-gray-900 flex-1 min-w-0">
           {selectedOrg.name}
         </p>
-        <ChevronDown className={`h-4 w-4 text-gray-400 flex-shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        <ChevronDown
+          className={`h-4 w-4 text-gray-400 flex-shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`}
+        />
       </button>
 
       {isOpen && (
@@ -104,8 +107,9 @@ export default function OrganizationDropdown() {
               <button
                 key={org.id}
                 onClick={() => handleOrganizationSelect(org.id)}
-                className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors text-left hover:bg-gray-50 ${selectedOrgId === org.id ? "bg-blue-50 text-blue-900" : "text-gray-700"
-                  }`}
+                className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors text-left hover:bg-gray-50 ${
+                  selectedOrgId === org.id ? "bg-blue-50 text-blue-900" : "text-gray-700"
+                }`}
               >
                 {org.isPersonal ? (
                   <Users className="h-4 w-4 flex-shrink-0" />
@@ -119,9 +123,7 @@ export default function OrganizationDropdown() {
                       <span className="text-xs text-gray-400 ml-1">(Personal)</span>
                     )}
                   </div>
-                  {org.isAdmin && (
-                    <div className="text-xs text-blue-600 font-medium">Admin</div>
-                  )}
+                  {org.isAdmin && <div className="text-xs text-blue-600 font-medium">Admin</div>}
                 </div>
               </button>
             ))}
@@ -139,9 +141,9 @@ export default function OrganizationDropdown() {
                   placeholder="Organization name"
                   className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
+                    if (e.key === "Enter") {
                       handleCreateOrganization();
-                    } else if (e.key === 'Escape') {
+                    } else if (e.key === "Escape") {
                       setIsCreating(false);
                       setNewOrgName("");
                       setCreateError("");
@@ -149,9 +151,7 @@ export default function OrganizationDropdown() {
                   }}
                   autoFocus
                 />
-                {createError && (
-                  <p className="text-xs text-red-600 mt-1">{createError}</p>
-                )}
+                {createError && <p className="text-xs text-red-600 mt-1">{createError}</p>}
                 <div className="flex items-center gap-2 mt-2">
                   <button
                     onClick={handleCreateOrganization}

@@ -16,10 +16,7 @@ type NextRequest = {
 
 type NextResponse = any;
 
-type NextRouteHandler = (
-  request: any,
-  context?: any
-) => Promise<NextResponse> | NextResponse;
+type NextRouteHandler = (request: any, context?: any) => Promise<NextResponse> | NextResponse;
 
 export interface NextJSConfig {
   bypassPaymentIf?: (request: any) => boolean | Promise<boolean>;
@@ -36,7 +33,7 @@ export function fixedPrice(
   sangria: Sangria,
   options: FixedPriceOptions,
   handler: NextRouteHandler,
-  config?: NextJSConfig
+  config?: NextJSConfig,
 ): NextRouteHandler {
   validateFixedPriceOptions(options);
 
@@ -63,15 +60,11 @@ export function fixedPrice(
     }
 
     // 2. Extract payment context from the request
-    const paymentHeader =
-      request.headers.get("payment-signature") ?? undefined;
+    const paymentHeader = request.headers.get("payment-signature") ?? undefined;
     const resourceUrl = request.url;
 
     // 3. Call core payment logic
-    const result = await sangria.handleFixedPrice(
-      { paymentHeader, resourceUrl },
-      options
-    );
+    const result = await sangria.handleFixedPrice({ paymentHeader, resourceUrl }, options);
 
     // 4. Block: return 402 challenge or error response
     if (result.action === "respond") {
@@ -96,8 +89,6 @@ export function fixedPrice(
 //   const payment = getSangria(request);
 //   if (payment?.paid) { /* payment succeeded */ }
 //
-export function getSangria(
-  request: any
-): SangriaRequestData | undefined {
+export function getSangria(request: any): SangriaRequestData | undefined {
   return request.sangria;
 }

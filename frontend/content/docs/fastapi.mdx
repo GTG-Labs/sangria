@@ -12,21 +12,9 @@ description: Learn how to accept your first payment using FastAPI and the Sangri
 Install the Sangria SDK with the FastAPI adapter.
 
 <Tabs items={["pip", "uv", "poetry"]}>
-  <Tab value="pip">
-  ```bash
-  pip install sangria-merchant-sdk[fastapi]
-  ```
-  </Tab>
-  <Tab value="uv">
-  ```bash
-  uv add sangria-merchant-sdk[fastapi]
-  ```
-  </Tab>
-  <Tab value="poetry">
-  ```bash
-  poetry add sangria-merchant-sdk[fastapi]
-  ```
-  </Tab>
+  <Tab value="pip">```bash pip install sangria-merchant-sdk[fastapi] ```</Tab>
+  <Tab value="uv">```bash uv add sangria-merchant-sdk[fastapi] ```</Tab>
+  <Tab value="poetry">```bash poetry add sangria-merchant-sdk[fastapi] ```</Tab>
 </Tabs>
 
 ## 2. Initialize the client
@@ -112,7 +100,7 @@ async def premium(request: Request):
 
 ## Handle errors
 
-If the Sangria backend is *unreachable, times out, or returns a non-2xx status*, the SDK raises a `SangriaError`. Register a FastAPI exception handler to return a clean response instead of a raw `500`:
+If the Sangria backend is _unreachable, times out, or returns a non-2xx status_, the SDK raises a `SangriaError`. Register a FastAPI exception handler to return a clean response instead of a raw `500`:
 
 ```python
 from fastapi import Request
@@ -130,11 +118,11 @@ async def sangria_error_handler(_request: Request, exc: SangriaError):
 
 `SangriaError` has an `.operation` attribute (`"generate"` or `"settle"`) so you know which step failed. Subclasses give you more detail:
 
-| Error | When | Properties |
-|-------|------|------------|
-| `SangriaConnectionError` | Network failure (DNS, refused, reset) | — |
-| `SangriaTimeoutError` | Request timed out | — |
-| `SangriaAPIStatusError` | Backend returned 4xx/5xx | `.status_code`, `.response` |
+| Error                    | When                                  | Properties                  |
+| ------------------------ | ------------------------------------- | --------------------------- |
+| `SangriaConnectionError` | Network failure (DNS, refused, reset) | —                           |
+| `SangriaTimeoutError`    | Request timed out                     | —                           |
+| `SangriaAPIStatusError`  | Backend returned 4xx/5xx              | `.status_code`, `.response` |
 
 Business-level payment failures (bad signature, insufficient funds) are **not** errors — they return a normal `402` response to the caller.
 

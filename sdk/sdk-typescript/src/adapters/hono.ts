@@ -22,7 +22,7 @@ export interface HonoConfig {
 export function fixedPrice(
   sangria: Sangria,
   options: FixedPriceOptions,
-  config?: HonoConfig
+  config?: HonoConfig,
 ): MiddlewareHandler<SangriaEnv> {
   validateFixedPriceOptions(options);
 
@@ -53,7 +53,7 @@ export function fixedPrice(
         paymentHeader: c.req.header("payment-signature"),
         resourceUrl: url.origin + url.pathname + url.search,
       },
-      options
+      options,
     );
 
     if (result.action === "respond") {
@@ -62,10 +62,7 @@ export function fixedPrice(
           c.header(key, value);
         }
       }
-      return c.json(
-        result.body as Record<string, unknown>,
-        result.status as ContentfulStatusCode
-      );
+      return c.json(result.body as Record<string, unknown>, result.status as ContentfulStatusCode);
     }
 
     c.set("sangria", result.data);

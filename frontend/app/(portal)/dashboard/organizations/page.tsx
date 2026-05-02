@@ -61,15 +61,19 @@ export default function OrganizationsPage() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ name: data.name })
+        body: JSON.stringify({ name: data.name }),
       });
 
       if (response.ok) {
         const newOrg = await response.json();
-        setUserInfo(prev => prev ? {
-          ...prev,
-          organizations: [...prev.organizations, newOrg]
-        } : null);
+        setUserInfo((prev) =>
+          prev
+            ? {
+                ...prev,
+                organizations: [...prev.organizations, newOrg],
+              }
+            : null,
+        );
         reset();
         setIsCreating(false);
       } else {
@@ -93,9 +97,7 @@ export default function OrganizationsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Organizations</h1>
-          <p className="text-gray-600 mt-1">
-            Manage your organizations and invite team members
-          </p>
+          <p className="text-gray-600 mt-1">Manage your organizations and invite team members</p>
         </div>
         <ArcadeButton onClick={() => setIsCreating(true)} variant="blue" size="sm">
           <Plus className="h-4 w-4 mr-1.5 inline" />
@@ -106,9 +108,7 @@ export default function OrganizationsPage() {
       {/* Create Organization Form */}
       {isCreating && (
         <div className="bg-white border border-gray-200 rounded-lg p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">
-            Create New Organization
-          </h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Create New Organization</h3>
           <form onSubmit={handleSubmit(handleCreateOrganization)} className="space-y-4">
             <div>
               <label htmlFor="orgName" className="block text-sm font-medium text-gray-700 mb-2">
@@ -125,9 +125,7 @@ export default function OrganizationsPage() {
                     : "border-gray-300 focus:ring-blue-500 focus:border-blue-500"
                 }`}
               />
-              {errors.name && (
-                <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>
-              )}
+              {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>}
             </div>
             <div className="flex items-center gap-3">
               <ArcadeButton type="submit" disabled={!isValid} variant="blue" size="sm">

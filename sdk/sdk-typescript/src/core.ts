@@ -34,10 +34,7 @@ export class Sangria {
     this.baseUrl = (config.baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, "");
   }
 
-  async handleFixedPrice(
-    ctx: PaymentContext,
-    options: FixedPriceOptions
-  ): Promise<PaymentResult> {
+  async handleFixedPrice(ctx: PaymentContext, options: FixedPriceOptions): Promise<PaymentResult> {
     if (!ctx.paymentHeader) {
       return this.generatePayment(ctx, options);
     } else {
@@ -49,7 +46,7 @@ export class Sangria {
   // and send the client a 402 response with details on how to pay us
   private async generatePayment(
     ctx: PaymentContext,
-    options: FixedPriceOptions
+    options: FixedPriceOptions,
   ): Promise<PaymentResult> {
     const x402_responsePayload = (await this.postToSangriaBackend(
       "/v1/generate-payment",
@@ -58,7 +55,7 @@ export class Sangria {
         resource: ctx.resourceUrl,
         description: options.description,
       },
-      "generate"
+      "generate",
     )) as X402ChallengePayload;
 
     // you gotta encode the payload before sending it back (part of the spec)
@@ -75,12 +72,12 @@ export class Sangria {
   // there was a payment header so we try to settle the payment
   private async settlePayment(
     paymentHeader: string,
-    options: FixedPriceOptions
+    options: FixedPriceOptions,
   ): Promise<PaymentResult> {
     const result = (await this.postToSangriaBackend(
       "/v1/settle-payment",
       { payment_payload: paymentHeader },
-      "settle"
+      "settle",
     )) as {
       success: boolean;
       transaction?: string;
@@ -112,7 +109,7 @@ export class Sangria {
   private async postToSangriaBackend(
     path: string,
     body: Record<string, unknown>,
-    operation: SangriaOperation
+    operation: SangriaOperation,
   ): Promise<unknown> {
     const url = `${this.baseUrl}${path}`;
     const init: RequestInit = {
@@ -130,14 +127,14 @@ export class Sangria {
       res = await fetch(url, init);
     } catch (err) {
       if (err instanceof DOMException && err.name === "TimeoutError") {
-        throw new SangriaTimeoutError(
-          "Sangria request timed out after 8000ms",
-          { operation, cause: err }
-        );
+        throw new SangriaTimeoutError("Sangria request timed out after 8000ms", {
+          operation,
+          cause: err,
+        });
       }
       throw new SangriaConnectionError(
         err instanceof Error ? err.message : "Sangria connection failed",
-        { operation, cause: err }
+        { operation, cause: err },
       );
     }
 
@@ -153,10 +150,12 @@ export class Sangria {
     try {
       return await res.clone().json();
     } catch (err) {
-      throw new SangriaAPIStatusError(
-        "Sangria returned a malformed response body",
-        { operation, response: res, statusCode: res.status, cause: err }
-      );
+      throw new SangriaAPIStatusError("Sangria returned a malformed response body", {
+        operation,
+        response: res,
+        statusCode: res.status,
+        cause: err,
+      });
     }
   }
 }
@@ -169,7 +168,8 @@ async function parseErrorMessage(response: Response): Promise<string> {
       const errorObj = body?.["error"] as Record<string, unknown> | null | undefined;
       const nestedMsg = errorObj?.["message"];
       const topMsg = body?.["message"];
-      const stringError = typeof body?.["error"] === "string" ? (body["error"] as string) : undefined;
+      const stringError =
+        typeof body?.["error"] === "string" ? (body["error"] as string) : undefined;
       const msg =
         (typeof nestedMsg === "string" ? nestedMsg : undefined) ??
         (typeof topMsg === "string" ? topMsg : undefined) ??

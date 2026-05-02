@@ -84,7 +84,7 @@ export default function WithdrawalsContent() {
         if (data.data && data.pagination) {
           const paginatedData = data as PaginatedWithdrawalsResponse;
           setWithdrawals((prev) =>
-            cursor ? [...prev, ...paginatedData.data] : paginatedData.data
+            cursor ? [...prev, ...paginatedData.data] : paginatedData.data,
           );
           setNextCursor(paginatedData.pagination.next_cursor);
           setHasMore(paginatedData.pagination.has_more);
@@ -96,9 +96,7 @@ export default function WithdrawalsContent() {
         }
         setError(null);
       } else {
-        const errorData = await response
-          .json()
-          .catch(() => ({ error: "Unknown error" }));
+        const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
         setError(errorData.error || "Failed to load withdrawals");
         if (isInitialLoad) resetForInitialLoadFailure();
       }
@@ -250,11 +248,7 @@ export default function WithdrawalsContent() {
           )}
         </div>
         {selectedOrgId && balance !== null && balance > 0 && (
-          <ArcadeButton
-            onClick={() => setShowWithdrawModal(true)}
-            size="sm"
-            variant="blue"
-          >
+          <ArcadeButton onClick={() => setShowWithdrawModal(true)} size="sm" variant="blue">
             Withdraw
           </ArcadeButton>
         )}
@@ -282,46 +276,29 @@ export default function WithdrawalsContent() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-zinc-200">
-                <th className="pb-3 pr-6 text-left text-sm font-medium text-gray-400">
-                  Amount
-                </th>
-                <th className="pb-3 px-6 text-left text-sm font-medium text-gray-400">
-                  Fee
-                </th>
-                <th className="pb-3 px-6 text-left text-sm font-medium text-gray-400">
-                  Net
-                </th>
-                <th className="pb-3 px-6 text-left text-sm font-medium text-gray-400">
-                  Status
-                </th>
-                <th className="pb-3 px-6 text-left text-sm font-medium text-gray-400">
-                  Requested
-                </th>
-                <th className="pb-3 pl-6 text-right text-sm font-medium text-gray-400">
-                  Actions
-                </th>
+                <th className="pb-3 pr-6 text-left text-sm font-medium text-gray-400">Amount</th>
+                <th className="pb-3 px-6 text-left text-sm font-medium text-gray-400">Fee</th>
+                <th className="pb-3 px-6 text-left text-sm font-medium text-gray-400">Net</th>
+                <th className="pb-3 px-6 text-left text-sm font-medium text-gray-400">Status</th>
+                <th className="pb-3 px-6 text-left text-sm font-medium text-gray-400">Requested</th>
+                <th className="pb-3 pl-6 text-right text-sm font-medium text-gray-400">Actions</th>
               </tr>
             </thead>
             <tbody>
               {withdrawals.map((w, i) => (
                 <tr
                   key={w.id}
-                  className={`border-b border-zinc-200 hover:bg-zinc-200/50 transition-colors ${i % 2 === 0 ? "bg-zinc-100/50" : ""
-                    }`}
+                  className={`border-b border-zinc-200 hover:bg-zinc-200/50 transition-colors ${
+                    i % 2 === 0 ? "bg-zinc-100/50" : ""
+                  }`}
                 >
-                  <td className="py-4 pl-4 pr-6 text-sm text-gray-900">
-                    {formatAmount(w.amount)}
-                  </td>
-                  <td className="py-4 px-6 text-sm text-gray-500">
-                    {formatAmount(w.fee)}
-                  </td>
+                  <td className="py-4 pl-4 pr-6 text-sm text-gray-900">{formatAmount(w.amount)}</td>
+                  <td className="py-4 px-6 text-sm text-gray-500">{formatAmount(w.fee)}</td>
                   <td className="py-4 px-6 text-sm text-gray-900 font-medium">
                     {formatAmount(w.net_amount)}
                   </td>
                   <td className="py-4 px-6">{statusBadge(w.status)}</td>
-                  <td className="py-4 px-6 text-sm text-gray-900">
-                    {timeAgo(w.created_at)}
-                  </td>
+                  <td className="py-4 px-6 text-sm text-gray-900">{timeAgo(w.created_at)}</td>
                   <td className="py-4 pl-6 pr-4 text-right">
                     {w.status === "pending_approval" && (
                       <button

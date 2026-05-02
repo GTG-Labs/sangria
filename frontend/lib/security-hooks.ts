@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from "react";
 
 // Rate limiting hook for form submissions
 export function useRateLimit(maxAttempts: number = 5, windowMs: number = 60000) {
@@ -22,7 +22,7 @@ export function useRateLimit(maxAttempts: number = 5, windowMs: number = 60000) 
     const windowStart = now - windowMs;
 
     // Remove old attempts outside the window
-    attemptsRef.current = attemptsRef.current.filter(attempt => attempt > windowStart);
+    attemptsRef.current = attemptsRef.current.filter((attempt) => attempt > windowStart);
 
     // Check if we're still in cooldown using ref for current value
     const currentCooldownEnd = cooldownEndRef.current;
@@ -82,12 +82,9 @@ export function useSecureSubmit<T>(
   options: {
     maxAttempts?: number;
     rateLimitWindow?: number;
-  } = {}
+  } = {},
 ) {
-  const {
-    maxAttempts = 5,
-    rateLimitWindow = 60000,
-  } = options;
+  const { maxAttempts = 5, rateLimitWindow = 60000 } = options;
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isSubmittingRef = useRef(false);
@@ -98,32 +95,37 @@ export function useSecureSubmit<T>(
   const getRemainingCooldown = rateLimit.remainingCooldown;
   const getAttemptsRemaining = rateLimit.attemptsRemaining;
 
-  const secureSubmit = useCallback(async (data: T) => {
-    // Check rate limiting with correct return format
-    const rateLimitResult = canProceed();
-    if (!rateLimitResult.ok) {
-      throw new Error(`Too many attempts. Please wait ${Math.ceil(rateLimitResult.retryAfterMs / 1000)} seconds.`);
-    }
+  const secureSubmit = useCallback(
+    async (data: T) => {
+      // Check rate limiting with correct return format
+      const rateLimitResult = canProceed();
+      if (!rateLimitResult.ok) {
+        throw new Error(
+          `Too many attempts. Please wait ${Math.ceil(rateLimitResult.retryAfterMs / 1000)} seconds.`,
+        );
+      }
 
-    // Prevent duplicate submissions using ref to avoid stale closure
-    if (isSubmittingRef.current) {
-      throw new Error('Submission already in progress');
-    }
+      // Prevent duplicate submissions using ref to avoid stale closure
+      if (isSubmittingRef.current) {
+        throw new Error("Submission already in progress");
+      }
 
-    isSubmittingRef.current = true;
-    setIsSubmitting(true);
+      isSubmittingRef.current = true;
+      setIsSubmitting(true);
 
-    try {
-      // Direct submission - no double invocation
-      await onSubmit(data);
-    } catch (error) {
-      console.error('Submission error:', error);
-      throw error;
-    } finally {
-      isSubmittingRef.current = false;
-      setIsSubmitting(false);
-    }
-  }, [onSubmit, canProceed, getRemainingCooldown]);
+      try {
+        // Direct submission - no double invocation
+        await onSubmit(data);
+      } catch (error) {
+        console.error("Submission error:", error);
+        throw error;
+      } finally {
+        isSubmittingRef.current = false;
+        setIsSubmitting(false);
+      }
+    },
+    [onSubmit, canProceed, getRemainingCooldown],
+  );
 
   return {
     secureSubmit,
@@ -133,4 +135,3 @@ export function useSecureSubmit<T>(
     remainingCooldown: getRemainingCooldown,
   };
 }
-

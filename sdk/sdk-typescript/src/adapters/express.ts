@@ -18,11 +18,7 @@ declare global {
 //
 //   app.get("/premium", fixedPrice(sangria, { price: 0.01 }), handler)
 //
-export function fixedPrice(
-  sangria: Sangria,
-  options: FixedPriceOptions,
-  config?: ExpressConfig
-) {
+export function fixedPrice(sangria: Sangria, options: FixedPriceOptions, config?: ExpressConfig) {
   validateFixedPriceOptions(options);
 
   return async (req: Request, res: Response, next: NextFunction) => {
@@ -54,7 +50,7 @@ export function fixedPrice(
             : req.headers["payment-signature"],
           resourceUrl: `${req.protocol}://${req.hostname}${req.originalUrl}`,
         },
-        options
+        options,
       );
 
       if (result.action === "respond") {

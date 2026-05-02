@@ -7,16 +7,13 @@ import { env } from "@/lib/env";
 export async function proxyToBackend(
   method: string,
   path: string,
-  options?: { body?: unknown; rawResponse?: boolean }
+  options?: { body?: unknown; rawResponse?: boolean },
 ): Promise<NextResponse> {
   try {
     const { user, accessToken } = await withAuth();
 
     if (!user || !accessToken) {
-      return NextResponse.json(
-        { error: "Authentication required" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
     }
 
     // Defense-in-depth: every mythos backend call is an admin operation.
@@ -25,10 +22,7 @@ export async function proxyToBackend(
     // non-admin authenticated users still can't reach admin endpoints.
     const isAdmin = await verifyAdmin(accessToken);
     if (!isAdmin) {
-      return NextResponse.json(
-        { error: "Admin access required" },
-        { status: 403 }
-      );
+      return NextResponse.json({ error: "Admin access required" }, { status: 403 });
     }
 
     const controller = new AbortController();
@@ -37,10 +31,7 @@ export async function proxyToBackend(
     try {
       const target = new URL(path, env.BACKEND_URL);
       if (target.origin !== new URL(env.BACKEND_URL).origin) {
-        return NextResponse.json(
-          { error: "Invalid proxy target" },
-          { status: 400 }
-        );
+        return NextResponse.json({ error: "Invalid proxy target" }, { status: 400 });
       }
 
       const response = await fetch(target, {
@@ -64,7 +55,7 @@ export async function proxyToBackend(
         } catch {
           return NextResponse.json(
             { error: `Backend error: ${response.statusText}` },
-            { status: response.status }
+            { status: response.status },
           );
         }
       }
@@ -93,16 +84,13 @@ export async function proxyToBackend(
       if (fetchError.name === "AbortError" || controller.signal.aborted) {
         return NextResponse.json(
           { error: "Gateway timeout - backend request took too long" },
-          { status: 504 }
+          { status: 504 },
         );
       }
 
       throw fetchError;
     }
   } catch (error) {
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

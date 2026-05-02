@@ -24,7 +24,7 @@ app.get(
   fixedPrice(sangria, { price: 0.01, description: "Access premium content" }),
   (c) => {
     return c.json({ message: "You accessed the premium endpoint!" });
-  }
+  },
 );
 
 const PORT = Number(process.env.PORT ?? 4003);

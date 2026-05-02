@@ -12,26 +12,10 @@ description: Learn how to accept your first payment using Fastify and the Sangri
 Install the Sangria SDK in your Fastify project.
 
 <Tabs items={["npm", "yarn", "pnpm", "bun"]}>
-  <Tab value="npm">
-  ```bash
-  npm install @sangria-sdk/core
-  ```
-  </Tab>
-  <Tab value="yarn">
-  ```bash
-  yarn add @sangria-sdk/core
-  ```
-  </Tab>
-  <Tab value="pnpm">
-  ```bash
-  pnpm add @sangria-sdk/core
-  ```
-  </Tab>
-  <Tab value="bun">
-  ```bash
-  bun add @sangria-sdk/core
-  ```
-  </Tab>
+  <Tab value="npm">```bash npm install @sangria-sdk/core ```</Tab>
+  <Tab value="yarn">```bash yarn add @sangria-sdk/core ```</Tab>
+  <Tab value="pnpm">```bash pnpm add @sangria-sdk/core ```</Tab>
+  <Tab value="bun">```bash bun add @sangria-sdk/core ```</Tab>
 </Tabs>
 
 ## 2. Initialize the client
@@ -89,7 +73,7 @@ fastify.get(
   },
   async () => {
     return { message: "You accessed the premium endpoint!" };
-  }
+  },
 );
 
 await fastify.listen({ port: 4002 });
@@ -105,19 +89,23 @@ If your customers already authenticate with their own API key, you can skip Sang
 fastify.get(
   "/premium",
   {
-    preHandler: fixedPrice(sangria, {
-      price: 0.01,
-      description: "Access premium content",
-    }, {
-      bypassPaymentIf: (request) => {
-        const key = request.headers["x-api-key"];
-        return typeof key === "string" && isValidApiKey(key); // validate against your own auth system
+    preHandler: fixedPrice(
+      sangria,
+      {
+        price: 0.01,
+        description: "Access premium content",
       },
-    }),
+      {
+        bypassPaymentIf: (request) => {
+          const key = request.headers["x-api-key"];
+          return typeof key === "string" && isValidApiKey(key); // validate against your own auth system
+        },
+      },
+    ),
   },
   async () => {
     return { message: "You accessed the premium endpoint!" };
-  }
+  },
 );
 ```
 
@@ -140,7 +128,7 @@ fastify.get(
     // payment.transaction — on-chain tx hash
 
     return { paid: payment?.paid };
-  }
+  },
 );
 ```
 
@@ -148,7 +136,7 @@ fastify.get(
 
 ## Handle errors
 
-If the Sangria backend is *unreachable, times out, or returns a non-2xx status*, the SDK throws a `SangriaError`. Register a Fastify error handler to return a clean response instead of Fastify's default `500`:
+If the Sangria backend is _unreachable, times out, or returns a non-2xx status_, the SDK throws a `SangriaError`. Register a Fastify error handler to return a clean response instead of Fastify's default `500`:
 
 ```ts
 import { SangriaError } from "@sangria-sdk/core";
@@ -164,11 +152,11 @@ fastify.setErrorHandler((err, _request, reply) => {
 
 `SangriaError` has an `.operation` field (`"generate"` or `"settle"`) so you know which step failed. Subclasses give you more detail:
 
-| Error | When | Properties |
-|-------|------|------------|
-| `SangriaConnectionError` | Network failure (DNS, refused, reset) | — |
-| `SangriaTimeoutError` | Request timed out | — |
-| `SangriaAPIStatusError` | Backend returned 4xx/5xx | `.statusCode`, `.response` |
+| Error                    | When                                  | Properties                 |
+| ------------------------ | ------------------------------------- | -------------------------- |
+| `SangriaConnectionError` | Network failure (DNS, refused, reset) | —                          |
+| `SangriaTimeoutError`    | Request timed out                     | —                          |
+| `SangriaAPIStatusError`  | Backend returned 4xx/5xx              | `.statusCode`, `.response` |
 
 Business-level payment failures (bad signature, insufficient funds) are **not** errors — they return a normal `402` response to the caller.
 

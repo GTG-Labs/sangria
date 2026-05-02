@@ -39,9 +39,7 @@ export const organizations = pgTable(
     id: uuid().primaryKey().defaultRandom(),
     name: varchar({ length: 255 }).notNull(),
     isPersonal: boolean("is_personal").notNull().default(false),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [index("organizations_name_idx").on(table.name)],
 );
@@ -50,12 +48,8 @@ export const organizations = pgTable(
 export const users = pgTable("users", {
   workosId: text("workos_id").primaryKey(),
   owner: text().notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 // ---------------------------------------------------------------------------
@@ -71,9 +65,7 @@ export const organizationMembers = pgTable(
       .notNull()
       .references(() => organizations.id),
     isAdmin: boolean("is_admin").notNull().default(false),
-    joinedAt: timestamp("joined_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
+    joinedAt: timestamp("joined_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
     // Composite primary key - user can only be in each organization once
@@ -91,9 +83,7 @@ export const admins = pgTable("admins", {
   userId: text("user_id")
     .primaryKey()
     .references(() => users.workosId),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 // ---------------------------------------------------------------------------
@@ -108,9 +98,7 @@ export const accounts = pgTable(
     type: accountTypeEnum().notNull(),
     currency: currencyEnum().notNull(),
     organizationId: uuid("organization_id").references(() => organizations.id),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
     index("idx_accounts_organization_id").on(table.organizationId),
@@ -132,9 +120,7 @@ export const transactions = pgTable(
     idempotencyKey: varchar("idempotency_key", { length: 255 }).notNull(),
     status: transactionStatusEnum().notNull().default("confirmed"),
     txHash: varchar("tx_hash", { length: 255 }),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
     unique("uq_idempotency_key").on(table.idempotencyKey),
@@ -210,11 +196,7 @@ export const networkEnum = pgEnum("network", [
 // Merchants — API keys for businesses receiving payments through x402
 // ---------------------------------------------------------------------------
 
-export const apiKeyStatusEnum = pgEnum("api_key_status", [
-  "active",
-  "pending",
-  "inactive",
-]);
+export const apiKeyStatusEnum = pgEnum("api_key_status", ["active", "pending", "inactive"]);
 
 export const merchants = pgTable(
   "merchants",
@@ -228,9 +210,7 @@ export const merchants = pgTable(
     name: varchar({ length: 255 }).notNull(),
     status: apiKeyStatusEnum().notNull().default("pending"),
     lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
     index("idx_merchants_organization_id").on(table.organizationId),
@@ -252,20 +232,13 @@ export const cryptoWallets = pgTable(
     accountId: uuid("account_id")
       .notNull()
       .references(() => accounts.id),
-    lastUsedAt: timestamp("last_used_at", { withTimezone: true })
-      .notNull()
-      .default(new Date(0)),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }).notNull().default(new Date(0)),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
     index("idx_crypto_wallets_last_used_at").on(table.lastUsedAt),
     index("idx_crypto_wallets_network").on(table.network),
-    unique("uq_crypto_wallets_address_network").on(
-      table.address,
-      table.network,
-    ),
+    unique("uq_crypto_wallets_address_network").on(table.address, table.network),
     unique("uq_crypto_wallets_account_id").on(table.accountId),
   ],
 );
@@ -284,22 +257,18 @@ export const withdrawals = pgTable(
 
     // Money
     amount: bigint({ mode: "bigint" }).notNull(),
-    fee: bigint({ mode: "bigint" }).notNull().default(sql`0`),
+    fee: bigint({ mode: "bigint" })
+      .notNull()
+      .default(sql`0`),
     netAmount: bigint("net_amount", { mode: "bigint" }).notNull(),
 
     // Status lifecycle
     status: withdrawalStatusEnum().notNull().default("pending_approval"),
 
     // Ledger transaction references
-    debitTransactionId: uuid("debit_transaction_id").references(
-      () => transactions.id,
-    ),
-    completionTransactionId: uuid("completion_transaction_id").references(
-      () => transactions.id,
-    ),
-    reversalTransactionId: uuid("reversal_transaction_id").references(
-      () => transactions.id,
-    ),
+    debitTransactionId: uuid("debit_transaction_id").references(() => transactions.id),
+    completionTransactionId: uuid("completion_transaction_id").references(() => transactions.id),
+    reversalTransactionId: uuid("reversal_transaction_id").references(() => transactions.id),
 
     // Failure info
     failureCode: varchar("failure_code", { length: 100 }),
@@ -318,9 +287,7 @@ export const withdrawals = pgTable(
     idempotencyKey: varchar("idempotency_key", { length: 255 }).notNull(),
 
     // Per-status timestamps
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     approvedAt: timestamp("approved_at", { withTimezone: true }),
     processedAt: timestamp("processed_at", { withTimezone: true }),
     completedAt: timestamp("completed_at", { withTimezone: true }),
@@ -358,9 +325,7 @@ export const organizationInvitations = pgTable(
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(), // 7 days from creation
 
     // Timestamps
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     acceptedAt: timestamp("accepted_at", { withTimezone: true }),
     declinedAt: timestamp("declined_at", { withTimezone: true }),
   },

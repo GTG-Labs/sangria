@@ -1,11 +1,11 @@
-import { env } from '@/lib/env';
+import { env } from "@/lib/env";
 
 export async function GET() {
   try {
     const response = await fetch(`${env.BACKEND_URL}/csrf-token`, {
-      method: 'GET',
+      method: "GET",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
     });
 
@@ -17,14 +17,14 @@ export async function GET() {
 
     // Prepare response headers
     const responseHeaders = new Headers({
-      'Content-Type': 'application/json',
-      'Cache-Control': 'no-store',
+      "Content-Type": "application/json",
+      "Cache-Control": "no-store",
     });
 
     // Forward Set-Cookie headers from backend to frontend (preserve multiple cookies)
     const setCookies = response.headers.getSetCookie?.() ?? [];
     for (const cookie of setCookies) {
-      responseHeaders.append('Set-Cookie', cookie);
+      responseHeaders.append("Set-Cookie", cookie);
     }
 
     return new Response(JSON.stringify(data), {
@@ -32,11 +32,11 @@ export async function GET() {
       headers: responseHeaders,
     });
   } catch (error) {
-    console.error('Failed to fetch CSRF token from backend:', error);
-    return new Response(JSON.stringify({ error: 'Failed to generate CSRF token' }), {
+    console.error("Failed to fetch CSRF token from backend:", error);
+    return new Response(JSON.stringify({ error: "Failed to generate CSRF token" }), {
       status: 500,
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
     });
   }

@@ -42,8 +42,7 @@ export default function PortalSidebarNav() {
           const Icon = item.icon;
           const isExternal = "external" in item && item.external;
           const isActive =
-            !isExternal &&
-            (pathname === item.href || pathname.startsWith(`${item.href}/`));
+            !isExternal && (pathname === item.href || pathname.startsWith(`${item.href}/`));
 
           return (
             <Link

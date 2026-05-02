@@ -30,7 +30,7 @@ app.get(
     // req.sangria.paid === true
     // req.sangria.transaction === "0x..."
     res.json({ data: "premium content" });
-  }
+  },
 );
 
 app.listen(3000);
@@ -48,14 +48,10 @@ const sangria = new Sangria({ apiKey: process.env.SANGRIA_SECRET_KEY });
 
 await app.register(sangriaPlugin);
 
-app.get(
-  "/premium",
-  { preHandler: fixedPrice(sangria, { price: 0.01 }) },
-  (request, reply) => {
-    // request.sangria.paid === true
-    reply.send({ data: "premium content" });
-  }
-);
+app.get("/premium", { preHandler: fixedPrice(sangria, { price: 0.01 }) }, (request, reply) => {
+  // request.sangria.paid === true
+  reply.send({ data: "premium content" });
+});
 
 await app.listen({ port: 3000 });
 ```
@@ -89,7 +85,7 @@ fixedPrice(
   { price: 0.01 },
   {
     bypassPaymentIf: (req) => !!req.headers["x-api-key"],
-  }
+  },
 );
 ```
 

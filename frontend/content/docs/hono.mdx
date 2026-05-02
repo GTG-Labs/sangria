@@ -12,26 +12,10 @@ description: Learn how to accept your first payment using Hono and the Sangria T
 Install the Sangria SDK in your Hono project.
 
 <Tabs items={["npm", "yarn", "pnpm", "bun"]}>
-  <Tab value="npm">
-  ```bash
-  npm install @sangria-sdk/core
-  ```
-  </Tab>
-  <Tab value="yarn">
-  ```bash
-  yarn add @sangria-sdk/core
-  ```
-  </Tab>
-  <Tab value="pnpm">
-  ```bash
-  pnpm add @sangria-sdk/core
-  ```
-  </Tab>
-  <Tab value="bun">
-  ```bash
-  bun add @sangria-sdk/core
-  ```
-  </Tab>
+  <Tab value="npm">```bash npm install @sangria-sdk/core ```</Tab>
+  <Tab value="yarn">```bash yarn add @sangria-sdk/core ```</Tab>
+  <Tab value="pnpm">```bash pnpm add @sangria-sdk/core ```</Tab>
+  <Tab value="bun">```bash bun add @sangria-sdk/core ```</Tab>
 </Tabs>
 
 ## 2. Initialize the client
@@ -74,7 +58,7 @@ app.get(
   }),
   (c) => {
     return c.json({ message: "You accessed the premium endpoint!" });
-  }
+  },
 );
 
 serve({ fetch: app.fetch, port: 4003 });
@@ -89,18 +73,22 @@ If your customers already authenticate with their own API key, you can skip Sang
 ```ts
 app.get(
   "/premium",
-  fixedPrice(sangria, {
-    price: 0.01,
-    description: "Access premium content",
-  }, {
-    bypassPaymentIf: (c) => {
-      const key = c.req.header("x-api-key");
-      return key != null && isValidApiKey(key); // validate against your own auth system
+  fixedPrice(
+    sangria,
+    {
+      price: 0.01,
+      description: "Access premium content",
     },
-  }),
+    {
+      bypassPaymentIf: (c) => {
+        const key = c.req.header("x-api-key");
+        return key != null && isValidApiKey(key); // validate against your own auth system
+      },
+    },
+  ),
   (c) => {
     return c.json({ message: "You accessed the premium endpoint!" });
-  }
+  },
 );
 ```
 
@@ -123,7 +111,7 @@ app.get(
     // payment.transaction — on-chain tx hash
 
     return c.json({ paid: payment?.paid });
-  }
+  },
 );
 ```
 
@@ -131,7 +119,7 @@ app.get(
 
 ## Handle errors
 
-If the Sangria backend is *unreachable, times out, or returns a non-2xx status*, the SDK throws a `SangriaError`. Register an `onError` handler to return a clean response:
+If the Sangria backend is _unreachable, times out, or returns a non-2xx status_, the SDK throws a `SangriaError`. Register an `onError` handler to return a clean response:
 
 ```ts
 import { SangriaError } from "@sangria-sdk/core";
@@ -148,11 +136,11 @@ app.onError((err, c) => {
 
 `SangriaError` has an `.operation` field (`"generate"` or `"settle"`) so you know which step failed. Subclasses give you more detail:
 
-| Error | When | Properties |
-|-------|------|------------|
-| `SangriaConnectionError` | Network failure (DNS, refused, reset) | — |
-| `SangriaTimeoutError` | Request timed out | — |
-| `SangriaAPIStatusError` | Backend returned 4xx/5xx | `.statusCode`, `.response` |
+| Error                    | When                                  | Properties                 |
+| ------------------------ | ------------------------------------- | -------------------------- |
+| `SangriaConnectionError` | Network failure (DNS, refused, reset) | —                          |
+| `SangriaTimeoutError`    | Request timed out                     | —                          |
+| `SangriaAPIStatusError`  | Backend returned 4xx/5xx              | `.statusCode`, `.response` |
 
 Business-level payment failures (bad signature, insufficient funds) are **not** errors — they return a normal `402` response to the caller.
 

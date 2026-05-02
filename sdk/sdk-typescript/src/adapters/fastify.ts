@@ -27,7 +27,7 @@ declare module "fastify" {
 export function fixedPrice(
   sangria: Sangria,
   options: FixedPriceOptions,
-  config?: FastifyConfig
+  config?: FastifyConfig,
 ): preHandlerAsyncHookHandler {
   validateFixedPriceOptions(options);
 
@@ -59,7 +59,7 @@ export function fixedPrice(
           : request.headers["payment-signature"],
         resourceUrl: `${request.protocol}://${request.hostname}${request.url}`,
       },
-      options
+      options,
     );
 
     if (result.action === "respond") {
@@ -78,5 +78,5 @@ export const sangriaPlugin = fp(
   async (fastify: FastifyInstance) => {
     fastify.decorateRequest("sangria", undefined);
   },
-  { name: "sangria" }
+  { name: "sangria" },
 );

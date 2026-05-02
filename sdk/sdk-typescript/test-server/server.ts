@@ -27,7 +27,7 @@ app.get(
   fixedPrice(sangria, { price: 0.01, description: "Access premium content" }),
   (_req, res) => {
     res.json({ message: "You accessed the premium endpoint!" });
-  }
+  },
 );
 
 // ── Start ──

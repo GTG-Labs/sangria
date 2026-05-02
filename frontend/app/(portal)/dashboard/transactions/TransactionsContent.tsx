@@ -72,7 +72,7 @@ export default function TransactionsContent() {
         } else {
           const paginatedData = data as PaginatedResponse;
           setTransactions((prev) =>
-            cursor ? [...prev, ...paginatedData.data] : paginatedData.data
+            cursor ? [...prev, ...paginatedData.data] : paginatedData.data,
           );
           setNextCursor(paginatedData.pagination.next_cursor);
           setHasMore(paginatedData.pagination.has_more);
@@ -80,9 +80,7 @@ export default function TransactionsContent() {
         }
         setError(null);
       } else {
-        const errorData = await response
-          .json()
-          .catch(() => ({ error: "Unknown error" }));
+        const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
         setError(errorData.error || "Failed to load transactions");
         if (isInitialLoad) resetForInitialLoadFailure();
       }
@@ -195,23 +193,18 @@ export default function TransactionsContent() {
                 <th className="pb-3 pr-6 text-left text-sm font-medium text-gray-400">
                   Transaction
                 </th>
-                <th className="pb-3 px-6 text-left text-sm font-medium text-gray-400">
-                  Status
-                </th>
-                <th className="pb-3 px-6 text-left text-sm font-medium text-gray-400">
-                  Amount
-                </th>
-                <th className="pb-3 pl-6 text-right text-sm font-medium text-gray-400">
-                  Sent
-                </th>
+                <th className="pb-3 px-6 text-left text-sm font-medium text-gray-400">Status</th>
+                <th className="pb-3 px-6 text-left text-sm font-medium text-gray-400">Amount</th>
+                <th className="pb-3 pl-6 text-right text-sm font-medium text-gray-400">Sent</th>
               </tr>
             </thead>
             <tbody>
               {transactions.map((tx, i) => (
                 <tr
                   key={tx.id}
-                  className={`border-b border-zinc-200 hover:bg-zinc-200/50 transition-colors ${i % 2 === 0 ? "bg-zinc-100/50" : ""
-                    }`}
+                  className={`border-b border-zinc-200 hover:bg-zinc-200/50 transition-colors ${
+                    i % 2 === 0 ? "bg-zinc-100/50" : ""
+                  }`}
                 >
                   <td className="py-4 pl-4 pr-6">
                     {tx.idempotency_key.startsWith("0x") ? (
@@ -221,9 +214,7 @@ export default function TransactionsContent() {
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-1.5 text-sm text-gray-900 hover:text-sangria-600 transition-colors"
                       >
-                        <span className="font-mono">
-                          {truncateKey(tx.idempotency_key)}
-                        </span>
+                        <span className="font-mono">{truncateKey(tx.idempotency_key)}</span>
                         <ExternalLink className="w-3.5 h-3.5 text-gray-400" />
                       </a>
                     ) : (
@@ -233,9 +224,7 @@ export default function TransactionsContent() {
                     )}
                   </td>
                   <td className="py-4 px-6">
-                    <span className="text-sm font-medium text-green-600">
-                      Received
-                    </span>
+                    <span className="text-sm font-medium text-green-600">Received</span>
                   </td>
                   <td className="py-4 px-6 text-sm text-gray-900">
                     +{formatAmount(tx.amount, tx.currency)}

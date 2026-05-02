@@ -89,13 +89,8 @@ export default function WithdrawModal({
     >
       <div className="w-full max-w-md mx-4 bg-white rounded-xl shadow-xl">
         <div className="flex items-center justify-between px-6 pt-6 pb-4">
-          <h2 className="text-lg font-semibold text-gray-900">
-            Request Withdrawal
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
+          <h2 className="text-lg font-semibold text-gray-900">Request Withdrawal</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
             <XIcon className="w-5 h-5" />
           </button>
         </div>
@@ -103,26 +98,17 @@ export default function WithdrawModal({
         <form onSubmit={handleSubmit(onSubmit)} className="px-6 pb-6 space-y-4">
           {balance !== null && (
             <div className="p-3 bg-gray-50 rounded-lg">
-              <p className="text-xs font-medium text-gray-500">
-                Available Balance
-              </p>
-              <p className="text-lg font-semibold text-gray-900">
-                ${formatBalance(balance)} USD
-              </p>
+              <p className="text-xs font-medium text-gray-500">Available Balance</p>
+              <p className="text-lg font-semibold text-gray-900">${formatBalance(balance)} USD</p>
             </div>
           )}
 
           <div>
-            <label
-              htmlFor="amount"
-              className="block text-sm font-medium text-gray-700 mb-1.5"
-            >
+            <label htmlFor="amount" className="block text-sm font-medium text-gray-700 mb-1.5">
               Amount (USD)
             </label>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                $
-              </span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">$</span>
               <input
                 id="amount"
                 type="number"
@@ -130,13 +116,12 @@ export default function WithdrawModal({
                 min="0"
                 {...register("amount")}
                 placeholder="0.00"
-                className={`w-full pl-7 pr-3 py-2 border rounded-md bg-white text-gray-900 placeholder-gray-400 ${errors.amount ? "border-red-500" : "border-gray-300"
-                  }`}
+                className={`w-full pl-7 pr-3 py-2 border rounded-md bg-white text-gray-900 placeholder-gray-400 ${
+                  errors.amount ? "border-red-500" : "border-gray-300"
+                }`}
               />
             </div>
-            {errors.amount && (
-              <p className="mt-1 text-sm text-red-600">{errors.amount.message}</p>
-            )}
+            {errors.amount && <p className="mt-1 text-sm text-red-600">{errors.amount.message}</p>}
           </div>
 
           {error && (
@@ -147,7 +132,12 @@ export default function WithdrawModal({
           )}
 
           <div className="flex gap-3 pt-2">
-            <ArcadeButton type="submit" disabled={submitting || !isValid} size="sm" className="flex-1">
+            <ArcadeButton
+              type="submit"
+              disabled={submitting || !isValid}
+              size="sm"
+              className="flex-1"
+            >
               {submitting ? "Submitting..." : "Submit Withdrawal"}
             </ArcadeButton>
             <button

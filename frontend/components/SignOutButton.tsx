@@ -18,7 +18,13 @@ export function SignOutButton({ children }: SignOutButtonProps) {
 
   return (
     <form action={handleSubmit} className="w-full">
-      <ArcadeButton type="submit" disabled={isSigningOut} variant="secondary" size="sm" className="w-full">
+      <ArcadeButton
+        type="submit"
+        disabled={isSigningOut}
+        variant="secondary"
+        size="sm"
+        className="w-full"
+      >
         {isSigningOut ? "Signing out..." : children || "Sign Out"}
       </ArcadeButton>
     </form>

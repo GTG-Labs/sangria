@@ -31,12 +31,7 @@ export default function GitHubStarChip() {
         aria-label="Star us on GitHub"
         className="flex items-center gap-2 pl-4 py-2 hover:text-white transition-colors"
       >
-        <svg
-          viewBox="0 0 1024 1024"
-          fill="currentColor"
-          className="w-4 h-4"
-          aria-hidden="true"
-        >
+        <svg viewBox="0 0 1024 1024" fill="currentColor" className="w-4 h-4" aria-hidden="true">
           <path
             fillRule="evenodd"
             clipRule="evenodd"

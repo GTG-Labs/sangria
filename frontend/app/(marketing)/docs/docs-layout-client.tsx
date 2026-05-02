@@ -7,20 +7,12 @@ import type { Root, Separator } from "fumadocs-core/page-tree";
 function DocsSidebarSeparator({ item }: { item: Separator }) {
   return (
     <div className="mt-6 mb-1 px-2 first:mt-0">
-      <span className="text-sm font-bold text-fd-foreground">
-        {item.name}
-      </span>
+      <span className="text-sm font-bold text-fd-foreground">{item.name}</span>
     </div>
   );
 }
 
-export default function DocsLayoutClient({
-  tree,
-  children,
-}: {
-  tree: Root;
-  children: ReactNode;
-}) {
+export default function DocsLayoutClient({ tree, children }: { tree: Root; children: ReactNode }) {
   return (
     <DocsLayout
       tree={tree}

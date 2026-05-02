@@ -30,7 +30,7 @@ fastify.get(
   },
   async () => {
     return { message: "You accessed the premium endpoint!" };
-  }
+  },
 );
 
 const PORT = Number(process.env.PORT ?? 4002);

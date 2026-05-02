@@ -6,7 +6,10 @@ const Ballpit = dynamic(() => import("@/components/Ballpit"), { ssr: false });
 
 export default function BlogHeader() {
   return (
-    <div className="relative overflow-hidden h-[220px] flex items-center justify-center" style={{ background: 'var(--bg-primary)' }}>
+    <div
+      className="relative overflow-hidden h-[220px] flex items-center justify-center"
+      style={{ background: "var(--bg-primary)" }}
+    >
       <div className="absolute inset-0">
         <Ballpit
           count={33}

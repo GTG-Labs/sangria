@@ -24,21 +24,21 @@ pnpm lint       # ESLint
 
 App-managed env vars (those whose `Validated` column is `Yes`) are checked at build time by `lib/env.ts` via `@t3-oss/env-nextjs` + Zod — `pnpm build` fails on any missing or malformed value, so no silent localhost fallbacks reach production. The remaining vars are consumed directly by libraries (e.g. WorkOS AuthKit reads `WORKOS_CLIENT_ID` / `WORKOS_API_KEY` from `process.env` itself).
 
-| Variable | Required | Scope | Validated | Description |
-|---|---|---|---|---|
-| `BACKEND_URL` | Yes | Server | Yes | Go backend base URL (e.g. `https://api.getsangria.com`). Must be a valid URL. |
-| `NEXT_PUBLIC_WORKOS_REDIRECT_URI` | Yes | Client | Yes | WorkOS redirect URI, inlined at build time. Must be a valid URL. |
-| `MYTHOS_BASE_URL` | No | Server | Yes | Override for the public origin used in demo resource URLs (`app/api/x402-pay/route.ts`). When unset, the route derives it from the incoming request. |
-| `SANGRIA_SECRET_KEY` | Yes | Server | Yes | Merchant API key used by the x402-pay demo route to authenticate against the backend's `/v1/*` endpoints. |
-| `BUYER_ADDRESS` | Yes | Server | Yes | Buyer EOA address for the x402-pay demo route. Validated as an Ethereum address (`viem.isAddress`) at the call site. |
-| `CDP_API_KEY_NAME` | Yes | Server | Yes | Buyer-side Coinbase Developer Platform API key name for signing demo payments. **Not the backend's CDP credentials** — these are buyer/agent-side. |
-| `CDP_API_KEY_PRIVATE_KEY` | Yes | Server | Yes | Buyer-side CDP API private key. |
-| `CDP_WALLET_SECRET` | Yes | Server | Yes | Buyer-side CDP wallet secret. |
-| `WORKOS_CLIENT_ID` | Yes | Server | No | WorkOS client ID. Consumed by AuthKit internally; not in `lib/env.ts`. |
-| `WORKOS_API_KEY` | Yes | Server | No | WorkOS API key. Consumed by AuthKit internally; not in `lib/env.ts`. |
-| `WORKOS_COOKIE_PASSWORD` | Yes | Server | No | 32-byte secret used by AuthKit to encrypt session cookies. Consumed internally. |
+| Variable                          | Required | Scope  | Validated | Description                                                                                                                                          |
+| --------------------------------- | -------- | ------ | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `BACKEND_URL`                     | Yes      | Server | Yes       | Go backend base URL (e.g. `https://api.getsangria.com`). Must be a valid URL.                                                                        |
+| `NEXT_PUBLIC_WORKOS_REDIRECT_URI` | Yes      | Client | Yes       | WorkOS redirect URI, inlined at build time. Must be a valid URL.                                                                                     |
+| `MYTHOS_BASE_URL`                 | No       | Server | Yes       | Override for the public origin used in demo resource URLs (`app/api/x402-pay/route.ts`). When unset, the route derives it from the incoming request. |
+| `SANGRIA_SECRET_KEY`              | Yes      | Server | Yes       | Merchant API key used by the x402-pay demo route to authenticate against the backend's `/v1/*` endpoints.                                            |
+| `BUYER_ADDRESS`                   | Yes      | Server | Yes       | Buyer EOA address for the x402-pay demo route. Validated as an Ethereum address (`viem.isAddress`) at the call site.                                 |
+| `CDP_API_KEY_NAME`                | Yes      | Server | Yes       | Buyer-side Coinbase Developer Platform API key name for signing demo payments. **Not the backend's CDP credentials** — these are buyer/agent-side.   |
+| `CDP_API_KEY_PRIVATE_KEY`         | Yes      | Server | Yes       | Buyer-side CDP API private key.                                                                                                                      |
+| `CDP_WALLET_SECRET`               | Yes      | Server | Yes       | Buyer-side CDP wallet secret.                                                                                                                        |
+| `WORKOS_CLIENT_ID`                | Yes      | Server | No        | WorkOS client ID. Consumed by AuthKit internally; not in `lib/env.ts`.                                                                               |
+| `WORKOS_API_KEY`                  | Yes      | Server | No        | WorkOS API key. Consumed by AuthKit internally; not in `lib/env.ts`.                                                                                 |
+| `WORKOS_COOKIE_PASSWORD`          | Yes      | Server | No        | 32-byte secret used by AuthKit to encrypt session cookies. Consumed internally.                                                                      |
 
-**Adding a new var:** edit `lib/env.ts` — add it to the appropriate `server` or `client` schema block *and* to the `runtimeEnv` mapping (Next.js's build-time inlining requires the literal `process.env.NEXT_PUBLIC_X` reference there). Do not add `process.env` reads elsewhere.
+**Adding a new var:** edit `lib/env.ts` — add it to the appropriate `server` or `client` schema block _and_ to the `runtimeEnv` mapping (Next.js's build-time inlining requires the literal `process.env.NEXT_PUBLIC_X` reference there). Do not add `process.env` reads elsewhere.
 
 ## Architecture
 

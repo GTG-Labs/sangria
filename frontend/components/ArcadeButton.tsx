@@ -41,13 +41,7 @@ export default function ArcadeButton({
   children,
   ...rest
 }: ArcadeButtonProps) {
-  const slotClass = [
-    slotStyles[variant],
-    glow && "glow",
-    className,
-  ]
-    .filter(Boolean)
-    .join(" ");
+  const slotClass = [slotStyles[variant], glow && "glow", className].filter(Boolean).join(" ");
 
   const hasFullWidth = className?.split(/\s+/).includes("w-full");
   const faceClass = [sizeStyles[size], hasFullWidth && "w-full"].filter(Boolean).join(" ");

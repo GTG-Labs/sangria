@@ -35,9 +35,7 @@ export default async function PortalLayout({
           </ResizableSidebar>
 
           <main className="flex-1 bg-[#F3F4F1]">
-            <div className="min-h-screen px-6 py-8 lg:px-10 lg:py-10">
-              {children}
-            </div>
+            <div className="min-h-screen px-6 py-8 lg:px-10 lg:py-10">{children}</div>
           </main>
         </div>
       </div>

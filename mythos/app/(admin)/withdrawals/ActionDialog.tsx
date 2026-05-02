@@ -44,9 +44,7 @@ export default function ActionDialog({
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [onCancel]);
 
-  const canConfirm = fields.every(
-    (f) => !f.required || (values[f.name] ?? "").trim() !== ""
-  );
+  const canConfirm = fields.every((f) => !f.required || (values[f.name] ?? "").trim() !== "");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,12 +84,7 @@ export default function ActionDialog({
               className="text-gray-500 hover:text-white transition-colors"
               aria-label="Close"
             >
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"

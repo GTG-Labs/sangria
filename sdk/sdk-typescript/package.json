@@ -5,7 +5,9 @@
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "exports": {
     ".": {
       "import": "./dist/index.js",
@@ -35,7 +37,9 @@
     "test-server": "tsx --watch test-server/server.ts",
     "test-server:express": "tsx --watch test-server/server.ts",
     "test-server:hono": "tsx --watch test-server/server-hono.ts",
-    "test-server:fastify": "tsx --watch test-server/server-fastify.ts"
+    "test-server:fastify": "tsx --watch test-server/server-fastify.ts",
+    "format": "prettier --write . --ignore-path ../../.prettierignore",
+    "format:check": "prettier --check . --ignore-path ../../.prettierignore"
   },
   "keywords": [
     "x402",
@@ -80,6 +84,7 @@
     "express": "^4.21.0",
     "fastify": "^5.0.0",
     "hono": "^4.0.0",
+    "prettier": "^3.8.1",
     "tsx": "^4.21.0",
     "typescript": "^5.7.0"
   },

@@ -28,7 +28,6 @@ interface APIKey {
   created_at: string;
 }
 
-
 export default function APIKeysContent() {
   const { selectedOrg, selectedOrgId, userInfo } = useOrganization();
   const [apiKeys, setApiKeys] = useState<APIKey[]>([]);
@@ -56,7 +55,6 @@ export default function APIKeysContent() {
     setShowCreateForm(false);
   };
 
-
   const fetchAPIKeys = async (showLoading = true, signal?: AbortSignal) => {
     if (showLoading) {
       setLoading(true);
@@ -73,13 +71,9 @@ export default function APIKeysContent() {
         setApiKeys(Array.isArray(keys) ? keys : []);
         setError(null); // Clear any previous errors
       } else {
-        const errorData = await response
-          .json()
-          .catch(() => ({ error: "Unknown error" }));
+        const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
         console.error("API Keys fetch failed:", response.status, errorData);
-        setError(
-          errorData.error || `Failed to load API keys (${response.status})`,
-        );
+        setError(errorData.error || `Failed to load API keys (${response.status})`);
         setApiKeys([]);
       }
     } catch (err) {
@@ -137,11 +131,7 @@ export default function APIKeysContent() {
   };
 
   const revokeAPIKey = async (keyId: string) => {
-    if (
-      !confirm(
-        "Are you sure you want to revoke this API key? This action cannot be undone.",
-      )
-    ) {
+    if (!confirm("Are you sure you want to revoke this API key? This action cannot be undone.")) {
       return;
     }
 
@@ -162,7 +152,7 @@ export default function APIKeysContent() {
   };
 
   const approveAPIKey = async (keyId: string) => {
-    setApprovalLoading(prev => new Set(prev).add(keyId));
+    setApprovalLoading((prev) => new Set(prev).add(keyId));
 
     try {
       const response = await internalFetch(`/api/backend/api-keys/${keyId}/approve`, {
@@ -179,7 +169,7 @@ export default function APIKeysContent() {
     } catch {
       setError("Failed to approve API key");
     } finally {
-      setApprovalLoading(prev => {
+      setApprovalLoading((prev) => {
         const newSet = new Set(prev);
         newSet.delete(keyId);
         return newSet;
@@ -188,7 +178,7 @@ export default function APIKeysContent() {
   };
 
   const rejectAPIKey = async (keyId: string) => {
-    setApprovalLoading(prev => new Set(prev).add(keyId));
+    setApprovalLoading((prev) => new Set(prev).add(keyId));
 
     try {
       const response = await internalFetch(`/api/backend/api-keys/${keyId}/reject`, {
@@ -205,7 +195,7 @@ export default function APIKeysContent() {
     } catch {
       setError("Failed to reject API key");
     } finally {
-      setApprovalLoading(prev => {
+      setApprovalLoading((prev) => {
         const newSet = new Set(prev);
         newSet.delete(keyId);
         return newSet;
@@ -295,13 +285,14 @@ export default function APIKeysContent() {
               <p className="text-sm text-blue-800">
                 {selectedOrg.isAdmin ? (
                   <>
-                    <strong>Admin privileges:</strong> Your API keys are automatically activated upon creation.
-                    You can also approve or reject pending keys from other team members.
+                    <strong>Admin privileges:</strong> Your API keys are automatically activated
+                    upon creation. You can also approve or reject pending keys from other team
+                    members.
                   </>
                 ) : (
                   <>
-                    <strong>Member privileges:</strong> New API keys require admin approval before they become active.
-                    Contact your organization admin to approve pending keys.
+                    <strong>Member privileges:</strong> New API keys require admin approval before
+                    they become active. Contact your organization admin to approve pending keys.
                   </>
                 )}
               </p>
@@ -321,11 +312,7 @@ export default function APIKeysContent() {
         <div className="mb-6 p-6 bg-amber-50 border border-amber-200 rounded-lg">
           <div className="flex items-start gap-3">
             <div className="flex-shrink-0 mt-1">
-              <svg
-                className="w-5 h-5 text-amber-600"
-                fill="currentColor"
-                viewBox="0 0 20 20"
-              >
+              <svg className="w-5 h-5 text-amber-600" fill="currentColor" viewBox="0 0 20 20">
                 <path
                   fillRule="evenodd"
                   d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
@@ -338,11 +325,8 @@ export default function APIKeysContent() {
                 API Key Created - Save It Now!
               </h3>
               <p className="text-amber-700 mb-4">
-                <strong>
-                  This is the only time you&apos;ll see your API key.
-                </strong>{" "}
-                Copy it now and store it securely. For security reasons, we
-                cannot show it again.
+                <strong>This is the only time you&apos;ll see your API key.</strong> Copy it now and
+                store it securely. For security reasons, we cannot show it again.
               </p>
               <div className="flex items-center gap-2 p-4 bg-white border border-amber-200 rounded-md font-mono text-sm break-all">
                 <span className="flex-1 select-all">{newKeyResult}</span>
@@ -381,15 +365,10 @@ export default function APIKeysContent() {
 
       {showCreateForm && (
         <div className="mb-6 p-6 border border-gray-200 rounded-lg bg-white">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">
-            Create New API Key
-          </h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Create New API Key</h3>
           <form onSubmit={handleSubmit(createAPIKey)} className="space-y-4">
             <div>
-              <label
-                htmlFor="keyName"
-                className="block text-sm font-medium text-gray-700 mb-2"
-              >
+              <label htmlFor="keyName" className="block text-sm font-medium text-gray-700 mb-2">
                 Key Name
               </label>
               <input
@@ -397,12 +376,13 @@ export default function APIKeysContent() {
                 type="text"
                 {...register("name")}
                 placeholder="e.g., Production Server, Development Environment"
-                className={`w-full px-3 py-2 border rounded-md bg-white text-gray-900 placeholder-gray-500 ${errors.name ? "border-red-500 focus:ring-red-500" : "border-gray-300 focus:ring-blue-500"
-                  } focus:outline-none focus:ring-2`}
+                className={`w-full px-3 py-2 border rounded-md bg-white text-gray-900 placeholder-gray-500 ${
+                  errors.name
+                    ? "border-red-500 focus:ring-red-500"
+                    : "border-gray-300 focus:ring-blue-500"
+                } focus:outline-none focus:ring-2`}
               />
-              {errors.name && (
-                <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>
-              )}
+              {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>}
             </div>
             <div className="flex gap-3">
               <ArcadeButton type="submit" disabled={createLoading || !isValid} size="sm">
@@ -459,30 +439,30 @@ export default function APIKeysContent() {
                 {apiKeys.map((key, index) => (
                   <tr key={key.id || `key-${index}`}>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">
-                        {key.name}
-                      </div>
+                      <div className="text-sm font-medium text-gray-900">{key.name}</div>
                       <div className="text-xs text-gray-500">
                         Created {new Date(key.created_at).toLocaleDateString()}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span
-                        className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${key.status === API_KEY_STATUS.ACTIVE
+                        className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                          key.status === API_KEY_STATUS.ACTIVE
                             ? "bg-green-100 text-green-800"
                             : key.status === API_KEY_STATUS.PENDING
                               ? "bg-yellow-100 text-yellow-800"
                               : "bg-gray-100 text-gray-800"
-                          }`}
+                        }`}
                       >
-                        {key.status === API_KEY_STATUS.ACTIVE ? 'Active' :
-                          key.status === API_KEY_STATUS.PENDING ? 'Pending' : 'Inactive'}
+                        {key.status === API_KEY_STATUS.ACTIVE
+                          ? "Active"
+                          : key.status === API_KEY_STATUS.PENDING
+                            ? "Pending"
+                            : "Inactive"}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {key.last_used_at
-                        ? new Date(key.last_used_at).toLocaleDateString()
-                        : "Never"}
+                      {key.last_used_at ? new Date(key.last_used_at).toLocaleDateString() : "Never"}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {new Date(key.created_at).toLocaleDateString()}
@@ -535,7 +515,9 @@ export default function APIKeysContent() {
 
                         {/* Show status message for pending keys (non-admin users) */}
                         {key.status === API_KEY_STATUS.PENDING && !selectedOrg?.isAdmin && (
-                          <span className="text-xs text-yellow-600 font-medium">Awaiting approval</span>
+                          <span className="text-xs text-yellow-600 font-medium">
+                            Awaiting approval
+                          </span>
                         )}
                       </div>
                     </td>

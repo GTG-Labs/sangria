@@ -74,8 +74,7 @@ Critics noted that similar pledges have been made before without sufficient foll
   {
     slug: "crypto-payments",
     section: "Finance",
-    headline:
-      "Stablecoin Payments Cross $10 Trillion in Annual Volume — What Comes Next",
+    headline: "Stablecoin Payments Cross $10 Trillion in Annual Volume — What Comes Next",
     byline: "By James Okafor",
     date: "April 12, 2026",
     teaser:
@@ -95,8 +94,7 @@ Traditional payment processors have taken notice. Stripe announced a USDC settle
   {
     slug: "biotech-breakthrough",
     section: "Science",
-    headline:
-      "CRISPR Trial Shows Complete Remission in Aggressive Blood Cancer",
+    headline: "CRISPR Trial Shows Complete Remission in Aggressive Blood Cancer",
     byline: "By Dr. Priya Nair",
     date: "April 12, 2026",
     teaser:
@@ -166,15 +164,9 @@ function StepRow({
   return (
     <div className="flex items-start gap-3 py-2.5">
       <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center">
-        {status === "idle" && (
-          <span className="h-2 w-2 rounded-full bg-gray-600" />
-        )}
+        {status === "idle" && <span className="h-2 w-2 rounded-full bg-gray-600" />}
         {status === "pending" && (
-          <svg
-            className="h-4 w-4 animate-spin text-amber-400"
-            viewBox="0 0 24 24"
-            fill="none"
-          >
+          <svg className="h-4 w-4 animate-spin text-amber-400" viewBox="0 0 24 24" fill="none">
             <circle
               className="opacity-25"
               cx="12"
@@ -191,11 +183,7 @@ function StepRow({
           </svg>
         )}
         {status === "done" && (
-          <svg
-            className="h-4 w-4 text-emerald-400"
-            viewBox="0 0 20 20"
-            fill="currentColor"
-          >
+          <svg className="h-4 w-4 text-emerald-400" viewBox="0 0 20 20" fill="currentColor">
             <path
               fillRule="evenodd"
               d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
@@ -204,11 +192,7 @@ function StepRow({
           </svg>
         )}
         {status === "error" && (
-          <svg
-            className="h-4 w-4 text-red-400"
-            viewBox="0 0 20 20"
-            fill="currentColor"
-          >
+          <svg className="h-4 w-4 text-red-400" viewBox="0 0 20 20" fill="currentColor">
             <path
               fillRule="evenodd"
               d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
@@ -223,19 +207,15 @@ function StepRow({
             status === "idle"
               ? "text-gray-500"
               : status === "pending"
-              ? "text-amber-300"
-              : status === "done"
-              ? "text-emerald-300"
-              : "text-red-300"
+                ? "text-amber-300"
+                : status === "done"
+                  ? "text-emerald-300"
+                  : "text-red-300"
           }`}
         >
           {label}
         </p>
-        {detail && (
-          <p className="mt-0.5 truncate font-mono text-xs text-gray-400">
-            {detail}
-          </p>
-        )}
+        {detail && <p className="mt-0.5 truncate font-mono text-xs text-gray-400">{detail}</p>}
       </div>
     </div>
   );
@@ -276,13 +256,9 @@ function PaywallModal({
       if (!dialog) return [];
       return Array.from(
         dialog.querySelectorAll<HTMLElement>(
-          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-        )
-      ).filter(
-        (el) =>
-          !el.hasAttribute("disabled") &&
-          el.getAttribute("aria-hidden") !== "true"
-      );
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((el) => !el.hasAttribute("disabled") && el.getAttribute("aria-hidden") !== "true");
     };
 
     requestAnimationFrame(() => {
@@ -417,10 +393,7 @@ function PaywallModal({
             continue;
           }
 
-          if (
-            event.step === "error" ||
-            (event.step === "settle" && event.status === "done")
-          ) {
+          if (event.step === "error" || (event.step === "settle" && event.status === "done")) {
             receivedTerminalEvent = true;
           }
 
@@ -516,12 +489,13 @@ function PaywallModal({
 
   const negotiateDetail =
     steps?.negotiate.status === "done" && steps.negotiate.data
-      ? `${steps.negotiate.data.amountUsdc} USDC → ${(
-          steps.negotiate.data.payTo as string
-        ).slice(0, 10)}...`
+      ? `${steps.negotiate.data.amountUsdc} USDC → ${(steps.negotiate.data.payTo as string).slice(
+          0,
+          10,
+        )}...`
       : steps?.negotiate.status === "pending"
-      ? "Contacting merchant server..."
-      : undefined;
+        ? "Contacting merchant server..."
+        : undefined;
 
   const signDetail =
     steps?.sign.status === "done" && steps.sign.data
@@ -529,15 +503,15 @@ function PaywallModal({
           steps.sign.data.signaturePreview
         }`
       : steps?.sign.status === "pending"
-      ? "Generating EIP-3009 authorization..."
-      : undefined;
+        ? "Generating EIP-3009 authorization..."
+        : undefined;
 
   const settleDetail =
     steps?.settle.status === "done"
       ? "Transaction confirmed on-chain"
       : steps?.settle.status === "pending"
-      ? "Broadcasting to Base network..."
-      : undefined;
+        ? "Broadcasting to Base network..."
+        : undefined;
 
   return (
     <div
@@ -592,25 +566,18 @@ function PaywallModal({
                   clipRule="evenodd"
                 />
               </svg>
-              <span className="text-sm text-emerald-300">
-                Payment confirmed — access granted
-              </span>
+              <span className="text-sm text-emerald-300">Payment confirmed — access granted</span>
             </div>
             <p className="mb-1 text-xs font-medium uppercase tracking-wider text-amber-400">
               {article.section}
             </p>
-            <h2 className="mb-1 text-xl font-bold leading-snug text-white">
-              {article.headline}
-            </h2>
+            <h2 className="mb-1 text-xl font-bold leading-snug text-white">{article.headline}</h2>
             <p className="mb-4 text-xs text-gray-500">
               {article.byline} · {article.date}
             </p>
             <div className="prose prose-sm prose-invert max-w-none">
               {article.body.split("\n\n").map((para, i) => (
-                <p
-                  key={i}
-                  className="mb-3 text-sm leading-relaxed text-gray-300"
-                >
+                <p key={i} className="mb-3 text-sm leading-relaxed text-gray-300">
                   {para}
                 </p>
               ))}
@@ -619,31 +586,21 @@ function PaywallModal({
         ) : (
           /* ── Paywall / payment flow ── */
           <div className="px-6 py-5">
-            <h2 className="mb-1 text-lg font-bold leading-snug text-white">
-              {article.headline}
-            </h2>
-            <p className="mb-4 text-sm leading-relaxed text-gray-400">
-              {article.teaser}
-            </p>
+            <h2 className="mb-1 text-lg font-bold leading-snug text-white">{article.headline}</h2>
+            <p className="mb-4 text-sm leading-relaxed text-gray-400">{article.teaser}</p>
 
             {/* Divider with lock */}
             <div className="relative mb-5 flex items-center gap-3">
               <div className="h-px flex-1 bg-white/10" />
               <div className="flex items-center gap-1.5 rounded-full border border-white/10 bg-zinc-800 px-3 py-1">
-                <svg
-                  className="h-3.5 w-3.5 text-amber-400"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                >
+                <svg className="h-3.5 w-3.5 text-amber-400" viewBox="0 0 20 20" fill="currentColor">
                   <path
                     fillRule="evenodd"
                     d="M10 1a4.5 4.5 0 00-4.5 4.5V9H5a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-.5V5.5A4.5 4.5 0 0010 1zm3 8V5.5a3 3 0 10-6 0V9h6z"
                     clipRule="evenodd"
                   />
                 </svg>
-                <span className="text-xs font-medium text-amber-400">
-                  Premium content
-                </span>
+                <span className="text-xs font-medium text-amber-400">Premium content</span>
               </div>
               <div className="h-px flex-1 bg-white/10" />
             </div>
@@ -678,17 +635,12 @@ function PaywallModal({
 
             {/* CTA */}
             <div className="flex items-center gap-4">
-              {paymentState.phase === "idle" ||
-              paymentState.phase === "error" ? (
+              {paymentState.phase === "idle" || paymentState.phase === "error" ? (
                 <button
                   onClick={startPayment}
                   className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-amber-500 px-5 py-3 text-sm font-semibold text-black transition hover:bg-amber-400 active:scale-95"
                 >
-                  <svg
-                    className="h-4 w-4"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                  >
+                  <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                     <path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4z" />
                     <path
                       fillRule="evenodd"
@@ -696,17 +648,11 @@ function PaywallModal({
                       clipRule="evenodd"
                     />
                   </svg>
-                  {paymentState.phase === "error"
-                    ? "Retry Payment"
-                    : "Pay $0.0001 USDC to unlock"}
+                  {paymentState.phase === "error" ? "Retry Payment" : "Pay $0.0001 USDC to unlock"}
                 </button>
               ) : (
                 <div className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-zinc-700 px-5 py-3 text-sm font-semibold text-gray-400">
-                  <svg
-                    className="h-4 w-4 animate-spin"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                  >
+                  <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
                     <circle
                       className="opacity-25"
                       cx="12"
@@ -795,15 +741,11 @@ function PremiumArticleCard({
             Subscribed
           </span>
         </div>
-        <h2 className="mb-1 text-lg font-bold leading-snug text-white">
-          {article.headline}
-        </h2>
+        <h2 className="mb-1 text-lg font-bold leading-snug text-white">{article.headline}</h2>
         <p className="mb-2 text-xs text-gray-500">
           {article.byline} · {article.date}
         </p>
-        <p className="text-sm leading-relaxed text-gray-400">
-          {article.teaser}
-        </p>
+        <p className="text-sm leading-relaxed text-gray-400">{article.teaser}</p>
         {expanded && (
           <div className="mt-3 border-t border-white/5 pt-3">
             {article.body.split("\n\n").map((para, i) => (
@@ -833,17 +775,13 @@ function PremiumArticleCard({
           Premium
         </span>
       </div>
-      <h2 className="mb-1 text-lg font-bold leading-snug text-white">
-        {article.headline}
-      </h2>
+      <h2 className="mb-1 text-lg font-bold leading-snug text-white">{article.headline}</h2>
       <p className="mb-2 text-xs text-gray-500">
         {article.byline} · {article.date}
       </p>
       {/* Teaser with gradient fade */}
       <div className="relative overflow-hidden">
-        <p className="text-sm leading-relaxed text-gray-400">
-          {article.teaser}
-        </p>
+        <p className="text-sm leading-relaxed text-gray-400">{article.teaser}</p>
         <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-zinc-950/90 to-transparent" />
       </div>
       <button
@@ -900,9 +838,7 @@ export default function NewspaperPage() {
         <div className="mx-auto max-w-5xl">
           <div className="flex items-end justify-between">
             <div>
-              <h1 className="text-4xl font-black tracking-tight text-white">
-                The Sangria Gazette
-              </h1>
+              <h1 className="text-4xl font-black tracking-tight text-white">The Sangria Gazette</h1>
               <p className="mt-0.5 text-xs text-gray-500">
                 Established 2026 · Independent Digital News
               </p>
@@ -914,16 +850,14 @@ export default function NewspaperPage() {
           </div>
           {/* Nav */}
           <nav className="mt-3 flex gap-4 border-t border-white/8 pt-3">
-            {["Economy", "Technology", "World", "Finance", "Science"].map(
-              (s) => (
-                <span
-                  key={s}
-                  className="cursor-default text-xs font-medium text-gray-400 transition hover:text-white"
-                >
-                  {s}
-                </span>
-              )
-            )}
+            {["Economy", "Technology", "World", "Finance", "Science"].map((s) => (
+              <span
+                key={s}
+                className="cursor-default text-xs font-medium text-gray-400 transition hover:text-white"
+              >
+                {s}
+              </span>
+            ))}
           </nav>
         </div>
       </header>
@@ -936,9 +870,8 @@ export default function NewspaperPage() {
             Breaking
           </span>
           <p className="text-sm text-gray-300">
-            Stablecoin payments cross{" "}
-            <span className="font-semibold text-white">$10 trillion</span> in
-            annual volume — x402 protocol sees explosive adoption
+            Stablecoin payments cross <span className="font-semibold text-white">$10 trillion</span>{" "}
+            in annual volume — x402 protocol sees explosive adoption
           </p>
         </div>
 
@@ -965,11 +898,7 @@ export default function NewspaperPage() {
         <div className="relative mb-8 flex items-center gap-4">
           <div className="h-px flex-1 bg-amber-500/20" />
           <div className="flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-950/30 px-4 py-1.5">
-            <svg
-              className="h-3.5 w-3.5 text-amber-400"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-            >
+            <svg className="h-3.5 w-3.5 text-amber-400" viewBox="0 0 20 20" fill="currentColor">
               <path
                 fillRule="evenodd"
                 d="M10 1a4.5 4.5 0 00-4.5 4.5V9H5a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-.5V5.5A4.5 4.5 0 0010 1zm3 8V5.5a3 3 0 10-6 0V9h6z"
@@ -1011,9 +940,8 @@ export default function NewspaperPage() {
         {/* Footer */}
         <footer className="mt-12 border-t border-white/8 pt-6 text-center">
           <p className="text-xs text-gray-600">
-            Premium articles are unlocked via{" "}
-            <span className="font-mono text-amber-600">x402</span> micropayments
-            · USDC on Base · Powered by Sangria
+            Premium articles are unlocked via <span className="font-mono text-amber-600">x402</span>{" "}
+            micropayments · USDC on Base · Powered by Sangria
           </p>
         </footer>
       </main>

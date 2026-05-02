@@ -63,7 +63,7 @@ export default function RootLayout({
         className={`${ibmPlexSans.variable} ${ptSerif.variable} ${jetbrainsMono.variable} antialiased`}
       >
         <RootProvider theme={{ enabled: false }} search={{ enabled: false }}>
-            {children}
+          {children}
         </RootProvider>
       </body>
     </html>

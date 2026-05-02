@@ -1,10 +1,6 @@
 import { CdpClient } from "@coinbase/cdp-sdk";
 import { x402Client, x402HTTPClient } from "@x402/core/client";
-import type {
-  PaymentRequired,
-  PaymentRequirements,
-  ResourceInfo,
-} from "@x402/core/types";
+import type { PaymentRequired, PaymentRequirements, ResourceInfo } from "@x402/core/types";
 import { ExactEvmScheme } from "@x402/evm/exact/client";
 import type { ClientEvmSigner } from "@x402/evm";
 import { withAuth } from "@workos-inc/authkit-nextjs";
@@ -32,10 +28,7 @@ const MIN_IDEMPOTENCY_KEY_LENGTH = 8;
 const MAX_IDEMPOTENCY_KEY_LENGTH = 128;
 const SWEEP_EVERY_N_REQUESTS = 50;
 
-const paymentRateLimitStore = new Map<
-  string,
-  { windowStart: number; count: number }
->();
+const paymentRateLimitStore = new Map<string, { windowStart: number; count: number }>();
 const idempotencyStore = new Map<
   string,
   { status: "in_flight" | "completed" | "unresolved"; expiresAt: number }
@@ -81,11 +74,11 @@ function encode(event: SseEvent): Uint8Array {
 
 function toPaymentRequired(
   response: BackendGeneratePaymentResponse,
-  fallbackResource: string
+  fallbackResource: string,
 ): PaymentRequired {
   if (response.x402Version !== 2) {
     throw new Error(
-      `Expected x402Version=2 from generate-payment, received ${response.x402Version}`
+      `Expected x402Version=2 from generate-payment, received ${response.x402Version}`,
     );
   }
   if (!response.accepts?.length) {
@@ -97,8 +90,7 @@ function toPaymentRequired(
     accepts: response.accepts,
     resource: {
       url: response.resource?.url ?? fallbackResource,
-      description:
-        response.resource?.description ?? "Access premium newspaper content",
+      description: response.resource?.description ?? "Access premium newspaper content",
       mimeType: response.resource?.mimeType ?? "application/json",
     },
   };
@@ -143,7 +135,7 @@ function checkRateLimit(userId: string): boolean {
 
 function reserveIdempotency(
   userId: string,
-  idempotencyKey: string
+  idempotencyKey: string,
 ):
   | { ok: true; storeKey: string }
   | { ok: false; status: "in_flight" | "completed" | "unresolved" } {
@@ -214,17 +206,11 @@ export async function POST(request: Request) {
     idempotencyKey.length < MIN_IDEMPOTENCY_KEY_LENGTH ||
     idempotencyKey.length > MAX_IDEMPOTENCY_KEY_LENGTH
   ) {
-    return Response.json(
-      { error: "Missing or invalid x-idempotency-key header" },
-      { status: 400 }
-    );
+    return Response.json({ error: "Missing or invalid x-idempotency-key header" }, { status: 400 });
   }
 
   if (!checkRateLimit(user.id)) {
-    return Response.json(
-      { error: "Rate limit exceeded. Try again shortly." },
-      { status: 429 }
-    );
+    return Response.json({ error: "Rate limit exceeded. Try again shortly." }, { status: 429 });
   }
 
   maybeSweepStateStores();
@@ -293,10 +279,7 @@ export async function POST(request: Request) {
       try {
         const generatePaymentUrl = `${BACKEND_URL}/v1/generate-payment`;
         const settlePaymentUrl = `${BACKEND_URL}/v1/settle-payment`;
-        const negotiateSignal = AbortSignal.any([
-          request.signal,
-          AbortSignal.timeout(15_000),
-        ]);
+        const negotiateSignal = AbortSignal.any([request.signal, AbortSignal.timeout(15_000)]);
 
         // ----------------------------------------------------------------
         // Step 1: Negotiate — ask Sangria backend for payment requirements
@@ -326,26 +309,19 @@ export async function POST(request: Request) {
           throw new Error("Payment service returned an error");
         }
 
-        const challenge =
-          (await initialResp.json()) as BackendGeneratePaymentResponse;
+        const challenge = (await initialResp.json()) as BackendGeneratePaymentResponse;
         const paymentRequired = toPaymentRequired(challenge, demoResource);
         const accepts = paymentRequired.accepts[0];
         if (!accepts) throw new Error("payment requirements missing accepts[]");
         const amountMicro = BigInt(accepts.amount);
         if (amountMicro !== BigInt(DEMO_PRICE_MICROUNITS)) {
-          throw new Error(
-            "Negotiated amount does not match configured demo price"
-          );
+          throw new Error("Negotiated amount does not match configured demo price");
         }
         const wholePart = amountMicro / MICROUNITS_PER_USDC;
-        const rawFractionalPart = (amountMicro % MICROUNITS_PER_USDC)
-          .toString()
-          .padStart(6, "0");
+        const rawFractionalPart = (amountMicro % MICROUNITS_PER_USDC).toString().padStart(6, "0");
         const fractionalPart = rawFractionalPart.replace(/0+$/, "");
         const amountUsdc =
-          fractionalPart.length > 0
-            ? `${wholePart}.${fractionalPart}`
-            : wholePart.toString();
+          fractionalPart.length > 0 ? `${wholePart}.${fractionalPart}` : wholePart.toString();
 
         send({
           step: "negotiate",
@@ -364,39 +340,29 @@ export async function POST(request: Request) {
         // ----------------------------------------------------------------
         send({ step: "sign", status: "pending" });
 
-        const client = new x402Client().register(
-          "eip155:*",
-          new ExactEvmScheme(signer)
-        );
+        const client = new x402Client().register("eip155:*", new ExactEvmScheme(signer));
         const httpClient = new x402HTTPClient(client);
-        const paymentPayload = await httpClient.createPaymentPayload(
-          paymentRequired
-        );
-        const signatureHeaders =
-          httpClient.encodePaymentSignatureHeader(paymentPayload);
+        const paymentPayload = await httpClient.createPaymentPayload(paymentRequired);
+        const signatureHeaders = httpClient.encodePaymentSignatureHeader(paymentPayload);
         const paymentSignature = signatureHeaders["PAYMENT-SIGNATURE"];
         if (!paymentSignature) {
-          throw new Error(
-            "x402 v2 client did not return PAYMENT-SIGNATURE header"
-          );
+          throw new Error("x402 v2 client did not return PAYMENT-SIGNATURE header");
         }
 
         const signedPreview = JSON.parse(
-          Buffer.from(paymentSignature, "base64").toString("utf8")
+          Buffer.from(paymentSignature, "base64").toString("utf8"),
         ) as SignedPayloadPreview;
         const signature = signedPreview.payload?.signature;
         if (!signature) {
           throw new Error("x402 v2 client returned payload without signature");
         }
-        const signaturePreview =
-          signature.length > 22 ? signature.slice(0, 22) + "..." : signature;
+        const signaturePreview = signature.length > 22 ? signature.slice(0, 22) + "..." : signature;
 
         send({
           step: "sign",
           status: "done",
           data: {
-            signer:
-              signedPreview.payload?.authorization?.from ?? signer.address,
+            signer: signedPreview.payload?.authorization?.from ?? signer.address,
             signaturePreview,
           },
         });
@@ -410,10 +376,7 @@ export async function POST(request: Request) {
           throw new Error("Request aborted before settlement");
         }
 
-        const settleSignal = AbortSignal.any([
-          request.signal,
-          AbortSignal.timeout(120_000),
-        ]);
+        const settleSignal = AbortSignal.any([request.signal, AbortSignal.timeout(120_000)]);
         const settleResp = await fetch(settlePaymentUrl, {
           method: "POST",
           headers: {

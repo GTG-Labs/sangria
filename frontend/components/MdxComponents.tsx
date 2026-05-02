@@ -14,34 +14,15 @@ export const mdxComponents: MDXComponents = {
     />
   ),
   h3: (props) => (
-    <h3
-      className="text-lg font-semibold text-gray-900 dark:text-white mt-6 mb-2"
-      {...props}
-    />
+    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mt-6 mb-2" {...props} />
   ),
-  p: (props) => (
-    <p
-      className="text-gray-700 dark:text-zinc-300 leading-relaxed mb-4"
-      {...props}
-    />
-  ),
-  a: (props) => (
-    <a
-      className="text-sangria-500 hover:underline transition-colors"
-      {...props}
-    />
-  ),
+  p: (props) => <p className="text-gray-700 dark:text-zinc-300 leading-relaxed mb-4" {...props} />,
+  a: (props) => <a className="text-sangria-500 hover:underline transition-colors" {...props} />,
   ul: (props) => (
-    <ul
-      className="list-disc pl-6 text-gray-700 dark:text-zinc-300 mb-4 space-y-1"
-      {...props}
-    />
+    <ul className="list-disc pl-6 text-gray-700 dark:text-zinc-300 mb-4 space-y-1" {...props} />
   ),
   ol: (props) => (
-    <ol
-      className="list-decimal pl-6 text-gray-700 dark:text-zinc-300 mb-4 space-y-1"
-      {...props}
-    />
+    <ol className="list-decimal pl-6 text-gray-700 dark:text-zinc-300 mb-4 space-y-1" {...props} />
   ),
   li: (props) => <li className="leading-relaxed" {...props} />,
   blockquote: (props) => (
@@ -86,12 +67,7 @@ export const mdxComponents: MDXComponents = {
     />
   ),
   hr: () => <hr className="border-zinc-200 dark:border-zinc-800 my-8" />,
-  strong: (props) => (
-    <strong
-      className="text-gray-900 dark:text-white font-semibold"
-      {...props}
-    />
-  ),
+  strong: (props) => <strong className="text-gray-900 dark:text-white font-semibold" {...props} />,
   img: (props) => (
     // eslint-disable-next-line @next/next/no-img-element
     <img className="rounded-lg my-4 max-w-full" alt="" {...props} />

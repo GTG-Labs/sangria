@@ -121,7 +121,7 @@ export default function AdminWithdrawalsContent() {
         if (data.data && data.pagination) {
           const paginatedData = data as PaginatedWithdrawalsResponse;
           setWithdrawals((prev) =>
-            cursor ? [...prev, ...paginatedData.data] : paginatedData.data
+            cursor ? [...prev, ...paginatedData.data] : paginatedData.data,
           );
           setNextCursor(paginatedData.pagination.next_cursor);
           setHasMore(paginatedData.pagination.has_more);
@@ -133,9 +133,7 @@ export default function AdminWithdrawalsContent() {
         }
         setError(null);
       } else {
-        const errorData = await response
-          .json()
-          .catch(() => ({ error: "Unknown error" }));
+        const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
         if (controller.signal.aborted) return;
         setError(errorData.error || "Failed to load withdrawals");
         if (isInitialLoad) resetForInitialLoadFailure();
@@ -157,20 +155,17 @@ export default function AdminWithdrawalsContent() {
   const performAction = async (
     withdrawalId: string,
     action: string,
-    body?: Record<string, string>
+    body?: Record<string, string>,
   ) => {
     setActionLoading(withdrawalId);
     setError(null);
 
     try {
-      const response = await fetch(
-        `/api/admin/withdrawals/${withdrawalId}/${action}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          ...(body ? { body: JSON.stringify(body) } : {}),
-        }
-      );
+      const response = await fetch(`/api/admin/withdrawals/${withdrawalId}/${action}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        ...(body ? { body: JSON.stringify(body) } : {}),
+      });
 
       if (response.ok) {
         // Patch the acted-upon row in place using the returned Withdrawal
@@ -180,20 +175,17 @@ export default function AdminWithdrawalsContent() {
         // longer matches the active filter, drop the row from the list and
         // decrement `total` so the filter's promise stays intact.
         const updated = (await response.json()) as Withdrawal;
-        const droppedByFilter =
-          !!statusFilter && updated.status !== statusFilter;
+        const droppedByFilter = !!statusFilter && updated.status !== statusFilter;
         setWithdrawals((prev) =>
           droppedByFilter
             ? prev.filter((w) => w.id !== updated.id)
-            : prev.map((w) => (w.id === updated.id ? updated : w))
+            : prev.map((w) => (w.id === updated.id ? updated : w)),
         );
         if (droppedByFilter) {
           setTotal((t) => (t !== null ? Math.max(0, t - 1) : t));
         }
       } else {
-        const errorData = await response
-          .json()
-          .catch(() => ({ error: "Unknown error" }));
+        const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
         setError(errorData.error || `Failed to ${action} withdrawal`);
       }
     } catch {
@@ -230,8 +222,7 @@ export default function AdminWithdrawalsContent() {
   const handleReject = (id: string) => {
     setDialog({
       title: "Reject withdrawal",
-      message:
-        "This will reverse the balance debit. This action cannot be undone.",
+      message: "This will reverse the balance debit. This action cannot be undone.",
       fields: [
         {
           name: "note",
@@ -254,8 +245,7 @@ export default function AdminWithdrawalsContent() {
   const handleComplete = (id: string) => {
     setDialog({
       title: "Mark as completed",
-      message:
-        "This confirms the bank transfer has been sent. This action cannot be undone.",
+      message: "This confirms the bank transfer has been sent. This action cannot be undone.",
       fields: [],
       confirmLabel: "Complete",
       confirmVariant: "primary",
@@ -310,16 +300,11 @@ export default function AdminWithdrawalsContent() {
   const formatMicrounits = (microunits: number) => {
     const whole = Math.floor(microunits / 1_000_000);
     const frac = microunits % 1_000_000;
-    const fracStr = frac
-      .toString()
-      .padStart(6, "0")
-      .replace(/0+$/, "")
-      .padEnd(2, "0");
+    const fracStr = frac.toString().padStart(6, "0").replace(/0+$/, "").padEnd(2, "0");
     return `${whole.toLocaleString("en-US")}.${fracStr}`;
   };
 
-  const formatAmount = (microunits: number) =>
-    `$${formatMicrounits(microunits)}`;
+  const formatAmount = (microunits: number) => `$${formatMicrounits(microunits)}`;
 
   const formatDate = (dateString: string) =>
     new Date(dateString).toLocaleString("en-US", {
@@ -328,9 +313,7 @@ export default function AdminWithdrawalsContent() {
     });
 
   const timeAgo = (dateString: string) => {
-    const seconds = Math.floor(
-      (Date.now() - new Date(dateString).getTime()) / 1000
-    );
+    const seconds = Math.floor((Date.now() - new Date(dateString).getTime()) / 1000);
     if (seconds < 60) return "just now";
     const minutes = Math.floor(seconds / 60);
     if (minutes < 60) return `${minutes}m ago`;
@@ -376,9 +359,7 @@ export default function AdminWithdrawalsContent() {
   const detailRow = (label: string, value: string | null, mono = false) => (
     <div className="flex gap-4 py-1 text-sm">
       <span className="w-32 shrink-0 text-gray-500">{label}</span>
-      <span
-        className={`break-all ${mono ? "font-mono text-xs text-gray-400" : "text-gray-300"}`}
-      >
+      <span className={`break-all ${mono ? "font-mono text-xs text-gray-400" : "text-gray-300"}`}>
         {value || "—"}
       </span>
     </div>
@@ -386,9 +367,7 @@ export default function AdminWithdrawalsContent() {
 
   const detailSection = (title: string, rows: React.ReactNode) => (
     <div>
-      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-500">
-        {title}
-      </h3>
+      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-500">{title}</h3>
       {rows}
     </div>
   );
@@ -405,49 +384,31 @@ export default function AdminWithdrawalsContent() {
           <>
             {detailRow("ID", w.id, true)}
             {detailRow("Organization ID", w.organization_id, true)}
-          </>
+          </>,
         )}
         {detailSection(
           "Timeline",
           <>
             {detailRow("Requested", formatDate(w.created_at))}
             {detailRow("Approved", w.approved_at && formatDate(w.approved_at))}
-            {detailRow(
-              "Processed",
-              w.processed_at && formatDate(w.processed_at)
-            )}
-            {detailRow(
-              "Completed",
-              w.completed_at && formatDate(w.completed_at)
-            )}
+            {detailRow("Processed", w.processed_at && formatDate(w.processed_at))}
+            {detailRow("Completed", w.completed_at && formatDate(w.completed_at))}
             {detailRow("Failed", w.failed_at && formatDate(w.failed_at))}
-            {detailRow(
-              "Reversed",
-              w.reversed_at && formatDate(w.reversed_at)
-            )}
-            {detailRow(
-              "Canceled",
-              w.canceled_at && formatDate(w.canceled_at)
-            )}
-          </>
+            {detailRow("Reversed", w.reversed_at && formatDate(w.reversed_at))}
+            {detailRow("Canceled", w.canceled_at && formatDate(w.canceled_at))}
+          </>,
         )}
         {hasReview &&
           detailSection(
             "Review",
             <>
               {detailRow("Reviewer", w.reviewed_by, true)}
-              {detailRow(
-                "Reviewed at",
-                w.reviewed_at && formatDate(w.reviewed_at)
-              )}
+              {detailRow("Reviewed at", w.reviewed_at && formatDate(w.reviewed_at))}
               {detailRow("Note", w.review_note)}
-            </>
+            </>,
           )}
         {hasCompletion &&
-          detailSection(
-            "Completion",
-            detailRow("Completed by", w.completed_by, true)
-          )}
+          detailSection("Completion", detailRow("Completed by", w.completed_by, true))}
         {hasFailure &&
           detailSection(
             "Failure",
@@ -455,7 +416,7 @@ export default function AdminWithdrawalsContent() {
               {detailRow("Failed by", w.failed_by, true)}
               {detailRow("Code", w.failure_code)}
               {detailRow("Message", w.failure_message)}
-            </>
+            </>,
           )}
         {detailSection(
           "Ledger Transactions",
@@ -463,7 +424,7 @@ export default function AdminWithdrawalsContent() {
             {detailRow("Debit", w.debit_transaction_id, true)}
             {detailRow("Completion", w.completion_transaction_id, true)}
             {detailRow("Reversal", w.reversal_transaction_id, true)}
-          </>
+          </>,
         )}
       </div>
     );
@@ -541,11 +502,7 @@ export default function AdminWithdrawalsContent() {
           className="rounded-lg border border-gray-700 bg-transparent px-3 py-2 text-sm text-white focus:border-gray-500 focus:outline-none"
         >
           {STATUS_OPTIONS.map((opt) => (
-            <option
-              key={opt.value}
-              value={opt.value}
-              className="bg-gray-950 text-white"
-            >
+            <option key={opt.value} value={opt.value} className="bg-gray-950 text-white">
               {opt.label}
             </option>
           ))}
@@ -608,8 +565,7 @@ export default function AdminWithdrawalsContent() {
             <tbody>
               {withdrawals.map((w) => {
                 const isExpanded = expandedId === w.id;
-                const toggle = () =>
-                  setExpandedId(isExpanded ? null : w.id);
+                const toggle = () => setExpandedId(isExpanded ? null : w.id);
                 return (
                   <Fragment key={w.id}>
                     <tr
@@ -632,10 +588,7 @@ export default function AdminWithdrawalsContent() {
                     >
                       <td className="py-4 pr-4 font-mono text-xs text-gray-500">
                         <div className="flex items-center gap-2">
-                          <span
-                            aria-hidden
-                            className="select-none text-gray-500 w-3 inline-block"
-                          >
+                          <span aria-hidden className="select-none text-gray-500 w-3 inline-block">
                             {isExpanded ? "▾" : "▸"}
                           </span>
                           {truncateId(w.id)}
@@ -654,13 +607,8 @@ export default function AdminWithdrawalsContent() {
                         {formatAmount(w.net_amount)}
                       </td>
                       <td className="py-4 px-4">{statusBadge(w.status)}</td>
-                      <td className="py-4 px-4 text-sm text-gray-500">
-                        {timeAgo(w.created_at)}
-                      </td>
-                      <td
-                        className="py-4 pl-4 text-right"
-                        onClick={(e) => e.stopPropagation()}
-                      >
+                      <td className="py-4 px-4 text-sm text-gray-500">{timeAgo(w.created_at)}</td>
+                      <td className="py-4 pl-4 text-right" onClick={(e) => e.stopPropagation()}>
                         {renderActions(w)}
                       </td>
                     </tr>

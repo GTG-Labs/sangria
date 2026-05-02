@@ -63,7 +63,7 @@ function AcceptInvitationContent() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          token
+          token,
         }),
       });
 
@@ -108,11 +108,10 @@ function AcceptInvitationContent() {
             {status === "loading" && (
               <>
                 <Loader className="mx-auto h-12 w-12 text-blue-500 animate-spin" />
-                <h2 className="mt-4 text-xl font-bold text-gray-900">
-                  Processing Invitation
-                </h2>
+                <h2 className="mt-4 text-xl font-bold text-gray-900">Processing Invitation</h2>
                 <p className="mt-2 text-sm text-gray-600">
-                  Accepting your invitation. Please sign in to complete account creation and join the organization.
+                  Accepting your invitation. Please sign in to complete account creation and join
+                  the organization.
                 </p>
               </>
             )}
@@ -120,9 +119,7 @@ function AcceptInvitationContent() {
             {status === "success" && (
               <>
                 <CheckCircle className="mx-auto h-12 w-12 text-green-500" />
-                <h2 className="mt-4 text-xl font-bold text-green-900">
-                  Welcome to the Team! 🎉
-                </h2>
+                <h2 className="mt-4 text-xl font-bold text-green-900">Welcome to the Team! 🎉</h2>
                 <p className="mt-2 text-sm text-gray-600">{message}</p>
                 <p className="mt-4 text-sm text-gray-500">
                   Now you need to sign in to access your account and the organization.
@@ -142,9 +139,7 @@ function AcceptInvitationContent() {
             {status === "error" && (
               <>
                 <XCircle className="mx-auto h-12 w-12 text-red-500" />
-                <h2 className="mt-4 text-xl font-bold text-red-900">
-                  Invitation Error
-                </h2>
+                <h2 className="mt-4 text-xl font-bold text-red-900">Invitation Error</h2>
                 <p className="mt-2 text-sm text-gray-600">{message}</p>
                 <div className="mt-6 space-y-3">
                   <button

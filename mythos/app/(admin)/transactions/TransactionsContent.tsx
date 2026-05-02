@@ -81,7 +81,7 @@ export default function TransactionsContent() {
       if (activeSearch) params.set("search", activeSearch);
       return `/api/admin/transactions?${params}`;
     },
-    [activeSearch]
+    [activeSearch],
   );
 
   const fetchTransactions = useCallback(
@@ -106,18 +106,14 @@ export default function TransactionsContent() {
 
         if (response.ok) {
           const data = (await response.json()) as PaginatedResponse;
-          setTransactions((prev) =>
-            cursor ? [...prev, ...data.data] : data.data
-          );
+          setTransactions((prev) => (cursor ? [...prev, ...data.data] : data.data));
           setNextCursor(data.pagination.next_cursor);
           setHasMore(data.pagination.has_more);
           setTotal(data.pagination.total);
           if (data.totals) setTotals(data.totals);
           setError(null);
         } else {
-          const errorData = await response
-            .json()
-            .catch(() => ({ error: "Unknown error" }));
+          const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
           setError(errorData.error || "Failed to load transactions");
           if (isInitialLoad) resetForInitialLoadFailure();
         }
@@ -132,7 +128,7 @@ export default function TransactionsContent() {
         }
       }
     },
-    [buildUrl]
+    [buildUrl],
   );
 
   useEffect(() => {
@@ -148,7 +144,9 @@ export default function TransactionsContent() {
     setLedgerEntries([]);
     setLedgerLoading(true);
     try {
-      const res = await fetch(`/api/admin/transactions/${tx.id}/ledger`, { signal: controller.signal });
+      const res = await fetch(`/api/admin/transactions/${tx.id}/ledger`, {
+        signal: controller.signal,
+      });
       if (res.ok) {
         const data = await res.json();
         setLedgerEntries(data.entries ?? []);
@@ -183,11 +181,7 @@ export default function TransactionsContent() {
   const formatMicrounits = (microunits: number) => {
     const whole = Math.floor(microunits / 1_000_000);
     const frac = microunits % 1_000_000;
-    const fracStr = frac
-      .toString()
-      .padStart(6, "0")
-      .replace(/0+$/, "")
-      .padEnd(2, "0");
+    const fracStr = frac.toString().padStart(6, "0").replace(/0+$/, "").padEnd(2, "0");
     return `$${whole.toLocaleString("en-US")}.${fracStr}`;
   };
 
@@ -202,13 +196,10 @@ export default function TransactionsContent() {
     return `${key.slice(0, 10)}...${key.slice(-8)}`;
   };
 
-  const getBlockExplorerUrl = (hash: string) =>
-    `https://basescan.org/tx/${hash}`;
+  const getBlockExplorerUrl = (hash: string) => `https://basescan.org/tx/${hash}`;
 
   const timeAgo = (dateString: string) => {
-    const seconds = Math.floor(
-      (Date.now() - new Date(dateString).getTime()) / 1000
-    );
+    const seconds = Math.floor((Date.now() - new Date(dateString).getTime()) / 1000);
     if (seconds < 60) return "just now";
     const minutes = Math.floor(seconds / 60);
     if (minutes < 60) return `${minutes}m ago`;
@@ -232,9 +223,7 @@ export default function TransactionsContent() {
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-white">Transactions</h1>
         {total !== null && (
-          <p className="mt-1 text-sm text-gray-500">
-            {total} total across all merchants
-          </p>
+          <p className="mt-1 text-sm text-gray-500">{total} total across all merchants</p>
         )}
       </div>
 
@@ -242,28 +231,20 @@ export default function TransactionsContent() {
       {totals && (
         <div className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-3">
           <div className="rounded-lg border border-gray-800 p-4">
-            <p className="text-xs text-gray-500 uppercase tracking-wider">
-              Volume
-            </p>
+            <p className="text-xs text-gray-500 uppercase tracking-wider">Volume</p>
             <p className="mt-1 text-xl font-semibold text-white">
               {formatMicrounits(totals.total_volume)}
             </p>
           </div>
           <div className="rounded-lg border border-gray-800 p-4">
-            <p className="text-xs text-gray-500 uppercase tracking-wider">
-              Transactions
-            </p>
+            <p className="text-xs text-gray-500 uppercase tracking-wider">Transactions</p>
             <p className="mt-1 text-xl font-semibold text-white">
               {totals.transaction_count.toLocaleString()}
             </p>
           </div>
           <div className="rounded-lg border border-gray-800 p-4">
-            <p className="text-xs text-gray-500 uppercase tracking-wider">
-              Merchants
-            </p>
-            <p className="mt-1 text-xl font-semibold text-white">
-              {totals.merchant_count}
-            </p>
+            <p className="text-xs text-gray-500 uppercase tracking-wider">Merchants</p>
+            <p className="mt-1 text-xl font-semibold text-white">{totals.merchant_count}</p>
           </div>
         </div>
       )}
@@ -349,9 +330,7 @@ export default function TransactionsContent() {
                         onClick={(e) => e.stopPropagation()}
                         className="inline-flex items-center gap-1.5 text-sm text-gray-300 hover:text-white transition-colors"
                       >
-                        <span className="font-mono">
-                          {truncateKey(tx.idempotency_key)}
-                        </span>
+                        <span className="font-mono">{truncateKey(tx.idempotency_key)}</span>
                         <svg
                           className="w-3.5 h-3.5 text-gray-600"
                           fill="none"
@@ -372,9 +351,7 @@ export default function TransactionsContent() {
                       </span>
                     )}
                   </td>
-                  <td className="py-4 px-4 text-sm text-gray-300">
-                    {tx.merchant_name}
-                  </td>
+                  <td className="py-4 px-4 text-sm text-gray-300">{tx.merchant_name}</td>
                   <td className="py-4 px-4 text-sm text-gray-300 font-mono">
                     +{formatAmount(tx.amount, tx.currency)}
                   </td>
@@ -422,33 +399,30 @@ export default function TransactionsContent() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-semibold text-white">
-                Transaction Details
-              </h2>
+              <h2 className="text-lg font-semibold text-white">Transaction Details</h2>
               <button
                 onClick={() => setSelectedTx(null)}
                 className="text-gray-500 hover:text-white transition-colors"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
                 </svg>
               </button>
             </div>
 
             <div className="space-y-4">
               <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wider">
-                  Transaction ID
-                </p>
-                <p className="mt-1 text-sm text-gray-300 font-mono break-all">
-                  {selectedTx.id}
-                </p>
+                <p className="text-xs text-gray-500 uppercase tracking-wider">Transaction ID</p>
+                <p className="mt-1 text-sm text-gray-300 font-mono break-all">{selectedTx.id}</p>
               </div>
 
               <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wider">
-                  Transaction Hash
-                </p>
+                <p className="text-xs text-gray-500 uppercase tracking-wider">Transaction Hash</p>
                 <p className="mt-1 text-sm text-gray-300 font-mono break-all">
                   {selectedTx.idempotency_key.startsWith("0x") ? (
                     <a
@@ -466,15 +440,9 @@ export default function TransactionsContent() {
               </div>
 
               <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wider">
-                  Merchant
-                </p>
-                <p className="mt-1 text-sm text-gray-300">
-                  {selectedTx.merchant_name}
-                </p>
-                <p className="text-xs text-gray-600 font-mono">
-                  {selectedTx.merchant_id}
-                </p>
+                <p className="text-xs text-gray-500 uppercase tracking-wider">Merchant</p>
+                <p className="mt-1 text-sm text-gray-300">{selectedTx.merchant_name}</p>
+                <p className="text-xs text-gray-600 font-mono">{selectedTx.merchant_id}</p>
               </div>
 
               <div className="grid grid-cols-3 gap-4 rounded-lg border border-gray-800 p-4">
@@ -499,15 +467,11 @@ export default function TransactionsContent() {
               </div>
 
               <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wider">
-                  Time
-                </p>
+                <p className="text-xs text-gray-500 uppercase tracking-wider">Time</p>
                 <p className="mt-1 text-sm text-gray-300">
                   {new Date(selectedTx.created_at).toLocaleString()}
                 </p>
-                <p className="text-xs text-gray-600">
-                  {timeAgo(selectedTx.created_at)}
-                </p>
+                <p className="text-xs text-gray-600">{timeAgo(selectedTx.created_at)}</p>
               </div>
 
               {/* Ledger Entries */}
@@ -526,7 +490,9 @@ export default function TransactionsContent() {
                     <table className="w-full text-xs">
                       <thead>
                         <tr className="border-b border-gray-800 bg-gray-900/50">
-                          <th className="px-3 py-2 text-left text-gray-500 font-medium">Direction</th>
+                          <th className="px-3 py-2 text-left text-gray-500 font-medium">
+                            Direction
+                          </th>
                           <th className="px-3 py-2 text-left text-gray-500 font-medium">Account</th>
                           <th className="px-3 py-2 text-right text-gray-500 font-medium">Amount</th>
                         </tr>
@@ -535,11 +501,13 @@ export default function TransactionsContent() {
                         {ledgerEntries.map((entry) => (
                           <tr key={entry.id} className="border-b border-gray-800/50 last:border-0">
                             <td className="px-3 py-2">
-                              <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                                entry.direction === "DEBIT"
-                                  ? "bg-red-900/40 text-red-400"
-                                  : "bg-green-900/40 text-green-400"
-                              }`}>
+                              <span
+                                className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                                  entry.direction === "DEBIT"
+                                    ? "bg-red-900/40 text-red-400"
+                                    : "bg-green-900/40 text-green-400"
+                                }`}
+                              >
                                 {entry.direction}
                               </span>
                             </td>

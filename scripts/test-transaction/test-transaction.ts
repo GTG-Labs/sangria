@@ -32,14 +32,10 @@ function requireEnv(name: string): string {
   return val;
 }
 
-const MERCHANT_URL = (
-  process.env.MERCHANT_URL ?? "http://localhost:4005"
-).replace(/\/+$/, "");
+const MERCHANT_URL = (process.env.MERCHANT_URL ?? "http://localhost:4005").replace(/\/+$/, "");
 const buyerAddr = requireEnv("BUYER_ADDRESS");
 if (!isAddress(buyerAddr)) {
-  throw new Error(
-    `BUYER_ADDRESS is not a valid Ethereum address: ${buyerAddr}`
-  );
+  throw new Error(`BUYER_ADDRESS is not a valid Ethereum address: ${buyerAddr}`);
 }
 const BUYER_ADDRESS = buyerAddr as Address;
 
@@ -109,22 +105,19 @@ async function main() {
 
   console.log(`  Network:  ${accepts.network}`);
   console.log(
-    `  Amount:   ${accepts.amount} USDC microunits (${(
-      parseInt(accepts.amount) / 1e6
-    ).toFixed(6)} USDC)`
+    `  Amount:   ${accepts.amount} USDC microunits (${(parseInt(accepts.amount) / 1e6).toFixed(
+      6,
+    )} USDC)`,
   );
   console.log(`  PayTo:    ${accepts.payTo}`);
   console.log(`  Asset:    ${accepts.asset}`);
 
   // Extract chainId from CAIP-2 string (e.g. "eip155:8453" → 8453)
   const chainIdStr = accepts.network.split(":")[1];
-  if (!chainIdStr)
-    throw new Error(`Unexpected network format: ${accepts.network}`);
+  if (!chainIdStr) throw new Error(`Unexpected network format: ${accepts.network}`);
   const chainId = parseInt(chainIdStr, 10);
   if (Number.isNaN(chainId))
-    throw new Error(
-      `Invalid chainId "${chainIdStr}" in network: ${accepts.network}`
-    );
+    throw new Error(`Invalid chainId "${chainIdStr}" in network: ${accepts.network}`);
 
   // ------------------------------------------------------------------
   // Step 2: Sign EIP-3009 TransferWithAuthorization via CDP
@@ -207,21 +200,15 @@ async function main() {
     },
   };
 
-  const payloadB64 = Buffer.from(JSON.stringify(x402Payload)).toString(
-    "base64"
-  );
+  const payloadB64 = Buffer.from(JSON.stringify(x402Payload)).toString("base64");
   console.log(
-    `  Encoded ${JSON.stringify(x402Payload).length} chars → ${
-      payloadB64.length
-    } base64 chars`
+    `  Encoded ${JSON.stringify(x402Payload).length} chars → ${payloadB64.length} base64 chars`,
   );
 
   // ------------------------------------------------------------------
   // Step 4: Retry /api/premium with payment-signature header
   // ------------------------------------------------------------------
-  console.log(
-    "\nStep 4: GET /api/premium with payment-signature (settling on-chain)..."
-  );
+  console.log("\nStep 4: GET /api/premium with payment-signature (settling on-chain)...");
 
   const settleResp = await fetch(premiumUrl, {
     headers: { "payment-signature": payloadB64 },
@@ -245,10 +232,7 @@ async function main() {
     console.log(JSON.stringify(result, null, 2));
   } else {
     console.error("\n=== Payment failed ===");
-    console.error(
-      `  HTTP ${settleResp.status}:`,
-      JSON.stringify(result, null, 2)
-    );
+    console.error(`  HTTP ${settleResp.status}:`, JSON.stringify(result, null, 2));
     process.exit(1);
   }
 }

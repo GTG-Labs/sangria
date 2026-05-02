@@ -12,26 +12,10 @@ description: Learn how to accept your first payment using Express and the Sangri
 Install the Sangria SDK in your Express project.
 
 <Tabs items={["npm", "yarn", "pnpm", "bun"]}>
-  <Tab value="npm">
-  ```bash
-  npm install @sangria-sdk/core
-  ```
-  </Tab>
-  <Tab value="yarn">
-  ```bash
-  yarn add @sangria-sdk/core
-  ```
-  </Tab>
-  <Tab value="pnpm">
-  ```bash
-  pnpm add @sangria-sdk/core
-  ```
-  </Tab>
-  <Tab value="bun">
-  ```bash
-  bun add @sangria-sdk/core
-  ```
-  </Tab>
+  <Tab value="npm">```bash npm install @sangria-sdk/core ```</Tab>
+  <Tab value="yarn">```bash yarn add @sangria-sdk/core ```</Tab>
+  <Tab value="pnpm">```bash pnpm add @sangria-sdk/core ```</Tab>
+  <Tab value="bun">```bash bun add @sangria-sdk/core ```</Tab>
 </Tabs>
 
 ## 2. Initialize the client
@@ -73,7 +57,7 @@ app.get(
   }),
   (_req, res) => {
     res.json({ message: "You accessed the premium endpoint!" });
-  }
+  },
 );
 
 app.listen(4001);
@@ -88,18 +72,22 @@ If your customers already authenticate with their own API key, you can skip Sang
 ```ts
 app.get(
   "/premium",
-  fixedPrice(sangria, {
-    price: 0.01,
-    description: "Access premium content",
-  }, {
-    bypassPaymentIf: (req) => {
-      const key = req.headers["x-api-key"];
-      return typeof key === "string" && isValidApiKey(key); // validate against your own auth system
+  fixedPrice(
+    sangria,
+    {
+      price: 0.01,
+      description: "Access premium content",
     },
-  }),
+    {
+      bypassPaymentIf: (req) => {
+        const key = req.headers["x-api-key"];
+        return typeof key === "string" && isValidApiKey(key); // validate against your own auth system
+      },
+    },
+  ),
   (_req, res) => {
     res.json({ message: "You accessed the premium endpoint!" });
-  }
+  },
 );
 ```
 
@@ -120,7 +108,7 @@ app.get(
     // payment.transaction — on-chain tx hash
 
     res.json({ paid: payment?.paid });
-  }
+  },
 );
 ```
 
@@ -128,7 +116,7 @@ app.get(
 
 ## Handle errors
 
-If the Sangria backend is *unreachable, times out, or returns a non-2xx status*, the SDK throws a `SangriaError`. Without an error handler, Express returns a raw `500` stack trace to the caller.
+If the Sangria backend is _unreachable, times out, or returns a non-2xx status_, the SDK throws a `SangriaError`. Without an error handler, Express returns a raw `500` stack trace to the caller.
 
 Add an error handler **after** all your routes:
 
@@ -146,11 +134,11 @@ app.use((err, _req, res, next) => {
 
 `SangriaError` has an `.operation` field (`"generate"` or `"settle"`) so you know which step failed. Subclasses give you more detail:
 
-| Error | When | Properties |
-|-------|------|------------|
-| `SangriaConnectionError` | Network failure (DNS, refused, reset) | — |
-| `SangriaTimeoutError` | Request timed out | — |
-| `SangriaAPIStatusError` | Backend returned 4xx/5xx | `.statusCode`, `.response` |
+| Error                    | When                                  | Properties                 |
+| ------------------------ | ------------------------------------- | -------------------------- |
+| `SangriaConnectionError` | Network failure (DNS, refused, reset) | —                          |
+| `SangriaTimeoutError`    | Request timed out                     | —                          |
+| `SangriaAPIStatusError`  | Backend returned 4xx/5xx              | `.statusCode`, `.response` |
 
 Business-level payment failures (bad signature, insufficient funds) are **not** errors — they return a normal `402` response to the caller.
 
@@ -161,4 +149,3 @@ Your endpoint is now priced. When an AI agent calls it, here's what happens:
 1. The SDK returns a `402` with the price and payment details
 2. The agent signs a USDC payment off-chain and retries with a `payment-signature` header
 3. The SDK settles the payment on-chain, and your handler runs
-

@@ -20,5 +20,5 @@ export const GET = fixedPrice(
     return NextResponse.json({
       message: "You accessed the premium endpoint!",
     });
-  }
+  },
 );

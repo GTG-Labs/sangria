@@ -20,16 +20,13 @@ export async function proxyToBackend(
   method: string,
   path: string,
   options: { body?: unknown; rawResponse?: boolean } | undefined,
-  request: Request
+  request: Request,
 ): Promise<NextResponse> {
   try {
     const { user, accessToken } = await withAuth();
 
     if (!user || !accessToken) {
-      return NextResponse.json(
-        { error: "Authentication required" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
     }
 
     const controller = new AbortController();
@@ -42,12 +39,9 @@ export async function proxyToBackend(
         // Validate object structure before serialization
         const validation = JSONSecurity.validateObjectStructure(options.body);
         if (!validation.isValid) {
-          console.error('Invalid object structure:', validation.error);
+          console.error("Invalid object structure:", validation.error);
           clearTimeout(timeoutId); // Clean up timer on early return
-          return NextResponse.json(
-            { error: "Invalid request data structure" },
-            { status: 400 }
-          );
+          return NextResponse.json({ error: "Invalid request data structure" }, { status: 400 });
         }
 
         // Safe JSON serialization with prototype pollution protection
@@ -57,15 +51,14 @@ export async function proxyToBackend(
       // Get CSRF token from the incoming request's cookie jar. Server-side
       // only — there's no other source here (Node fetch has no document,
       // no global cookie jar).
-      const csrfCookie = request.headers.get('cookie')
-        ?.split(';')
-        ?.find(cookie => cookie.trim().startsWith('csrf_token='));
+      const csrfCookie = request.headers
+        .get("cookie")
+        ?.split(";")
+        ?.find((cookie) => cookie.trim().startsWith("csrf_token="));
       // Use slice(idx + 1) instead of split('=')[1] so a token containing
       // an '=' (base64url padding, future format) isn't truncated.
-      const eqIdx = csrfCookie?.indexOf('=') ?? -1;
-      const csrfToken = csrfCookie && eqIdx >= 0
-        ? csrfCookie.slice(eqIdx + 1).trim()
-        : null;
+      const eqIdx = csrfCookie?.indexOf("=") ?? -1;
+      const csrfToken = csrfCookie && eqIdx >= 0 ? csrfCookie.slice(eqIdx + 1).trim() : null;
       const headers: Record<string, string> = {
         Authorization: `Bearer ${accessToken}`,
         "Content-Type": "application/json",
@@ -96,7 +89,7 @@ export async function proxyToBackend(
         } catch {
           return NextResponse.json(
             { error: `Backend error: ${response.statusText}` },
-            { status: response.status }
+            { status: response.status },
           );
         }
       }
@@ -117,7 +110,7 @@ export async function proxyToBackend(
       if (fetchError.name === "AbortError" || controller.signal.aborted) {
         return NextResponse.json(
           { error: "Gateway timeout - backend request took too long" },
-          { status: 504 }
+          { status: 504 },
         );
       }
 
@@ -125,9 +118,6 @@ export async function proxyToBackend(
     }
   } catch (error) {
     console.error(`API proxy ${method} ${path} error:`, error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

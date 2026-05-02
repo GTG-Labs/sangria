@@ -4,8 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const divider = "border-r border-zinc-200 dark:border-zinc-800";
-const baseItem =
-  "px-5 h-full flex items-center text-sm transition-all duration-200 relative";
+const baseItem = "px-5 h-full flex items-center text-sm transition-all duration-200 relative";
 
 const links = [
   { href: "/docs", label: "Docs" },
@@ -18,8 +17,7 @@ export default function NavLinks() {
   return (
     <div className="hidden md:flex items-stretch border-l border-zinc-200 dark:border-zinc-800">
       {links.map((link) => {
-        const isActive =
-          pathname === link.href || pathname.startsWith(`${link.href}/`);
+        const isActive = pathname === link.href || pathname.startsWith(`${link.href}/`);
 
         return (
           <Link

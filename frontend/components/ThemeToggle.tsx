@@ -11,9 +11,7 @@ function getThemeSnapshot(): "light" | "dark" {
     // localStorage may throw SecurityError in restricted contexts
   }
   try {
-    return window.matchMedia("(prefers-color-scheme: dark)").matches
-      ? "dark"
-      : "light";
+    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
   } catch {
     return "dark";
   }
@@ -34,11 +32,7 @@ function subscribeToTheme(cb: () => void) {
 }
 
 export default function ThemeToggle() {
-  const theme = useSyncExternalStore(
-    subscribeToTheme,
-    getThemeSnapshot,
-    getThemeServerSnapshot,
-  );
+  const theme = useSyncExternalStore(subscribeToTheme, getThemeSnapshot, getThemeServerSnapshot);
 
   const toggleTheme = useCallback(() => {
     const newTheme = theme === "dark" ? "light" : "dark";
@@ -49,9 +43,7 @@ export default function ThemeToggle() {
     }
     document.documentElement.classList.toggle("dark", newTheme === "dark");
     // Force re-read by dispatching a storage event
-    window.dispatchEvent(
-      new StorageEvent("storage", { key: "theme", newValue: newTheme }),
-    );
+    window.dispatchEvent(new StorageEvent("storage", { key: "theme", newValue: newTheme }));
   }, [theme]);
 
   return (

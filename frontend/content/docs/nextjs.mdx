@@ -12,26 +12,10 @@ description: Learn how to accept your first payment using Next.js App Router and
 Install the Sangria SDK in your Next.js project.
 
 <Tabs items={["npm", "yarn", "pnpm", "bun"]}>
-  <Tab value="npm">
-  ```bash
-  npm install @sangria-sdk/core
-  ```
-  </Tab>
-  <Tab value="yarn">
-  ```bash
-  yarn add @sangria-sdk/core
-  ```
-  </Tab>
-  <Tab value="pnpm">
-  ```bash
-  pnpm add @sangria-sdk/core
-  ```
-  </Tab>
-  <Tab value="bun">
-  ```bash
-  bun add @sangria-sdk/core
-  ```
-  </Tab>
+  <Tab value="npm">```bash npm install @sangria-sdk/core ```</Tab>
+  <Tab value="yarn">```bash yarn add @sangria-sdk/core ```</Tab>
+  <Tab value="pnpm">```bash pnpm add @sangria-sdk/core ```</Tab>
+  <Tab value="bun">```bash bun add @sangria-sdk/core ```</Tab>
 </Tabs>
 
 ## 2. Initialize the client
@@ -62,7 +46,7 @@ async function handler(request: NextRequest) {
 export const GET = fixedPrice(
   sangria,
   { price: 0.01, description: "Access premium content" },
-  handler
+  handler,
 );
 ```
 
@@ -82,7 +66,7 @@ export const GET = fixedPrice(
       const key = request.headers.get("x-api-key");
       return key != null && isValidApiKey(key); // validate against your own auth system
     },
-  }
+  },
 );
 ```
 
@@ -109,7 +93,7 @@ async function handler(request: NextRequest) {
 
 ## Handle errors
 
-If the Sangria backend is *unreachable, times out, or returns a non-2xx status*, the SDK throws a `SangriaError`. Next.js App Router doesn't have global error middleware for API routes, so wrap the call in a try/catch:
+If the Sangria backend is _unreachable, times out, or returns a non-2xx status_, the SDK throws a `SangriaError`. Next.js App Router doesn't have global error middleware for API routes, so wrap the call in a try/catch:
 
 ```ts
 // app/api/premium/route.ts
@@ -125,7 +109,7 @@ async function handler(request: NextRequest) {
 const premiumRoute = fixedPrice(
   sangria,
   { price: 0.01, description: "Access premium content" },
-  handler
+  handler,
 );
 
 export async function GET(request: NextRequest) {
@@ -134,10 +118,7 @@ export async function GET(request: NextRequest) {
   } catch (err) {
     if (err instanceof SangriaError) {
       console.error(`[sangria:${err.operation}]`, err.message);
-      return NextResponse.json(
-        { error: "Payment provider unavailable" },
-        { status: 503 }
-      );
+      return NextResponse.json({ error: "Payment provider unavailable" }, { status: 503 });
     }
     throw err;
   }
@@ -146,11 +127,11 @@ export async function GET(request: NextRequest) {
 
 `SangriaError` has an `.operation` field (`"generate"` or `"settle"`) so you know which step failed. Subclasses give you more detail:
 
-| Error | When | Properties |
-|-------|------|------------|
-| `SangriaConnectionError` | Network failure (DNS, refused, reset) | — |
-| `SangriaTimeoutError` | Request timed out | — |
-| `SangriaAPIStatusError` | Backend returned 4xx/5xx | `.statusCode`, `.response` |
+| Error                    | When                                  | Properties                 |
+| ------------------------ | ------------------------------------- | -------------------------- |
+| `SangriaConnectionError` | Network failure (DNS, refused, reset) | —                          |
+| `SangriaTimeoutError`    | Request timed out                     | —                          |
+| `SangriaAPIStatusError`  | Backend returned 4xx/5xx              | `.statusCode`, `.response` |
 
 Business-level payment failures (bad signature, insufficient funds) are **not** errors — they return a normal `402` response to the caller.
 
@@ -161,4 +142,3 @@ Your endpoint is now priced. When an AI agent calls it, here's what happens:
 1. The SDK returns a `402` with the price and payment details
 2. The agent signs a USDC payment off-chain and retries with a `payment-signature` header
 3. The SDK settles the payment on-chain, and your handler runs
-

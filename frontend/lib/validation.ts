@@ -13,14 +13,15 @@ function getRegistrableDomain(domain: string): string {
 // Email validation helper using maintained disposable domain list
 function isDisposableEmail(email: string): boolean {
   try {
-    const fullDomain = email.split('@')[1]?.toLowerCase();
+    const fullDomain = email.split("@")[1]?.toLowerCase();
     if (!fullDomain) return false;
 
     // Get the registrable domain to check against the list
     const registrableDomain = getRegistrableDomain(fullDomain);
 
     // Check exact match against the curated disposable domains list
-    const isInList = disposableEmailDomains.includes(fullDomain) ||
+    const isInList =
+      disposableEmailDomains.includes(fullDomain) ||
       disposableEmailDomains.includes(registrableDomain);
 
     if (isInList) return true;
@@ -35,7 +36,7 @@ function isDisposableEmail(email: string): boolean {
       /^(trash|spam|junk)mail/, // Starts with trash/spam/junk + mail
     ];
 
-    return suspiciousPatterns.some(pattern => pattern.test(registrableDomain));
+    return suspiciousPatterns.some((pattern) => pattern.test(registrableDomain));
   } catch {
     return false;
   }
@@ -62,11 +63,11 @@ const emailSchema = z
   }, "Temporary email addresses are not allowed")
   .refine((email) => {
     // Require proper business domain structure
-    const domain = email.split('@')[1];
+    const domain = email.split("@")[1];
     if (!domain) return false;
 
     // Must have at least one dot and proper TLD
-    const parts = domain.split('.');
+    const parts = domain.split(".");
     if (parts.length < 2) return false;
 
     const tld = parts[parts.length - 1];
@@ -75,37 +76,46 @@ const emailSchema = z
   }, "Please enter a valid business email address");
 
 // Base name schema for reusable validation patterns
-const createNameSchema = (maxLength: number) => z
-  .string()
-  .min(1, "Name is required")
-  .min(2, "Name must be at least 2 characters")
-  .max(maxLength, "Name is too long")
-  .refine((val) => {
-    // Use Unicode-aware validation instead of restrictive ASCII regex
-    return SecurityUtils.containsOnlySafeChars(val, 'name');
-  }, "Name contains invalid characters")
-  .refine((val) => securityValidations.noXSS(val) === true, "Input contains potentially dangerous content")
-  .refine((val) => securityValidations.safeUnicode(val) === true, "Suspicious character combinations detected")
-  .superRefine((val, ctx) => {
-    // Single call to sanitizeInput to check warnings
-    const result = SecurityUtils.sanitizeInput(val, { type: 'name', maxLength });
+const createNameSchema = (maxLength: number) =>
+  z
+    .string()
+    .min(1, "Name is required")
+    .min(2, "Name must be at least 2 characters")
+    .max(maxLength, "Name is too long")
+    .refine((val) => {
+      // Use Unicode-aware validation instead of restrictive ASCII regex
+      return SecurityUtils.containsOnlySafeChars(val, "name");
+    }, "Name contains invalid characters")
+    .refine(
+      (val) => securityValidations.noXSS(val) === true,
+      "Input contains potentially dangerous content",
+    )
+    .refine(
+      (val) => securityValidations.safeUnicode(val) === true,
+      "Suspicious character combinations detected",
+    )
+    .superRefine((val, ctx) => {
+      // Single call to sanitizeInput to check warnings
+      const result = SecurityUtils.sanitizeInput(val, { type: "name", maxLength });
 
-    // Fail validation if any warnings exist (no silent mutations)
-    if (result.warnings.length > 0) {
-      ctx.addIssue({
-        code: "custom",
-        message: `Input contains characters that cannot be safely processed: ${result.warnings.join(', ')}`,
-      });
-    }
+      // Fail validation if any warnings exist (no silent mutations)
+      if (result.warnings.length > 0) {
+        ctx.addIssue({
+          code: "custom",
+          message: `Input contains characters that cannot be safely processed: ${result.warnings.join(", ")}`,
+        });
+      }
 
-    // No return value needed - superRefine only validates
-    // The input passes through unchanged if no issues are added
-  });
+      // No return value needed - superRefine only validates
+      // The input passes through unchanged if no issues are added
+    });
 
 // Organization creation validation
 export const organizationSchema = z.object({
-  name: createNameSchema(100)
-    .refine((name) => name.trim().length === name.length, "Organization name cannot start or end with spaces"),
+  name: createNameSchema(100).refine(
+    (name) => name.trim().length === name.length,
+    "Organization name cannot start or end with spaces",
+  ),
 });
 
 // Organization member invitation validation
@@ -114,20 +124,29 @@ export const inviteSchema = z.object({
   message: z
     .string()
     .max(500, "Message is too long")
-    .refine((val) => !val || SecurityUtils.containsOnlySafeChars(val, 'general'), "Message contains invalid characters")
-    .refine((val) => !val || securityValidations.noXSS(val) === true, "Message contains potentially dangerous content")
-    .refine((val) => !val || securityValidations.safeUnicode(val) === true, "Suspicious characters detected in message")
+    .refine(
+      (val) => !val || SecurityUtils.containsOnlySafeChars(val, "general"),
+      "Message contains invalid characters",
+    )
+    .refine(
+      (val) => !val || securityValidations.noXSS(val) === true,
+      "Message contains potentially dangerous content",
+    )
+    .refine(
+      (val) => !val || securityValidations.safeUnicode(val) === true,
+      "Suspicious characters detected in message",
+    )
     .superRefine((val, ctx) => {
       if (!val) return; // Empty values are allowed
 
       // Single call to sanitizeInput to check warnings
-      const result = SecurityUtils.sanitizeInput(val, { type: 'general', maxLength: 500 });
+      const result = SecurityUtils.sanitizeInput(val, { type: "general", maxLength: 500 });
 
       // Fail validation if any warnings exist (no silent mutations)
       if (result.warnings.length > 0) {
         ctx.addIssue({
           code: "custom",
-          message: `Message contains characters that cannot be safely processed: ${result.warnings.join(', ')}`,
+          message: `Message contains characters that cannot be safely processed: ${result.warnings.join(", ")}`,
         });
       }
 
@@ -189,18 +208,27 @@ export const textInputSchema = z.object({
     .string()
     .max(1000, "Input is too long")
     .refine((val) => val.trim().length > 0, "Input cannot be empty")
-    .refine((val) => SecurityUtils.containsOnlySafeChars(val, 'general'), "Input contains invalid characters")
-    .refine((val) => securityValidations.noXSS(val) === true, "Input contains potentially dangerous content")
-    .refine((val) => securityValidations.safeUnicode(val) === true, "Suspicious character combinations detected")
+    .refine(
+      (val) => SecurityUtils.containsOnlySafeChars(val, "general"),
+      "Input contains invalid characters",
+    )
+    .refine(
+      (val) => securityValidations.noXSS(val) === true,
+      "Input contains potentially dangerous content",
+    )
+    .refine(
+      (val) => securityValidations.safeUnicode(val) === true,
+      "Suspicious character combinations detected",
+    )
     .superRefine((val, ctx) => {
       // Single call to sanitizeInput to check warnings
-      const result = SecurityUtils.sanitizeInput(val, { type: 'general', maxLength: 1000 });
+      const result = SecurityUtils.sanitizeInput(val, { type: "general", maxLength: 1000 });
 
       // Fail validation if any warnings exist (no silent mutations)
       if (result.warnings.length > 0) {
         ctx.addIssue({
           code: "custom",
-          message: `Input contains characters that cannot be safely processed: ${result.warnings.join(', ')}`,
+          message: `Input contains characters that cannot be safely processed: ${result.warnings.join(", ")}`,
         });
       }
 
@@ -216,10 +244,7 @@ export const tokenSchema = z.object({
     .min(1, "Token is required")
     .max(500, "Invalid token format")
     .refine((token) => token.trim() === token, "Invalid token format")
-    .refine(
-      (token) => /^[0-9a-f]{64}$/.test(token),
-      "Invalid token format"
-    ),
+    .refine((token) => /^[0-9a-f]{64}$/.test(token), "Invalid token format"),
 });
 
 // Helper function to safely parse and validate

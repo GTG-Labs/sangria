@@ -47,7 +47,7 @@ export function OrganizationProvider({ children }: OrganizationProviderProps) {
   const [selectedOrgId, setSelectedOrgId] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
 
-  const selectedOrg = userInfo?.organizations.find(org => org.id === selectedOrgId) || null;
+  const selectedOrg = userInfo?.organizations.find((org) => org.id === selectedOrgId) || null;
 
   const fetchUserInfo = async () => {
     try {
@@ -62,7 +62,7 @@ export function OrganizationProvider({ children }: OrganizationProviderProps) {
           const defaultOrg = personalOrg ? personalOrg.id : user.organizations[0].id;
 
           // Use functional state updater and validate prev against refreshed list
-          setSelectedOrgId(prev => {
+          setSelectedOrgId((prev) => {
             // Keep prev if it's truthy AND still exists in the refreshed organizations
             if (prev && user.organizations.some((org: any) => org.id === prev)) {
               return prev;

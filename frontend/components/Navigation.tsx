@@ -23,9 +23,7 @@ export default async function Navigation() {
             height={32}
             className="w-8 h-8 dark:mix-blend-normal mix-blend-multiply"
           />
-          <span className="text-gray-900 dark:text-white text-lg font-bold">
-            Sangria
-          </span>
+          <span className="text-gray-900 dark:text-white text-lg font-bold">Sangria</span>
         </Link>
 
         {/* Spacer */}
@@ -42,9 +40,7 @@ export default async function Navigation() {
             </ArcadeButton>
           ) : (
             <SignInForm className="btn-raised">
-              <span className="px-7 py-2.5 text-xs leading-none">
-                Sign In →
-              </span>
+              <span className="px-7 py-2.5 text-xs leading-none">Sign In →</span>
             </SignInForm>
           )}
         </div>

@@ -33,14 +33,11 @@ export default function ProfilePopover({
     }
     if (open) {
       document.addEventListener("mousedown", handleClickOutside);
-      return () =>
-        document.removeEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
     }
   }, [open]);
 
-  const displayName = firstName
-    ? `${firstName}${lastName ? ` ${lastName}` : ""}`
-    : email;
+  const displayName = firstName ? `${firstName}${lastName ? ` ${lastName}` : ""}` : email;
 
   const initials = firstName
     ? `${firstName[0]}${lastName ? lastName[0] : ""}`
@@ -78,9 +75,7 @@ export default function ProfilePopover({
           </div>
         )}
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium text-gray-900">
-            {displayName}
-          </p>
+          <p className="truncate text-sm font-medium text-gray-900">{displayName}</p>
           <p className="truncate text-xs text-gray-500">{email}</p>
         </div>
       </button>
@@ -105,9 +100,7 @@ export default function ProfilePopover({
               </div>
             )}
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-gray-900">
-                {displayName}
-              </p>
+              <p className="truncate text-sm font-semibold text-gray-900">{displayName}</p>
               <p className="truncate text-xs text-gray-500">{email}</p>
             </div>
           </div>

@@ -40,7 +40,8 @@ export default function BlogPage() {
                 </h2>
 
                 <p className="text-xs text-zinc-400 dark:text-zinc-500 mb-3 transition-colors duration-200 group-hover:text-[rgb(234,235,224)]/60">
-                  {post.author} · {new Date(post.date).toLocaleDateString("en-US", {
+                  {post.author} ·{" "}
+                  {new Date(post.date).toLocaleDateString("en-US", {
                     month: "short",
                     day: "numeric",
                     year: "numeric",

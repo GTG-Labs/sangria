@@ -34,7 +34,7 @@ fastify.get(
   },
   async () => {
     return { message: "You accessed the premium endpoint!" };
-  }
+  },
 );
 
 // ── Start ──

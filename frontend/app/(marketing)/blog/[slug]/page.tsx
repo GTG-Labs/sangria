@@ -9,11 +9,7 @@ export function generateStaticParams() {
   return getAllSlugs().map((slug) => ({ slug }));
 }
 
-export async function generateMetadata({
-  params,
-}: {
-  params: Promise<{ slug: string }>;
-}) {
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const post = getPostBySlug(slug);
   if (!post) return {};
@@ -24,11 +20,7 @@ export async function generateMetadata({
   };
 }
 
-export default async function BlogPostPage({
-  params,
-}: {
-  params: Promise<{ slug: string }>;
-}) {
+export default async function BlogPostPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const post = getPostBySlug(slug);
   if (!post) notFound();
@@ -57,9 +49,7 @@ export default async function BlogPostPage({
           <h1 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white leading-tight mb-3">
             {post.title}
           </h1>
-          <p className="text-zinc-500 dark:text-zinc-400 leading-relaxed">
-            {post.description}
-          </p>
+          <p className="text-zinc-500 dark:text-zinc-400 leading-relaxed">{post.description}</p>
           <hr className="border-zinc-200 dark:border-zinc-800 mt-8" />
         </header>
 

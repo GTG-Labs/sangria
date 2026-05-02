@@ -15,9 +15,7 @@ export default function Footer() {
               className="w-5 h-5"
               style={{ mixBlendMode: "multiply" }}
             />
-            <span className="text-zinc-400 dark:text-zinc-500 text-sm font-medium">
-              Sangria
-            </span>
+            <span className="text-zinc-400 dark:text-zinc-500 text-sm font-medium">Sangria</span>
           </Link>
 
           <div className="flex items-center gap-6">

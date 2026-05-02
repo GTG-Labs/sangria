@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+.next/
+dist/
+build/
+out/
+.turbo/
+coverage/
+
+# Lockfiles (managed by package managers)
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+
+# Minified
+*.min.js
+*.min.css
+
+# Non-JS/TS roots — formatted by their own tools
+backend/
+dbSchema/drizzle/
+playground/merchant-fastapi/
+playground/.venv/
+sdk/python/
+
+# Generated docs / content
+**/.next/**
+**/dist/**

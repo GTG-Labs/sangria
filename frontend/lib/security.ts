@@ -2,10 +2,9 @@ import DOMPurify from "dompurify";
 
 // XSS Protection and HTML Sanitization
 export class SecurityUtils {
-
   // Sanitize HTML content to prevent XSS attacks
   static sanitizeHtml(input: string): string {
-    if (typeof window === 'undefined') {
+    if (typeof window === "undefined") {
       // Server-side: basic HTML escaping
       return input
         .replace(/&/g, "&amp;")
@@ -36,10 +35,10 @@ export class SecurityUtils {
   // Normalize Unicode to prevent homograph attacks
   static normalizeUnicode(input: string): string {
     return input
-      .normalize('NFKC') // Canonical decomposition + canonical composition
-      .replace(/[\u200B-\u200D\uFEFF]/g, '') // Remove zero-width characters
-      .replace(/[\u2000-\u206F]/g, ' ') // Replace various Unicode spaces with regular space
-      .replace(/[\uFFF9-\uFFFB]/g, '') // Remove interlinear annotation characters
+      .normalize("NFKC") // Canonical decomposition + canonical composition
+      .replace(/[\u200B-\u200D\uFEFF]/g, "") // Remove zero-width characters
+      .replace(/[\u2000-\u206F]/g, " ") // Replace various Unicode spaces with regular space
+      .replace(/[\uFFF9-\uFFFB]/g, "") // Remove interlinear annotation characters
       .trim();
   }
 
@@ -47,13 +46,13 @@ export class SecurityUtils {
   static containsSuspiciousUnicode(input: string): boolean {
     // Check for dangerous control/invisible characters
     const dangerousCodepoints = [
-      /[\u202A-\u202E]/,   // Bidirectional text override characters
-      /[\u200B-\u200D]/,   // Zero-width characters (except normal spaces)
-      /[\u2066-\u2069]/,   // Directional isolate characters
-      /[\uFFF9-\uFFFB]/,   // Interlinear annotation characters
-      /[\u180E]/,          // Mongolian vowel separator
-      /[\u061C]/,          // Arabic letter mark
-      /[\u2028-\u2029]/,   // Line/paragraph separators
+      /[\u202A-\u202E]/, // Bidirectional text override characters
+      /[\u200B-\u200D]/, // Zero-width characters (except normal spaces)
+      /[\u2066-\u2069]/, // Directional isolate characters
+      /[\uFFF9-\uFFFB]/, // Interlinear annotation characters
+      /[\u180E]/, // Mongolian vowel separator
+      /[\u061C]/, // Arabic letter mark
+      /[\u2028-\u2029]/, // Line/paragraph separators
       /[\u{E0000}-\u{E007F}]/u, // Tag characters
     ];
 
@@ -86,9 +85,13 @@ export class SecurityUtils {
   }
 
   // Validate safe character sets for different input types
-  static containsOnlySafeChars(input: string, type: 'name' | 'email' | 'currency' | 'general'): boolean {
+  static containsOnlySafeChars(
+    input: string,
+    type: "name" | "email" | "currency" | "general",
+  ): boolean {
     // First check for dangerous control/invisible characters
-    const dangerousControlChars = /[\u202A-\u202E\u200B-\u200D\u2066-\u2069\uFFF9-\uFFFB\u180E\u061C\u2028-\u2029\u{E0000}-\u{E007F}]/u;
+    const dangerousControlChars =
+      /[\u202A-\u202E\u200B-\u200D\u2066-\u2069\uFFF9-\uFFFB\u180E\u061C\u2028-\u2029\u{E0000}-\u{E007F}]/u;
     if (dangerousControlChars.test(input)) {
       return false;
     }
@@ -96,7 +99,8 @@ export class SecurityUtils {
     const patterns = {
       // Allow Unicode letters/marks/numbers plus a narrow set of punctuation
       name: /^[\p{L}\p{M}\p{N}\s\-_.&()'']+$/u,
-      email: /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/,
+      email:
+        /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/,
       currency: /^\d{1,8}(\.\d{1,2})?$/,
       general: /^[\p{L}\p{M}\p{N}\s\-_.!?,:;()&@#'']+$/u,
     };
@@ -105,12 +109,14 @@ export class SecurityUtils {
   }
 
   // Comprehensive input sanitization
-  static sanitizeInput(input: string, options: {
-    maxLength?: number;
-    type?: 'name' | 'email' | 'currency' | 'general';
-    allowUnicode?: boolean;
-  } = {}): { sanitized: string; warnings: string[] } {
-
+  static sanitizeInput(
+    input: string,
+    options: {
+      maxLength?: number;
+      type?: "name" | "email" | "currency" | "general";
+      allowUnicode?: boolean;
+    } = {},
+  ): { sanitized: string; warnings: string[] } {
     const warnings: string[] = [];
     let sanitized = input;
 
@@ -123,7 +129,7 @@ export class SecurityUtils {
     // Unicode normalization and checks
     if (!options.allowUnicode) {
       if (this.containsSuspiciousUnicode(sanitized)) {
-        warnings.push('Suspicious character mixing detected');
+        warnings.push("Suspicious character mixing detected");
       }
       sanitized = this.normalizeUnicode(sanitized);
     }
@@ -133,8 +139,8 @@ export class SecurityUtils {
       warnings.push(`Invalid characters for ${options.type} input`);
 
       // Only auto-sanitize for specific types, not for names (to prevent silent mutation)
-      if (options.type === 'currency') {
-        sanitized = sanitized.replace(/[^0-9.]/g, '');
+      if (options.type === "currency") {
+        sanitized = sanitized.replace(/[^0-9.]/g, "");
       }
       // For 'name' and 'general' types, don't auto-sanitize to avoid silent data corruption
       // Validation schemas should check warnings and fail appropriately
@@ -149,7 +155,7 @@ export class SecurityUtils {
   // Secure display of user content
   static secureDisplay(input: string): string {
     const { sanitized } = this.sanitizeInput(input, {
-      type: 'general',
+      type: "general",
       allowUnicode: false,
       maxLength: 1000,
     });
@@ -165,11 +171,11 @@ export class JSONSecurity {
   // Safe JSON serialization with prototype pollution and cycle protection
   static safeStringify(obj: unknown): string {
     if (obj === null || obj === undefined) {
-      return 'null';
+      return "null";
     }
 
     // Prevent prototype pollution attacks with cycle detection and depth limiting
-    if (typeof obj === 'object' && obj !== null) {
+    if (typeof obj === "object" && obj !== null) {
       const visited = new WeakSet<object>();
       const safeObj = this.sanitizeObject(obj, visited, 0);
       return JSON.stringify(safeObj);
@@ -187,13 +193,13 @@ export class JSONSecurity {
 
     // Prevent excessive recursion depth
     if (depth > this.MAX_DEPTH) {
-      return '[MaxDepth]';
+      return "[MaxDepth]";
     }
 
-    if (typeof obj === 'object') {
+    if (typeof obj === "object") {
       // Detect and break circular references
       if (visited.has(obj as object)) {
-        return '[Circular]';
+        return "[Circular]";
       }
 
       // Mark object as visited
@@ -201,7 +207,7 @@ export class JSONSecurity {
 
       if (Array.isArray(obj)) {
         // Arrays also increment depth to count nested empty arrays properly
-        return obj.map(item => this.sanitizeObject(item, visited, depth + 1));
+        return obj.map((item) => this.sanitizeObject(item, visited, depth + 1));
       }
 
       const sanitized: Record<string, unknown> = {};
@@ -225,13 +231,13 @@ export class JSONSecurity {
   // Check for dangerous object keys that could lead to prototype pollution
   private static isDangerousKey(key: string): boolean {
     const dangerousKeys = [
-      '__proto__',
-      'constructor',
-      'prototype',
-      '__defineGetter__',
-      '__defineSetter__',
-      '__lookupGetter__',
-      '__lookupSetter__',
+      "__proto__",
+      "constructor",
+      "prototype",
+      "__defineGetter__",
+      "__defineSetter__",
+      "__lookupGetter__",
+      "__lookupSetter__",
     ];
 
     return dangerousKeys.includes(key);
@@ -239,7 +245,7 @@ export class JSONSecurity {
 
   // Check for circular references using WeakSet-based detection
   private static hasCycles(obj: unknown, visited = new WeakSet<object>()): boolean {
-    if (obj === null || obj === undefined || typeof obj !== 'object') {
+    if (obj === null || obj === undefined || typeof obj !== "object") {
       return false;
     }
 
@@ -279,17 +285,17 @@ export class JSONSecurity {
   static validateObjectStructure(obj: unknown): { isValid: boolean; error?: string } {
     // Check for circular references first
     if (this.hasCycles(obj)) {
-      return { isValid: false, error: 'Circular reference detected' };
+      return { isValid: false, error: "Circular reference detected" };
     }
 
     // Check depth (prevent deeply nested objects)
     if (this.getObjectDepth(obj) > 10) {
-      return { isValid: false, error: 'Object nesting too deep' };
+      return { isValid: false, error: "Object nesting too deep" };
     }
 
     // Check for dangerous keys
     if (this.containsDangerousKeys(obj)) {
-      return { isValid: false, error: 'Object contains dangerous properties' };
+      return { isValid: false, error: "Object contains dangerous properties" };
     }
 
     return { isValid: true };
@@ -299,7 +305,7 @@ export class JSONSecurity {
   private static getObjectDepth(obj: unknown, visited = new WeakSet<object>(), depth = 0): number {
     if (depth > this.MAX_DEPTH) return depth; // Prevent stack overflow
 
-    if (obj === null || obj === undefined || typeof obj !== 'object') {
+    if (obj === null || obj === undefined || typeof obj !== "object") {
       return depth;
     }
 
@@ -313,18 +319,18 @@ export class JSONSecurity {
 
     if (Array.isArray(obj)) {
       if (obj.length === 0) return depth + 1; // Empty arrays still increment depth
-      return Math.max(...obj.map(item => this.getObjectDepth(item, visited, depth + 1)));
+      return Math.max(...obj.map((item) => this.getObjectDepth(item, visited, depth + 1)));
     }
 
     const values = Object.values(obj as Record<string, unknown>);
     if (values.length === 0) return depth + 1; // Empty objects still increment depth
 
-    return Math.max(...values.map(value => this.getObjectDepth(value, visited, depth + 1)));
+    return Math.max(...values.map((value) => this.getObjectDepth(value, visited, depth + 1)));
   }
 
   // Check if object contains dangerous keys with cycle protection
   private static containsDangerousKeys(obj: unknown, visited = new WeakSet<object>()): boolean {
-    if (obj === null || obj === undefined || typeof obj !== 'object') {
+    if (obj === null || obj === undefined || typeof obj !== "object") {
       return false;
     }
 
@@ -337,7 +343,7 @@ export class JSONSecurity {
     visited.add(obj as object);
 
     if (Array.isArray(obj)) {
-      return obj.some(item => this.containsDangerousKeys(item, visited));
+      return obj.some((item) => this.containsDangerousKeys(item, visited));
     }
 
     for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
@@ -362,10 +368,15 @@ export const securityValidations = {
   },
 
   safeUnicode: (value: string) => {
-    return !SecurityUtils.containsSuspiciousUnicode(value) || "Suspicious character combinations detected";
+    return (
+      !SecurityUtils.containsSuspiciousUnicode(value) ||
+      "Suspicious character combinations detected"
+    );
   },
 
-  safeCharacters: (value: string, type: 'name' | 'email' | 'currency' | 'general') => {
-    return SecurityUtils.containsOnlySafeChars(value, type) || `Invalid characters for ${type} input`;
+  safeCharacters: (value: string, type: "name" | "email" | "currency" | "general") => {
+    return (
+      SecurityUtils.containsOnlySafeChars(value, type) || `Invalid characters for ${type} input`
+    );
   },
 };
