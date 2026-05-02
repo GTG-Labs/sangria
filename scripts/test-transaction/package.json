@@ -15,5 +15,10 @@
     "@types/node": "^22.15.3",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
+  },
+  "packageManager": "pnpm@10.15.1",
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=10"
   }
 }
