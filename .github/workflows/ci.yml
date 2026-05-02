@@ -19,6 +19,7 @@ jobs:
       fail-fast: false
       matrix:
         package:
+          - "." # root tooling package (lint-staged + simple-git-hooks + prettier)
           - frontend
           - mythos
           - dbSchema

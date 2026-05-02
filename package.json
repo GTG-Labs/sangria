@@ -9,7 +9,9 @@
     "pnpm": ">=10"
   },
   "scripts": {
-    "prepare": "simple-git-hooks"
+    "prepare": "simple-git-hooks",
+    "format": "prettier --write . --ignore-path .prettierignore",
+    "format:check": "prettier --check . --ignore-path .prettierignore"
   },
   "devDependencies": {
     "lint-staged": "^15.2.10",
