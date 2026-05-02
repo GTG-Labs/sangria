@@ -12,7 +12,6 @@ import (
 	"github.com/workos/workos-go/v4/pkg/webhooks"
 
 	"sangria/backend/config"
-	dbengine "sangria/backend/dbEngine"
 )
 
 // isWorkOSIPAllowed checks the caller IP against the pre-parsed allowlist
@@ -109,8 +108,6 @@ func HandleWorkOSWebhook(pool *pgxpool.Pool) fiber.Handler {
 
 		// Handle different event types - each event fires its own function
 		switch event.Event {
-		case EventTypeInvitationAccepted:
-			return handleInvitationAccepted(c, pool, event)
 		case EventTypeAuthPasswordSucceeded:
 			return handleAuthPasswordSucceeded(c, pool, event)
 		case EventTypeAuthOAuthSucceeded:
@@ -126,138 +123,34 @@ func HandleWorkOSWebhook(pool *pgxpool.Pool) fiber.Handler {
 	}
 }
 
-// handleInvitationAccepted processes invitation.accepted events
-func handleInvitationAccepted(c fiber.Ctx, pool *pgxpool.Pool, event WorkOSWebhookEvent) error {
-	// Extract relevant data from the event
-	invitationData, ok := event.Data["invitation"].(map[string]interface{})
-	if !ok {
-		slog.Error("invalid invitation data in webhook", "event_id", event.ID)
-		return c.Status(400).JSON(fiber.Map{"error": "invalid invitation data"})
+// logAuthSuccess handles common auth success logging and response logic
+func logAuthSuccess(c fiber.Ctx, event WorkOSWebhookEvent, authType string) error {
+	userEmail, _ := event.Data["email"].(string)
+	if userEmail != "" {
+		userEmail = strings.TrimSpace(strings.ToLower(userEmail))
 	}
+	userID, _ := event.Data["user_id"].(string)
 
-	userData, ok := event.Data["user"].(map[string]interface{})
-	if !ok {
-		slog.Error("invalid user data in webhook", "event_id", event.ID)
-		return c.Status(400).JSON(fiber.Map{"error": "invalid user data"})
-	}
-
-	// Extract required fields
-	organizationID, ok := invitationData["organization_id"].(string)
-	if !ok || organizationID == "" {
-		slog.Error("missing organization_id in webhook", "event_id", event.ID)
-		return c.Status(400).JSON(fiber.Map{"error": "missing organization_id"})
-	}
-
-	userID, ok := userData["id"].(string)
-	if !ok || userID == "" {
-		slog.Error("missing user id in webhook", "event_id", event.ID)
-		return c.Status(400).JSON(fiber.Map{"error": "missing user id"})
-	}
-
-	userEmail, ok := userData["email"].(string)
-	if !ok || userEmail == "" {
-		slog.Error("missing user email in webhook", "event_id", event.ID)
-		return c.Status(400).JSON(fiber.Map{"error": "missing user email"})
-	}
-	userEmail = strings.TrimSpace(strings.ToLower(userEmail))
-
-	slog.Info("processing invitation acceptance",
-		"user_id", userID,
-		"organization_id", organizationID,
+	slog.Info(authType+" authentication succeeded",
 		"event_id", event.ID,
-	)
-
-	// Begin transaction
-	tx, err := pool.Begin(c.Context())
-	if err != nil {
-		slog.Error("failed to begin transaction", "error", err)
-		return c.Status(500).JSON(fiber.Map{"error": "failed to begin transaction"})
-	}
-	defer tx.Rollback(c.Context())
-
-	// Ensure the user exists in our database
-	userName := userEmail // Default to email
-	if firstName, ok := userData["first_name"].(string); ok && firstName != "" {
-		if lastName, ok := userData["last_name"].(string); ok && lastName != "" {
-			userName = firstName + " " + lastName
-		} else {
-			userName = firstName
-		}
-	}
-
-	_, err = dbengine.UpsertUserTx(c.Context(), tx, userName, userID)
-	if err != nil {
-		slog.Error("failed to upsert user", "user_id", userID, "error", err)
-		return c.Status(500).JSON(fiber.Map{"error": "failed to upsert user"})
-	}
-
-	// Add user to organization as a member (not admin)
-	err = dbengine.AddUserToOrganizationTx(c.Context(), tx, userID, organizationID, false)
-	if err != nil {
-		slog.Error("failed to add user to organization",
-			"user_id", userID,
-			"organization_id", organizationID,
-			"error", err,
-		)
-		return c.Status(500).JSON(fiber.Map{"error": "failed to add user to organization"})
-	}
-
-	// Commit the transaction
-	if err := tx.Commit(c.Context()); err != nil {
-		slog.Error("failed to commit transaction", "error", err)
-		return c.Status(500).JSON(fiber.Map{"error": "failed to commit transaction"})
-	}
-
-	slog.Info("successfully processed invitation acceptance",
-		"user_id", userID,
-		"organization_id", organizationID,
-		"event_id", event.ID,
+		"workos_user_id", userID,
+		"email", maskEmail(userEmail),
 	)
 
 	return c.Status(200).JSON(fiber.Map{
-		"message": "invitation acceptance processed successfully",
+		"message":  authType + " authentication logged",
 		"event_id": event.ID,
 	})
 }
 
 // handleAuthPasswordSucceeded processes authentication.password_succeeded events
 func handleAuthPasswordSucceeded(c fiber.Ctx, pool *pgxpool.Pool, event WorkOSWebhookEvent) error {
-	userEmail, _ := event.Data["email"].(string)
-	if userEmail != "" {
-		userEmail = strings.TrimSpace(strings.ToLower(userEmail))
-	}
-	userID, _ := event.Data["user_id"].(string)
-
-	slog.Info("password authentication succeeded",
-		"event_id", event.ID,
-		"workos_user_id", userID,
-		"email", maskEmail(userEmail),
-	)
-
-	return c.Status(200).JSON(fiber.Map{
-		"message":  "password authentication logged",
-		"event_id": event.ID,
-	})
+	return logAuthSuccess(c, event, "password")
 }
 
 // handleAuthOAuthSucceeded processes authentication.oauth_succeeded events
 func handleAuthOAuthSucceeded(c fiber.Ctx, pool *pgxpool.Pool, event WorkOSWebhookEvent) error {
-	userEmail, _ := event.Data["email"].(string)
-	if userEmail != "" {
-		userEmail = strings.TrimSpace(strings.ToLower(userEmail))
-	}
-	userID, _ := event.Data["user_id"].(string)
-
-	slog.Info("OAuth authentication succeeded",
-		"event_id", event.ID,
-		"workos_user_id", userID,
-		"email", maskEmail(userEmail),
-	)
-
-	return c.Status(200).JSON(fiber.Map{
-		"message":  "OAuth authentication logged",
-		"event_id": event.ID,
-	})
+	return logAuthSuccess(c, event, "OAuth")
 }
 
 // handleAuthPasswordFailed processes authentication.password_failed events
