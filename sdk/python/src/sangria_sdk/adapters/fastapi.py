@@ -79,6 +79,7 @@ def require_sangria_payment(
             request.state.sangria_payment = result
             response = await func(*args, **kwargs)
 
+            # Attach x402 PAYMENT-RESPONSE header to the handler's response
             if result.headers and isinstance(response, Response):
                 for k, v in result.headers.items():
                     response.headers[k] = v

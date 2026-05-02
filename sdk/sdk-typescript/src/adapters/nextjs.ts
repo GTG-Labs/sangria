@@ -89,6 +89,7 @@ export function fixedPrice(
     request.sangria = result.data;
     const handlerResponse = await handler(request, context);
 
+    // Attach x402 PAYMENT-RESPONSE header to the handler's response
     if (result.headers && handlerResponse instanceof Response) {
       const merged = new Headers(handlerResponse.headers);
       for (const [k, v] of Object.entries(result.headers)) {

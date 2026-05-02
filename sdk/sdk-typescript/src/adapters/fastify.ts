@@ -69,6 +69,7 @@ export function fixedPrice(
       return reply.status(result.status).send(result.body);
     }
 
+    // Attach x402 PAYMENT-RESPONSE header to the outgoing response
     if (result.headers) {
       reply.headers(result.headers);
     }
