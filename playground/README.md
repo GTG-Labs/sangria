@@ -106,16 +106,17 @@ See `e2e_test/README.md` for full details and expected output.
 ## Merchant server implementations
 
 Each merchant server demonstrates integrating the Sangria SDK in a different framework. They all do the same thing:
+
 - Expose a `GET /premium` endpoint
 - Use the Sangria SDK's `@require_sangria_payment` decorator (or equivalent)
 - The SDK handles the full 402 → generate → settle flow automatically
 
-| Directory | Framework | Language |
-|---|---|---|
-| `merchant-fastapi/` | FastAPI | Python |
-| `merchant-express/` | Express | Node.js |
-| `merchant-fastify/` | Fastify | Node.js |
-| `merchant-hono/` | Hono | Node.js |
+| Directory           | Framework | Language |
+| ------------------- | --------- | -------- |
+| `merchant-fastapi/` | FastAPI   | Python   |
+| `merchant-express/` | Express   | Node.js  |
+| `merchant-fastify/` | Fastify   | Node.js  |
+| `merchant-hono/`    | Hono      | Node.js  |
 
 ## Legacy files
 

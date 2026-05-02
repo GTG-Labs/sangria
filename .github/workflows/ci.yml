@@ -1,0 +1,88 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# Cancel in-progress runs for the same PR/branch when a new push lands.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  js:
+    name: JS (${{ matrix.package }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - frontend
+          - mythos
+          - dbSchema
+          - sdk/sdk-typescript
+          - playground/merchant-express
+          - playground/merchant-fastify
+          - playground/merchant-hono
+          - playground/merchant-nextjs
+          - scripts/test-transaction
+    defaults:
+      run:
+        working-directory: ${{ matrix.package }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # Corepack reads each package.json's `packageManager` pin and uses
+      # exactly that pnpm version, regardless of any globally-installed pnpm.
+      - name: Enable Corepack
+        run: corepack enable
+
+      # The load-bearing line of this whole workflow: refuses to mutate the
+      # lockfile and exits non-zero if package.json drifted from it. This is
+      # what catches PRs that would otherwise silently rewrite the lockfile.
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Format check
+        run: pnpm format:check
+
+      # --if-present skips silently for packages without a lint/build script.
+      - name: Lint
+        run: pnpm run --if-present lint
+
+      - name: Build
+        run: pnpm run --if-present build
+
+  go:
+    name: Go
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+
+      - name: gofmt
+        run: |
+          out=$(gofmt -l .)
+          if [ -n "$out" ]; then
+            echo "Files need gofmt:"
+            echo "$out"
+            exit 1
+          fi
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: go build
+        run: go build ./...

@@ -18,13 +18,33 @@ yarn.lock
 *.min.js
 *.min.css
 
-# Non-JS/TS roots — formatted by their own tools
+# Non-JS/TS roots — formatted by their own tools (gofmt, ruff/black, etc.)
 backend/
 dbSchema/drizzle/
-playground/merchant-fastapi/
-playground/.venv/
 sdk/python/
+playground/main.py
+playground/pyproject.toml
+playground/merchant-fastapi/
+playground/merchant-jokes/
+playground/merchant_server/
+playground/e2e_test/
 
-# Generated docs / content
+# Python virtualenvs and cache anywhere in the tree
+**/.venv/
+**/__pycache__/
+**/*.dist-info/
+
+# Generated / vendored
 **/.next/**
 **/dist/**
+
+# Existing CI workflows (out of this PR's reformat scope; touch in a dedicated cleanup)
+.github/workflows/deploy-sdks.yml
+.github/workflows/publish-python-sdk.yml
+.github/workflows/publish-ts-sdk.yml
+
+# Working/plan docs not committed to the repo
+CRITICAL_SECURITY_ISSUES.md
+DOC_INCONSISTENCIES.md
+H8_PART_A_PLAN.md
+TOOLING_HYGIENE_PLAN.md

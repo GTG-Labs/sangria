@@ -19,6 +19,17 @@ make down         # Stop all services
 
 Requires Docker. Services: backend on `:8080`, frontend on `:3000`, mythos (admin) on `:3001`.
 
+### One-time setup for new contributors
+
+The repo pins `pnpm@10.15.1` via the `packageManager` field in every `package.json`. Use Corepack (ships with Node 20+) so every developer runs the exact same pnpm version regardless of what's globally installed:
+
+```bash
+corepack enable        # one-time, makes the `pnpm` binary respect packageManager pins
+pnpm install           # at repo root — installs pre-commit tooling and sets up git hooks
+```
+
+The root `pnpm install` configures a pre-commit hook (`simple-git-hooks` + `lint-staged`) that runs Prettier on staged files. Skip with `SKIP_SIMPLE_GIT_HOOKS=1 git commit ...` if needed. CI also runs `pnpm install --frozen-lockfile`, `pnpm format:check`, and `pnpm build` (where present) on every PR — so any lockfile drift or unformatted code fails before review.
+
 ---
 
 ## Quick Start
@@ -42,7 +53,7 @@ app.get(
   fixedPrice(sangria, { price: 0.01, description: "Premium content" }),
   (req, res) => {
     res.json({ data: "premium content", tx: req.sangria?.transaction });
-  }
+  },
 );
 
 app.listen(3000);

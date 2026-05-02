@@ -1,0 +1,25 @@
+{
+  "name": "sangria-net-tooling",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Root tooling only (pre-commit hooks). Each app/package has its own package.json and lockfile — this repo is NOT a pnpm workspace.",
+  "packageManager": "pnpm@10.15.1",
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=10"
+  },
+  "scripts": {
+    "prepare": "simple-git-hooks"
+  },
+  "devDependencies": {
+    "lint-staged": "^15.2.10",
+    "prettier": "^3.8.1",
+    "simple-git-hooks": "^2.11.1"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "pnpm exec lint-staged"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx,json,md,mdx,yaml,yml,css}": "prettier --write"
+  }
+}

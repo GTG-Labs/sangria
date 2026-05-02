@@ -10,15 +10,15 @@ For protocol details see [Sangria-Overview.md](Sangria-Overview.md). For archite
 
 ## Repository Map
 
-| Directory | What | Stack |
-|---|---|---|
-| `backend/` | Orchestration API — accounts, payments, settlement, withdrawals | Go 1.25, Fiber v3, pgx/pgxpool |
-| `dbSchema/` | Database schema — single source of truth | Drizzle ORM (TypeScript), PostgreSQL |
-| `frontend/` | Docs site + merchant dashboard | Next.js 16, React 19, Tailwind 4 |
-| `sdk/sdk-typescript/` | TypeScript merchant SDK (`@sangria-sdk/core`) | TypeScript, adapters for Express/Fastify/Hono |
-| `sdk/python/` | Python merchant SDK (`sangria-core`) | Python 3.10+, httpx, FastAPI adapter |
-| `playground/` | Example merchant servers + e2e test client | Express, Fastify, Hono, FastAPI, uv |
-| `mythos/` | Internal admin dashboard | Next.js 16, WorkOS AuthKit, port 3001 |
+| Directory             | What                                                            | Stack                                         |
+| --------------------- | --------------------------------------------------------------- | --------------------------------------------- |
+| `backend/`            | Orchestration API — accounts, payments, settlement, withdrawals | Go 1.25, Fiber v3, pgx/pgxpool                |
+| `dbSchema/`           | Database schema — single source of truth                        | Drizzle ORM (TypeScript), PostgreSQL          |
+| `frontend/`           | Docs site + merchant dashboard                                  | Next.js 16, React 19, Tailwind 4              |
+| `sdk/sdk-typescript/` | TypeScript merchant SDK (`@sangria-sdk/core`)                   | TypeScript, adapters for Express/Fastify/Hono |
+| `sdk/python/`         | Python merchant SDK (`sangria-core`)                            | Python 3.10+, httpx, FastAPI adapter          |
+| `playground/`         | Example merchant servers + e2e test client                      | Express, Fastify, Hono, FastAPI, uv           |
+| `mythos/`             | Internal admin dashboard                                        | Next.js 16, WorkOS AuthKit, port 3001         |
 
 Per-package build/test commands are in each package's own CLAUDE.md where one exists. See `backend/CLAUDE.md`, `dbSchema/CLAUDE.md`, `frontend/CLAUDE.md`, `sdk/sdk-typescript/CLAUDE.md`.
 
@@ -26,12 +26,12 @@ Per-package build/test commands are in each package's own CLAUDE.md where one ex
 
 Sangria runs two strictly separated environments — different Postgres databases, different CDP/facilitator endpoints, different WorkOS tenants, different chain contexts (Base Sepolia for dev, Base mainnet for prod).
 
-| Scope | Dev convention | Prod convention |
-|---|---|---|
-| Backend | Loads `.env` (copy from `.env.example`) | Railway runtime env vars |
-| dbSchema | `pnpm push:dev` (loads `.env.dev`) | `pnpm push:prd` (loads `.env.prd`) |
-| Frontend | `.env` / `.env.local` | Railway runtime env vars |
-| Playground | `.env` with CDP testnet keys, Base Sepolia | Never runs against prod |
+| Scope      | Dev convention                             | Prod convention                    |
+| ---------- | ------------------------------------------ | ---------------------------------- |
+| Backend    | Loads `.env` (copy from `.env.example`)    | Railway runtime env vars           |
+| dbSchema   | `pnpm push:dev` (loads `.env.dev`)         | `pnpm push:prd` (loads `.env.prd`) |
+| Frontend   | `.env` / `.env.local`                      | Railway runtime env vars           |
+| Playground | `.env` with CDP testnet keys, Base Sepolia | Never runs against prod            |
 
 **Default is always dev.** `go run .`, `pnpm dev`, and all local commands hit the dev environment. Production configs are for CI/CD and production runtimes only.
 
@@ -53,26 +53,31 @@ Use these terms consistently:
 ## Non-Negotiable Principles
 
 ### Schema
+
 - **Schema lives in Drizzle.** Any schema change starts in `dbSchema/schema.ts`. Go code is a consumer, never the author. Never hand-write SQL DDL.
 - **Enforce correctness at the database layer** (NOT NULL, unique, FK, CHECK). Never rely on caller discipline.
 - Schema conventions (column types, naming, FK rules) live in `dbSchema/CLAUDE.md`.
 
 ### Money & Ledger
+
 - **Double-entry bookkeeping for all USDC->USD flows.** Every movement debits and credits named accounts. The ledger is the source of truth for balances.
 - **x402 settle is NOT HTTP-idempotent.** Persist intent before calling. Treat ambiguous HTTP responses as UNRESOLVED (not failed) and reconcile against on-chain state. Never release a fiat payout on HTTP 200 alone.
 - **EIP-3009 nonces give on-chain idempotency but do not solve HTTP-layer ambiguity.** Don't conflate the two.
 - Amount representation is defined in § Product Vocabulary (microunits).
 
 ### Code
+
 - **Atomic admin checks.** Permission checks and mutations should be in the same SQL query to prevent TOCTOU races.
 - **Email normalization.** Always `strings.TrimSpace(strings.ToLower(email))` before storing or matching.
 - **Sentinel errors.** Use package-level `var Err... = errors.New(...)` for typed error handling.
 
 ### Security
+
 - **CSRF Protection is automatic.** Frontend components use standard `internalFetch()` calls — never manual CSRF token handling. The fetch wrapper (`lib/fetch.ts`) automatically injects tokens. Backend validates via `auth.CSRFMiddleware()`.
 - **Use secure fetch wrapper.** Import `{ internalFetch } from "@/lib/fetch"` instead of global `fetch` for automatic CSRF protection on state-changing requests.
 
 ### SDK
+
 - **SDK surface is a product.** Breaking changes to `@sangria-sdk/core` or `sangria-core` need explicit justification.
 - Match idioms of each host framework (Express middleware vs Fastify plugin vs FastAPI dependency) rather than forcing a single abstraction.
 - Keep TypeScript and Python SDK behavior in lockstep. If you add a feature to one, either add it to the other or explicitly document why it's language-specific.
@@ -80,6 +85,7 @@ Use these terms consistently:
 - **Bump SDK versions in `deployment/SDK_VERSIONS.md`** — it's the single source of truth. CI auto-bumps the patch version if you forget, but explicit edits communicate intent (patch = fix, minor = feature, major = breaking per semver). Never hand-edit `sdk/sdk-typescript/package.json#version` or `sdk/python/pyproject.toml#version` — CI overwrites them at publish time. See `deployment/DEPLOYMENT.md` for the full flow.
 
 ### Process
+
 - Ask clarifying questions before architectural changes.
 - Prefer principled reasoning over "what to change" — explain the why.
 - Match existing patterns in the codebase; flag inconsistencies rather than silently homogenizing.
@@ -105,9 +111,11 @@ Applies to both `frontend/` (merchant portal) and `mythos/` (admin dashboard) �
 ### Proxy routes (`app/api/**/route.ts`)
 
 - **URL-encode every dynamic segment** before interpolating into the backend path:
+
   ```ts
   return proxyToBackend("POST", `/admin/withdrawals/${encodeURIComponent(id)}/approve`, { body });
   ```
+
   Raw `${id}` lets a caller inject `/` or `..` to reach a different backend route with the authenticated bearer token attached.
 
 - **CSRF Protection**: Pass the request object to `proxyToBackend()` for automatic CSRF token extraction:
