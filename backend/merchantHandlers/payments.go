@@ -257,7 +257,7 @@ func SettlePayment(pool *pgxpool.Pool) fiber.Handler {
 			return c.Status(200).JSON(fiber.Map{
 				"success":     true,
 				"transaction": storedTxHash,
-				"network":     string(wallet.Network),
+				"network":     netConfig.CAIP2,
 				"payer":       "",
 			})
 		}
@@ -393,7 +393,7 @@ func SettlePayment(pool *pgxpool.Pool) fiber.Handler {
 		return c.Status(200).JSON(fiber.Map{
 			"success":     true,
 			"transaction": settleResp.Transaction,
-			"network":     string(wallet.Network),
+			"network":     netConfig.CAIP2,
 			"payer":       settleResp.Payer,
 		})
 	}
