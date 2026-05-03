@@ -25,6 +25,7 @@ interface OrganizationContextType {
   selectedOrg: Organization | null;
   setSelectedOrgId: (orgId: string) => void;
   isLoading: boolean;
+  error: string | null;
   refreshUserInfo: () => Promise<void>;
 }
 
@@ -46,34 +47,62 @@ export function OrganizationProvider({ children }: OrganizationProviderProps) {
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
   const [selectedOrgId, setSelectedOrgId] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const selectedOrg = userInfo?.organizations.find(org => org.id === selectedOrgId) || null;
 
   const fetchUserInfo = async () => {
+    setIsLoading(true);
+    setError(null);
+
     try {
       const response = await internalFetch("/api/backend/me");
-      if (response.ok) {
-        const user = await response.json();
-        setUserInfo(user);
 
-        // Set default organization to personal org or first available
-        if (user.organizations && user.organizations.length > 0) {
-          const personalOrg = user.organizations.find((org: Organization) => org.isPersonal);
-          const defaultOrg = personalOrg ? personalOrg.id : user.organizations[0].id;
-
-          // Use functional state updater and validate prev against refreshed list
-          setSelectedOrgId(prev => {
-            // Keep prev if it's truthy AND still exists in the refreshed organizations
-            if (prev && user.organizations.some((org: any) => org.id === prev)) {
-              return prev;
-            }
-            // Otherwise, set to default
-            return defaultOrg;
-          });
+      if (!response.ok) {
+        // Handle HTTP errors with specific messages
+        // Note: 401/403 are now handled globally by internalFetch
+        if (response.status >= 500) {
+          throw new Error("Server error. Please try again in a few moments.");
+        } else {
+          const errorText = await response.text().catch(() => "Unknown error");
+          throw new Error(`Failed to load user data: ${errorText}`);
         }
       }
+
+      const user = await response.json();
+
+      // Validate response structure
+      if (!user || typeof user !== 'object') {
+        throw new Error("Invalid user data received from server");
+      }
+
+      if (!user.organizations || !Array.isArray(user.organizations)) {
+        throw new Error("No organizations found for user");
+      }
+
+      setUserInfo(user);
+
+      // Set default organization to personal org or first available
+      if (user.organizations.length > 0) {
+        const personalOrg = user.organizations.find((org: Organization) => org.isPersonal);
+        const defaultOrg = personalOrg ? personalOrg.id : user.organizations[0].id;
+
+        // Use functional state updater and validate prev against refreshed list
+        setSelectedOrgId(prev => {
+          // Keep prev if it's truthy AND still exists in the refreshed organizations
+          if (prev && user.organizations.some((org: any) => org.id === prev)) {
+            return prev;
+          }
+          // Otherwise, set to default
+          return defaultOrg;
+        });
+      }
     } catch (err) {
-      console.error("Failed to fetch user info:", err);
+      const errorMessage = err instanceof Error ? err.message : "Unknown error occurred";
+      console.error("Failed to fetch user info:", errorMessage);
+      setError(errorMessage);
+      setUserInfo(null);
+      setSelectedOrgId("");
     } finally {
       setIsLoading(false);
     }
@@ -95,6 +124,7 @@ export function OrganizationProvider({ children }: OrganizationProviderProps) {
         selectedOrg,
         setSelectedOrgId,
         isLoading,
+        error,
         refreshUserInfo,
       }}
     >

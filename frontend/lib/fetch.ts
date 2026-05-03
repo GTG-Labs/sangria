@@ -63,7 +63,7 @@ async function getOrFetchCSRFToken(): Promise<string | null> {
   return null;
 }
 
-// Override the global fetch with CSRF-aware version
+// Override the global fetch with CSRF-aware version and global 401 handling
 export async function internalFetch(url: string, options: RequestInit = {}): Promise<Response> {
   // Prepare headers
   const headers = new Headers(options.headers);
@@ -77,11 +77,37 @@ export async function internalFetch(url: string, options: RequestInit = {}): Pro
   }
 
   // Make the request with CSRF token
-  return globalThis.fetch(url, {
+  const response = await globalThis.fetch(url, {
     ...options,
     headers,
     credentials: 'include', // Always send cookies
   });
+
+  // Global 401 handling for banking security
+  if (response.status === 401) {
+    console.warn('Session expired - redirecting to login');
+
+    // Store current location for post-login redirect
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('redirect_after_login', window.location.pathname);
+    }
+
+    // For banking apps, immediately redirect to login on any 401
+    if (typeof window !== 'undefined') {
+      window.location.href = '/auth/login?reason=session_expired';
+    }
+
+    // Throw error to prevent component from trying to process the response
+    throw new Error('Your session has expired for security reasons. Please log in again.');
+  }
+
+  // Global 403 handling - access denied
+  if (response.status === 403) {
+    console.warn('Access denied for request:', url);
+    throw new Error('Access denied. You do not have permission to perform this action.');
+  }
+
+  return response;
 }
 
 // Convenience methods for cleaner API calls
