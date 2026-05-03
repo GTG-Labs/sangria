@@ -44,6 +44,7 @@ export function ErrorBanner({
             <div className="flex items-center gap-3 mt-3">
               {onRetry && (
                 <button
+                  type="button"
                   onClick={onRetry}
                   className="text-sm text-red-800 hover:text-red-900 font-medium underline"
                 >
@@ -52,6 +53,7 @@ export function ErrorBanner({
               )}
               {onDismiss && (
                 <button
+                  type="button"
                   onClick={onDismiss}
                   className="text-sm text-red-600 hover:text-red-700"
                 >
@@ -64,6 +66,7 @@ export function ErrorBanner({
 
         {onDismiss && (
           <button
+            type="button"
             onClick={onDismiss}
             className="flex-shrink-0 text-red-400 hover:text-red-600 transition-colors"
             aria-label="Dismiss error"

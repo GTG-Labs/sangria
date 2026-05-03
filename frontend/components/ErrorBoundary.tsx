@@ -1,6 +1,6 @@
 "use client";
 
-import { ArcadeButton } from "@/components/ArcadeButton";
+import ArcadeButton from "@/components/ArcadeButton";
 
 interface ErrorBoundaryProps {
   error: string;

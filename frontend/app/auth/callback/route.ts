@@ -10,29 +10,48 @@ export const GET = handleAuth({
       throw new Error("Missing access token");
     }
 
-    // Get CSRF token - will throw on failure
-    const csrfResponse = await fetch(`${env.BACKEND_URL}/csrf-token`);
-    if (!csrfResponse.ok) {
-      throw new Error(`Failed to get CSRF token: ${csrfResponse.status}`);
+    // Get CSRF token with timeout - will throw on failure
+    const csrfController = new AbortController();
+    const csrfTimeout = setTimeout(() => csrfController.abort(), 5000);
+    try {
+      const csrfResponse = await fetch(`${env.BACKEND_URL}/csrf-token`, {
+        signal: csrfController.signal,
+      });
+      clearTimeout(csrfTimeout);
+      if (!csrfResponse.ok) {
+        throw new Error(`Failed to get CSRF token: ${csrfResponse.status}`);
+      }
+      const { csrf_token: csrfToken } = await csrfResponse.json();
+
+      // Create user with timeout - will throw on failure
+      const userController = new AbortController();
+      const userTimeout = setTimeout(() => userController.abort(), 10000);
+      try {
+        const response = await fetch(`${env.BACKEND_URL}/internal/users`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+            "X-CSRF-Token": csrfToken,
+          },
+          signal: userController.signal,
+        });
+        clearTimeout(userTimeout);
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Failed to create user: ${response.status} ${errorText}`);
+        }
+
+        // Only reaches here on success - redirect proceeds
+        console.log("User record created successfully");
+      } catch (err) {
+        clearTimeout(userTimeout);
+        throw err;
+      }
+    } catch (err) {
+      clearTimeout(csrfTimeout);
+      throw err;
     }
-    const { token: csrfToken } = await csrfResponse.json();
-
-    // Create user - will throw on failure
-    const response = await fetch(`${env.BACKEND_URL}/internal/users`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-        "X-CSRF-Token": csrfToken,
-      },
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Failed to create user: ${response.status} ${errorText}`);
-    }
-
-    // Only reaches here on success - redirect proceeds
-    console.log("User record created successfully");
   },
 });

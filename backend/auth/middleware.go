@@ -40,15 +40,18 @@ var (
 // getCachedUserInfo attempts to retrieve user info from cache
 func getCachedUserInfo(userID string) (WorkOSUser, bool) {
 	cacheMutex.RLock()
-	defer cacheMutex.RUnlock()
-
 	cached, exists := userInfoCache[userID]
+	cacheMutex.RUnlock()
+
 	if !exists {
 		return WorkOSUser{}, false
 	}
 
-	// Check if cache entry has expired
-	if time.Now().After(cached.ExpiresAt) {
+	// Check if cache entry has expired - delete it if so
+	if cached.ExpiresAt.Before(time.Now()) {
+		cacheMutex.Lock()
+		delete(userInfoCache, userID)
+		cacheMutex.Unlock()
 		return WorkOSUser{}, false
 	}
 
@@ -68,6 +71,50 @@ func setCachedUserInfo(userID string, user WorkOSUser) {
 	}
 }
 
+// init starts background janitor to clean expired cache entries
+func init() {
+	go func() {
+		ticker := time.NewTicker(10 * time.Minute)
+		defer ticker.Stop()
+		for range ticker.C {
+			cacheMutex.Lock()
+			now := time.Now()
+			for userID, entry := range userInfoCache {
+				if entry.ExpiresAt.Before(now) {
+					delete(userInfoCache, userID)
+				}
+			}
+			cacheMutex.Unlock()
+		}
+	}()
+}
+
+// isTransientWorkOSError determines if the error is transient (network, timeout, 5xx)
+// versus permanent (auth failure, not found, client error).
+func isTransientWorkOSError(err error) bool {
+	if err == nil {
+		return false
+	}
+	errStr := strings.ToLower(err.Error())
+	// Network timeouts, connection refused, DNS failures
+	if strings.Contains(errStr, "timeout") ||
+		strings.Contains(errStr, "connection refused") ||
+		strings.Contains(errStr, "no such host") ||
+		strings.Contains(errStr, "context deadline exceeded") {
+		return true
+	}
+	// HTTP 5xx server errors
+	if strings.Contains(errStr, "status 5") || strings.Contains(errStr, "server error") {
+		return true
+	}
+	// Rate limiting (429)
+	if strings.Contains(errStr, "429") || strings.Contains(errStr, "rate limit") {
+		return true
+	}
+	// Permanent errors: 401, 403, 404, 400, etc.
+	return false
+}
+
 // getUserInfoWithFallback attempts WorkOS API first, falls back to cache for availability
 func getUserInfoWithFallback(userID string) (WorkOSUser, error) {
 	// Try WorkOS API first
@@ -82,7 +129,7 @@ func getUserInfoWithFallback(userID string) (WorkOSUser, error) {
 		// Success - cache the result and return
 		workosUser := WorkOSUser{
 			ID:        user.ID,
-			Email:     user.Email,
+			Email:     strings.TrimSpace(strings.ToLower(user.Email)),
 			FirstName: user.FirstName,
 			LastName:  user.LastName,
 		}
@@ -90,8 +137,15 @@ func getUserInfoWithFallback(userID string) (WorkOSUser, error) {
 		return workosUser, nil
 	}
 
-	// WorkOS API failed - log and try cache
-	slog.Warn("WorkOS API unavailable, attempting cache fallback", "user_id", userID, "error", err)
+	// WorkOS API failed - determine if error is transient or permanent
+	if !isTransientWorkOSError(err) {
+		// Permanent error (401, 403, 404, etc.) - don't use cache
+		slog.Error("WorkOS API returned permanent error, skipping cache", "user_id", userID, "error", err)
+		return WorkOSUser{}, err
+	}
+
+	// Transient error - try cache fallback
+	slog.Warn("WorkOS API unavailable (transient error), attempting cache fallback", "user_id", userID, "error", err)
 
 	// Check cache for fallback
 	if cachedUser, found := getCachedUserInfo(userID); found {

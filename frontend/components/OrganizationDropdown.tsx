@@ -95,11 +95,20 @@ export default function OrganizationDropdown() {
   }
 
   // Show loading state
-  if (isLoading || !userInfo || !selectedOrg) {
+  if (isLoading || !userInfo) {
     return (
       <div className="flex items-center gap-3 px-2 py-2">
         <div className="w-4 h-4 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin"></div>
         <span className="text-sm text-gray-500">Loading organizations...</span>
+      </div>
+    );
+  }
+
+  // Show empty state (no organization selected)
+  if (!selectedOrg) {
+    return (
+      <div className="flex items-center gap-3 px-2 py-2">
+        <span className="text-sm text-gray-500">No organization selected</span>
       </div>
     );
   }

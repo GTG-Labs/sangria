@@ -174,7 +174,7 @@ func handleAuthOAuthSucceeded(c fiber.Ctx, pool *pgxpool.Pool, event WorkOSWebho
 
 // handleAuthPasswordFailed processes authentication.password_failed events
 func handleAuthPasswordFailed(c fiber.Ctx, pool *pgxpool.Pool, event WorkOSWebhookEvent) error {
-wh	userEmail, _ := event.Data["email"].(string)
+	userEmail, _ := event.Data["email"].(string)
 	if userEmail != "" {
 		userEmail = strings.TrimSpace(strings.ToLower(userEmail))
 	}
