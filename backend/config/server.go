@@ -4,9 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"os"
 	"strconv"
-	"strings"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
@@ -21,27 +19,21 @@ func LoadEnvironment() {
 	godotenv.Load()
 }
 
-// SetupWorkOS initializes WorkOS configuration and JWKS cache
+// SetupWorkOS initializes the WorkOS SDK and JWKS cache from pre-loaded
+// WorkOSConfig values. Caller must have invoked LoadWorkOSConfig() first.
 func SetupWorkOS() error {
-	workosAPIKey := os.Getenv("WORKOS_API_KEY")
-	if workosAPIKey == "" {
-		return fmt.Errorf("WORKOS_API_KEY environment variable is required")
+	if WorkOS.APIKey == "" || WorkOS.ClientID == "" {
+		return fmt.Errorf("SetupWorkOS called before LoadWorkOSConfig — WorkOS config not populated")
 	}
-	workosClientID := os.Getenv("WORKOS_CLIENT_ID")
-	if workosClientID == "" {
-		return fmt.Errorf("WORKOS_CLIENT_ID environment variable is required")
-	}
-
-	usermanagement.SetAPIKey(workosAPIKey)
-
-	return auth.InitJWKSCache(workosClientID)
+	usermanagement.SetAPIKey(WorkOS.APIKey)
+	return auth.InitJWKSCache(WorkOS.ClientID, WorkOS.TokenIssuer)
 }
 
 // ConnectDatabase establishes database connection
 func ConnectDatabase(ctx context.Context) (*pgxpool.Pool, error) {
-	connStr := os.Getenv("DATABASE_URL")
-	if connStr == "" {
-		return nil, fmt.Errorf("DATABASE_URL is not set")
+	connStr, err := requireEnv("DATABASE_URL")
+	if err != nil {
+		return nil, err
 	}
 
 	pool, err := dbengine.Connect(ctx, connStr)
@@ -54,9 +46,9 @@ func ConnectDatabase(ctx context.Context) (*pgxpool.Pool, error) {
 
 // GetPort returns the server port from the PORT environment variable.
 func GetPort() (string, error) {
-	port := strings.TrimSpace(os.Getenv("PORT"))
-	if port == "" {
-		return "", fmt.Errorf("PORT environment variable is required")
+	port, err := requireEnv("PORT")
+	if err != nil {
+		return "", err
 	}
 	n, err := strconv.Atoi(port)
 	if err != nil || n < 1 || n > 65535 {

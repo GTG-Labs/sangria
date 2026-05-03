@@ -1,28 +1,19 @@
 package utils
 
 import (
-	"log/slog"
-	"os"
 	"slices"
-	"strings"
 
 	"github.com/gofiber/fiber/v3"
+
+	"sangria/backend/config"
 )
 
-// GetAllowedOrigins parses the ALLOWED_ORIGINS environment variable
+// GetAllowedOrigins returns the configured CORS allowlist. Value is
+// parsed once at startup via config.LoadCORSConfig — an unset env var
+// logs a loud warning there and returns an empty list here, which means
+// cross-origin requests are rejected (by design).
 func GetAllowedOrigins() []string {
-	allowedOriginsEnv := os.Getenv("ALLOWED_ORIGINS")
-	if allowedOriginsEnv == "" {
-		slog.Warn("ALLOWED_ORIGINS not set, defaulting to localhost:3000")
-		return []string{"http://localhost:3000"}
-	}
-
-	origins := strings.Split(allowedOriginsEnv, ",")
-	for i, origin := range origins {
-		origins[i] = strings.TrimSpace(origin)
-	}
-
-	return origins
+	return config.CORS.AllowedOrigins
 }
 
 // IsOriginAllowed checks if the given origin is in the allowlist

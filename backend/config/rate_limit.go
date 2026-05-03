@@ -1,11 +1,9 @@
 package config
 
 import (
-	"fmt"
 	"log/slog"
 	"net"
 	"os"
-	"strconv"
 	"strings"
 )
 
@@ -106,18 +104,3 @@ func LoadRateLimitConfig() error {
 	return nil
 }
 
-// loadIntEnv reads a positive integer env var with a default fallback.
-func loadIntEnv(name string, fallback int) (int, error) {
-	raw := os.Getenv(name)
-	if raw == "" {
-		return fallback, nil
-	}
-	n, err := strconv.Atoi(raw)
-	if err != nil {
-		return 0, fmt.Errorf("invalid %s: %w", name, err)
-	}
-	if n <= 0 {
-		return 0, fmt.Errorf("%s must be positive, got %d", name, n)
-	}
-	return n, nil
-}

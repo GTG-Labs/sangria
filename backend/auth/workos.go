@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -36,15 +35,17 @@ var (
 	initErr        error
 )
 
-// InitJWKSCache initializes the global JWKS cache with proper security settings.
-func InitJWKSCache(clientID string) error {
+// InitJWKSCache initializes the global JWKS cache with proper security
+// settings. The issuer is passed in (not read from env) so this package
+// doesn't depend on backend/config — caller resolves both values from
+// WorkOSConfig. A zero-value issuer is a programming error.
+func InitJWKSCache(clientID, tokenIssuer string) error {
 	initOnce.Do(func() {
-		// Validate issuer first — fail fast if not configured.
-		expectedIssuer = os.Getenv("WORKOS_TOKEN_ISSUER")
-		if expectedIssuer == "" {
-			initErr = fmt.Errorf("WORKOS_TOKEN_ISSUER environment variable is required")
+		if tokenIssuer == "" {
+			initErr = fmt.Errorf("InitJWKSCache: tokenIssuer must be non-empty")
 			return
 		}
+		expectedIssuer = tokenIssuer
 
 		// Get JWKS URL for this client and store it for reuse
 		parsedURL, err := usermanagement.GetJWKSURL(clientID)
