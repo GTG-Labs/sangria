@@ -42,11 +42,18 @@ func isWorkOSIPAllowed(ip string) bool {
 
 // WorkOS webhook event types
 const (
-	EventTypeInvitationAccepted      = "invitation.accepted"
-	EventTypeAuthPasswordSucceeded   = "authentication.password_succeeded"
-	EventTypeAuthOAuthSucceeded      = "authentication.oauth_succeeded"
-	EventTypeAuthPasswordFailed      = "authentication.password_failed"
-	EventTypeSessionCreated          = "session.created"
+	EventTypeInvitationAccepted          = "invitation.accepted"
+	EventTypeAuthPasswordSucceeded       = "authentication.password_succeeded"
+	EventTypeAuthOAuthSucceeded          = "authentication.oauth_succeeded"
+	EventTypeAuthPasswordFailed          = "authentication.password_failed"
+	EventTypeSessionCreated              = "session.created"
+	EventTypeUserCreated                 = "user.created"
+	EventTypeUserUpdated                 = "user.updated"
+	EventTypeUserDeleted                 = "user.deleted"
+	EventTypeSessionRevoked              = "session.revoked"
+	EventTypeEmailVerificationCreated    = "email_verification.created"
+	EventTypeEmailVerificationSucceeded  = "authentication.email_verification_succeeded"
+	// Note: organization events are handled via JWT user creation, not webhooks
 )
 
 // WorkOS webhook event structure
@@ -116,6 +123,18 @@ func HandleWorkOSWebhook(pool *pgxpool.Pool) fiber.Handler {
 			return handleAuthPasswordFailed(c, pool, event)
 		case EventTypeSessionCreated:
 			return handleSessionCreated(c, pool, event)
+		case EventTypeUserCreated:
+			return handleUserCreated(c, pool, event)
+		case EventTypeUserUpdated:
+			return handleUserUpdated(c, pool, event)
+		case EventTypeUserDeleted:
+			return handleUserDeleted(c, pool, event)
+		case EventTypeSessionRevoked:
+			return handleSessionRevoked(c, pool, event)
+		case EventTypeEmailVerificationCreated:
+			return handleEmailVerificationCreated(c, pool, event)
+		case EventTypeEmailVerificationSucceeded:
+			return handleEmailVerificationSucceeded(c, pool, event)
 		default:
 			slog.Info("unhandled webhook event type", "event_type", event.Event)
 			return c.Status(200).JSON(fiber.Map{"message": "event type not handled"})
@@ -184,6 +203,111 @@ func handleSessionCreated(c fiber.Ctx, pool *pgxpool.Pool, event WorkOSWebhookEv
 
 	return c.Status(200).JSON(fiber.Map{
 		"message":  "session creation logged",
+		"event_id": event.ID,
+	})
+}
+
+// handleUserCreated processes user.created events (logging only - user creation handled via JWT)
+func handleUserCreated(c fiber.Ctx, pool *pgxpool.Pool, event WorkOSWebhookEvent) error {
+	userID, _ := event.Data["id"].(string)
+	email, _ := event.Data["email"].(string)
+	if email != "" {
+		email = strings.TrimSpace(strings.ToLower(email))
+	}
+
+	slog.Info("user created",
+		"event_id", event.ID,
+		"workos_user_id", userID,
+		"email", maskEmail(email),
+	)
+
+	return c.Status(200).JSON(fiber.Map{
+		"message":  "user creation logged",
+		"event_id": event.ID,
+	})
+}
+
+// handleUserUpdated processes user.updated events
+func handleUserUpdated(c fiber.Ctx, pool *pgxpool.Pool, event WorkOSWebhookEvent) error {
+	userID, _ := event.Data["id"].(string)
+	email, _ := event.Data["email"].(string)
+	if email != "" {
+		email = strings.TrimSpace(strings.ToLower(email))
+	}
+
+	slog.Info("user updated",
+		"event_id", event.ID,
+		"workos_user_id", userID,
+		"email", maskEmail(email),
+	)
+
+	return c.Status(200).JSON(fiber.Map{
+		"message":  "user update logged",
+		"event_id": event.ID,
+	})
+}
+
+// handleUserDeleted processes user.deleted events
+func handleUserDeleted(c fiber.Ctx, pool *pgxpool.Pool, event WorkOSWebhookEvent) error {
+	userID, _ := event.Data["id"].(string)
+
+	slog.Info("user deleted",
+		"event_id", event.ID,
+		"workos_user_id", userID,
+	)
+
+	return c.Status(200).JSON(fiber.Map{
+		"message":  "user deletion logged",
+		"event_id": event.ID,
+	})
+}
+
+// handleSessionRevoked processes session.revoked events
+func handleSessionRevoked(c fiber.Ctx, pool *pgxpool.Pool, event WorkOSWebhookEvent) error {
+	userID, _ := event.Data["user_id"].(string)
+
+	slog.Info("session revoked",
+		"event_id", event.ID,
+		"workos_user_id", userID,
+	)
+
+	return c.Status(200).JSON(fiber.Map{
+		"message":  "session revocation logged",
+		"event_id": event.ID,
+	})
+}
+
+// handleEmailVerificationCreated processes email_verification.created events
+func handleEmailVerificationCreated(c fiber.Ctx, pool *pgxpool.Pool, event WorkOSWebhookEvent) error {
+	userID, _ := event.Data["user_id"].(string)
+
+	slog.Info("email verification created",
+		"event_id", event.ID,
+		"workos_user_id", userID,
+	)
+
+	return c.Status(200).JSON(fiber.Map{
+		"message":  "email verification creation logged",
+		"event_id": event.ID,
+	})
+}
+
+// handleEmailVerificationSucceeded processes authentication.email_verification_succeeded events
+func handleEmailVerificationSucceeded(c fiber.Ctx, pool *pgxpool.Pool, event WorkOSWebhookEvent) error {
+	userID, _ := event.Data["user_id"].(string)
+	email, _ := event.Data["email"].(string)
+	if email != "" {
+		email = strings.TrimSpace(strings.ToLower(email))
+	}
+
+	slog.Info("email verification succeeded",
+		"event_id", event.ID,
+		"workos_user_id", userID,
+		"email", maskEmail(email),
+	)
+
+	return c.Status(200).JSON(fiber.Map{
+		"message":  "email verification success logged",
 		"event_id": event.ID,
 	})
 }

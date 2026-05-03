@@ -16,11 +16,23 @@ export const GET = handleAuth({
     const timeoutId = setTimeout(() => controller.abort(), 5000);
 
     try {
+      // First get CSRF token
+      const csrfResponse = await fetch(`${env.BACKEND_URL}/csrf-token`, {
+        signal: controller.signal,
+      });
+
+      if (!csrfResponse.ok) {
+        throw new Error(`Failed to get CSRF token: ${csrfResponse.status}`);
+      }
+
+      const { token: csrfToken } = await csrfResponse.json();
+
       const response = await fetch(`${env.BACKEND_URL}/internal/users`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${accessToken}`,
           "Content-Type": "application/json",
+          "X-CSRF-Token": csrfToken,
         },
         signal: controller.signal,
       });
