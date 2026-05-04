@@ -3,11 +3,16 @@ package auth
 import (
 	"crypto/rand"
 	"encoding/hex"
-	"os"
 	"time"
 
 	"github.com/gofiber/fiber/v3"
 )
+
+// IsDevelopmentEnv toggles dev-mode relaxations (SameSite=Lax, non-secure) in
+// this package's cookie helpers. Startup contract: main.go sets this once after
+// config.LoadLoggingConfig and before any cookie-setting handler is registered.
+// Defaults to false so unwired reads get the production posture.
+var IsDevelopmentEnv bool
 
 // CSRFToken represents a CSRF token with expiration
 type CSRFToken struct {
@@ -26,17 +31,14 @@ func GenerateCSRFToken() (string, error) {
 
 // SetCSRFTokenCookie sets a secure CSRF token cookie
 func SetCSRFTokenCookie(c fiber.Ctx, token string) {
-	// Determine environment-based cookie settings
-	isDev := os.Getenv("APP_ENV") == "development" || os.Getenv("NODE_ENV") == "development"
-
 	// Production defaults: strict security
 	sameSite := "Strict"
 	secure := c.Protocol() == "https"
 
 	// Development settings: relaxed for local development
-	if isDev {
-		sameSite = "Lax"  // Allow cross-origin for localhost frontend
-		secure = false    // Allow HTTP in development
+	if IsDevelopmentEnv {
+		sameSite = "Lax" // Allow cross-origin for localhost frontend
+		secure = false   // Allow HTTP in development
 	}
 
 	c.Cookie(&fiber.Cookie{
