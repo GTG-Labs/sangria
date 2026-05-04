@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Sans, PT_Serif, JetBrains_Mono } from "next/font/google";
-import Script from "next/script";
 import "./globals.css";
 
 import { RootProvider } from "fumadocs-ui/provider/next";
@@ -38,26 +37,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="scroll-smooth">
       <head>
-        <Script
-          id="apollo-tracker"
-          strategy="afterInteractive"
-          dangerouslySetInnerHTML={{
-            __html: `
-              function initApollo(){
-                var n=Math.random().toString(36).substring(7),
-                    o=document.createElement("script");
-                o.src="https://assets.apollo.io/micro/website-tracker/tracker.iife.js?nocache="+n;
-                o.async=true;
-                o.defer=true;
-                o.onload=function(){
-                  window.trackingFunctions.onLoad({appId:"69e6b9192b847900152bd1e6"})
-                };
-                document.head.appendChild(o)
-              }
-              initApollo();
-            `,
-          }}
-        />
+        {/* Banking application - no third-party tracking for compliance and security */}
       </head>
       <body
         className={`${ibmPlexSans.variable} ${ptSerif.variable} ${jetbrainsMono.variable} antialiased`}

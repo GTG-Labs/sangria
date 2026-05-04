@@ -4,38 +4,41 @@ import { env } from "@/lib/env";
 export const GET = handleAuth({
   baseURL: env.BASE_URL,
   returnPathname: "/dashboard/api-keys",
-  onSuccess: async (authData: { user?: any; accessToken?: string }) => {
+  onSuccess: async (authData) => {
     const accessToken = authData.accessToken;
     if (!accessToken) {
-      console.warn("Skipping user upsert: missing access token");
-      return;
+      throw new Error("Missing access token");
     }
 
-    // Call Go backend to upsert user record on login
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    console.log("Auth callback - Starting user creation flow");
 
+    // Create user directly on backend (no CSRF needed for server-side auth operations)
+    const userController = new AbortController();
+    const userTimeout = setTimeout(() => userController.abort(), 10000);
     try {
-      const response = await fetch(`${env.BACKEND_URL}/internal/users`, {
+      console.log("Creating user via auth callback endpoint:", `${env.BACKEND_URL}/auth/users`);
+      const response = await fetch(`${env.BACKEND_URL}/auth/users`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${accessToken}`,
           "Content-Type": "application/json",
         },
-        signal: controller.signal,
+        signal: userController.signal,
       });
+      clearTimeout(userTimeout);
 
-      clearTimeout(timeoutId);
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error("User creation failed:", response.status, errorText);
+          throw new Error(`Failed to create user: ${response.status} ${errorText}`);
+        }
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`Failed to upsert user: ${response.status} ${errorText}`);
-      } else {
-        console.log("User record upserted successfully");
-      }
-    } catch (error) {
-      clearTimeout(timeoutId);
-      console.error("Error upserting user:", error);
+      // Only reaches here on success - redirect proceeds
+      console.log("User record created successfully");
+    } catch (err) {
+      clearTimeout(userTimeout);
+      console.error("User creation error:", err);
+      throw err;
     }
   },
 });

@@ -6,7 +6,7 @@ import { useOrganization } from "@/contexts/OrganizationContext";
 import { internalFetch } from "@/lib/fetch";
 
 export default function OrganizationDropdown() {
-  const { userInfo, selectedOrgId, selectedOrg, setSelectedOrgId, refreshUserInfo } = useOrganization();
+  const { userInfo, selectedOrgId, selectedOrg, setSelectedOrgId, refreshUserInfo, error, isLoading } = useOrganization();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -73,10 +73,42 @@ export default function OrganizationDropdown() {
     }
   };
 
-  if (!userInfo || !selectedOrg) {
+  // Show error state
+  if (error) {
+    return (
+      <div className="px-2 py-2">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-4 h-4 rounded-full bg-red-500"></div>
+            <span className="text-sm font-medium text-red-800">Failed to load organizations</span>
+          </div>
+          <p className="text-xs text-red-700 mb-2">{error}</p>
+          <button
+            onClick={refreshUserInfo}
+            className="text-xs text-red-800 hover:text-red-900 font-medium underline"
+          >
+            Try again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Show loading state
+  if (isLoading || !userInfo) {
     return (
       <div className="flex items-center gap-3 px-2 py-2">
-        <span className="text-sm text-gray-500">Loading...</span>
+        <div className="w-4 h-4 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin"></div>
+        <span className="text-sm text-gray-500">Loading organizations...</span>
+      </div>
+    );
+  }
+
+  // Show empty state (no organization selected)
+  if (!selectedOrg) {
+    return (
+      <div className="flex items-center gap-3 px-2 py-2">
+        <span className="text-sm text-gray-500">No organization selected</span>
       </div>
     );
   }
