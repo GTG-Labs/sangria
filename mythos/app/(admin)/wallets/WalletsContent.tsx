@@ -44,12 +44,12 @@ function networkLabel(network: string): string {
 
 function networkBadgeColor(network: string): string {
   switch (network) {
-    case "base": return "bg-blue-500/20 text-blue-400";
+    case "base": return "bg-blue-500/15 text-blue-400";
     case "base-sepolia": return "bg-blue-500/10 text-blue-300";
-    case "ethereum": return "bg-purple-500/20 text-purple-400";
-    case "solana": return "bg-green-500/20 text-green-400";
+    case "ethereum": return "bg-purple-500/15 text-purple-400";
+    case "solana": return "bg-green-500/15 text-green-400";
     case "solana-devnet": return "bg-green-500/10 text-green-300";
-    default: return "bg-gray-500/20 text-gray-400";
+    default: return "bg-zinc-500/15 text-zinc-400";
   }
 }
 
@@ -57,6 +57,7 @@ export default function WalletsContent() {
   const [wallets, setWallets] = useState<WalletAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [copiedAddress, setCopiedAddress] = useState<string | null>(null);
   const controllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -91,142 +92,181 @@ export default function WalletsContent() {
     return () => controller.abort();
   }, []);
 
+  const copyAddress = (address: string) => {
+    navigator.clipboard.writeText(address);
+    setCopiedAddress(address);
+    setTimeout(() => setCopiedAddress((prev) => (prev === address ? null : prev)), 1500);
+  };
+
   const totalBalances = wallets.reduce((acc, w) => {
     return acc + Object.values(w.balances).reduce((n, tokens) => n + tokens.length, 0);
   }, 0);
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent-soft" />
+      </div>
+    );
+  }
+
   return (
     <div>
+      {/* Header */}
       <div className="mb-8">
-        <h1 className="text-2xl font-bold">Wallets</h1>
-        <p className="text-sm text-gray-400 mt-1">
-          CDP accounts and live on-chain balances
+        <h1 className="text-2xl font-bold text-fg">Wallets</h1>
+        <p className="mt-1 text-sm text-zinc-500">
+          {wallets.length} CDP account{wallets.length !== 1 ? "s" : ""} with live on-chain balances
         </p>
       </div>
 
       {/* Summary cards */}
-      {!loading && !error && (
-        <div className="grid grid-cols-3 gap-4 mb-8">
-          <div className="border border-white/10 rounded-lg p-4">
-            <div className="text-xs text-gray-500 uppercase tracking-wider">Total Accounts</div>
-            <div className="text-2xl font-bold mt-1">{wallets.length}</div>
+      {!error && (
+        <div className="mb-8 flex rounded-xl border border-white/8 bg-surface divide-x divide-white/8">
+          <div className="flex-1 px-5 py-4">
+            <p className="text-xs text-zinc-500 uppercase tracking-wider">Accounts</p>
+            <p className="mt-1 text-xl font-semibold text-fg">{wallets.length}</p>
           </div>
-          <div className="border border-white/10 rounded-lg p-4">
-            <div className="text-xs text-gray-500 uppercase tracking-wider">EVM Accounts</div>
-            <div className="text-2xl font-bold mt-1">{wallets.filter(w => w.type === "evm").length}</div>
+          <div className="flex-1 px-5 py-4">
+            <p className="text-xs text-zinc-500 uppercase tracking-wider">EVM</p>
+            <p className="mt-1 text-xl font-semibold text-fg">
+              {wallets.filter((w) => w.type === "evm").length}
+            </p>
           </div>
-          <div className="border border-white/10 rounded-lg p-4">
-            <div className="text-xs text-gray-500 uppercase tracking-wider">Token Balances</div>
-            <div className="text-2xl font-bold mt-1">{totalBalances}</div>
+          <div className="flex-1 px-5 py-4">
+            <p className="text-xs text-zinc-500 uppercase tracking-wider">Token Balances</p>
+            <p className="mt-1 text-xl font-semibold text-fg">{totalBalances}</p>
           </div>
-        </div>
-      )}
-
-      {loading && (
-        <div className="text-center py-16 text-gray-500">
-          <div className="inline-block h-6 w-6 animate-spin rounded-full border-2 border-gray-500 border-t-white" />
-          <p className="mt-3 text-sm">Fetching accounts from CDP...</p>
         </div>
       )}
 
       {error && (
-        <div className="text-center py-16">
-          <p className="text-red-400 text-sm">{error}</p>
+        <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">
+          {error}
         </div>
       )}
 
-      {!loading && !error && wallets.length === 0 && (
-        <div className="text-center py-16 text-gray-500">
-          <p className="text-sm">No accounts found in CDP.</p>
+      {!error && wallets.length === 0 ? (
+        <div className="py-16 text-center">
+          <p className="text-zinc-500 mb-1">No accounts found</p>
+          <p className="text-sm text-zinc-600">
+            CDP accounts will appear here once created.
+          </p>
         </div>
-      )}
-
-      {!loading && !error && wallets.length > 0 && (
-        <div className="space-y-4">
+      ) : !error ? (
+        <div className="space-y-3">
           {wallets.map((wallet) => {
-            const networkKeys = Object.keys(wallet.balances);
-            const hasBalances = networkKeys.length > 0;
+            const networks = Object.keys(wallet.balances);
 
             return (
               <div
                 key={wallet.address}
-                className="border border-white/10 rounded-lg overflow-hidden"
+                className="rounded-xl border border-white/8 bg-surface overflow-hidden"
               >
                 {/* Wallet header */}
-                <div className="px-5 py-4 flex items-center justify-between">
+                <div className="px-5 py-3.5 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <span
                       className={`px-2 py-0.5 rounded text-xs font-medium uppercase ${
                         wallet.type === "evm"
-                          ? "bg-blue-500/20 text-blue-400"
-                          : "bg-green-500/20 text-green-400"
+                          ? "bg-blue-500/15 text-blue-400"
+                          : "bg-green-500/15 text-green-400"
                       }`}
                     >
                       {wallet.type}
                     </span>
-                    <code className="text-sm font-mono" title={wallet.address}>
+                    <code className="text-sm font-mono text-zinc-300" title={wallet.address}>
                       {truncateAddress(wallet.address)}
                     </code>
+                    {wallet.type === "evm" && (
+                      <a
+                        href={`https://${networks.includes("base-sepolia") ? "sepolia.basescan.org" : "basescan.org"}/address/${wallet.address}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="group/scan flex items-center gap-1 text-zinc-600 hover:text-fg transition-all p-1"
+                      >
+                        <span className="max-w-0 overflow-hidden whitespace-nowrap text-xs transition-all duration-200 group-hover/scan:max-w-40">
+                          Open in BaseScan
+                        </span>
+                        <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                      </a>
+                    )}
                     {wallet.name && (
-                      <span className="text-sm text-gray-400">({wallet.name})</span>
+                      <span className="text-sm text-zinc-500">({wallet.name})</span>
                     )}
                   </div>
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={() => navigator.clipboard.writeText(wallet.address)}
-                      className="text-xs text-gray-500 hover:text-white transition-colors"
-                      title="Copy address"
-                    >
-                      Copy
-                    </button>
-                  </div>
+                  <button
+                    onClick={() => copyAddress(wallet.address)}
+                    className="text-zinc-600 hover:text-fg transition-colors p-1"
+                    title="Copy address"
+                  >
+                    {copiedAddress === wallet.address ? (
+                      <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    ) : (
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                    )}
+                  </button>
                 </div>
 
                 {/* Balances */}
-                {hasBalances ? (
-                  <div className="border-t border-white/5">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="text-xs text-gray-500 uppercase tracking-wider">
-                          <th className="text-left px-5 py-2 font-medium">Network</th>
-                          <th className="text-left px-5 py-2 font-medium">Token</th>
-                          <th className="text-right px-5 py-2 font-medium">Balance</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {networkKeys.map((network) =>
-                          wallet.balances[network].map((token, i) => (
-                            <tr
-                              key={`${network}-${token.contractAddress}`}
-                              className="border-t border-white/5"
-                            >
-                              <td className="px-5 py-2">
-                                {i === 0 ? (
-                                  <span className={`px-2 py-0.5 rounded text-xs ${networkBadgeColor(network)}`}>
-                                    {networkLabel(network)}
-                                  </span>
-                                ) : null}
-                              </td>
-                              <td className="px-5 py-2 text-gray-300">
-                                {token.symbol}
-                              </td>
-                              <td className="px-5 py-2 text-right font-mono">
-                                {formatBalance(token.amount, token.decimals)}
-                              </td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
+                {networks.length > 0 ? (
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-t border-white/5">
+                        <th className="px-5 py-2 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                          Network
+                        </th>
+                        <th className="px-5 py-2 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                          Token
+                        </th>
+                        <th className="px-5 py-2 text-right text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                          Balance
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {networks.map((network) =>
+                        wallet.balances[network].map((token, i) => (
+                          <tr
+                            key={`${network}-${token.contractAddress}`}
+                            className="border-t border-white/5 hover:bg-elevated transition-colors"
+                          >
+                            <td className="px-5 py-2.5">
+                              <span className={`inline-block px-2 py-0.5 rounded text-xs ${networkBadgeColor(network)}`}>
+                                {networkLabel(network)}
+                              </span>
+                            </td>
+                            <td className="px-5 py-2.5 text-zinc-300">
+                              {token.symbol}
+                            </td>
+                            <td className="px-5 py-2.5 text-right font-mono text-zinc-300">
+                              {formatBalance(token.amount, token.decimals)}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
                 ) : (
-                  <div className="border-t border-white/5 px-5 py-3 text-sm text-gray-500">
+                  <div className="border-t border-white/5 px-5 py-3 text-sm text-zinc-600">
                     No token balances found
                   </div>
                 )}
               </div>
             );
           })}
+        </div>
+      ) : null}
+
+      {!error && wallets.length > 0 && (
+        <div className="mt-4 text-xs text-zinc-600 text-center">
+          Showing {wallets.length} account{wallets.length !== 1 ? "s" : ""} · {totalBalances} token balance{totalBalances !== 1 ? "s" : ""}
         </div>
       )}
     </div>

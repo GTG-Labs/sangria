@@ -353,7 +353,7 @@ export default function AdminWithdrawalsContent() {
       completed: "bg-green-900/40 text-green-400",
       failed: "bg-red-900/40 text-red-400",
       reversed: "bg-purple-900/40 text-purple-400",
-      canceled: "bg-gray-800 text-gray-400",
+      canceled: "bg-zinc-800 text-zinc-400",
     };
     const labels: Record<string, string> = {
       pending_approval: "Pending",
@@ -366,7 +366,7 @@ export default function AdminWithdrawalsContent() {
     };
     return (
       <span
-        className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${styles[status] || "bg-gray-800 text-gray-400"}`}
+        className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${styles[status] || "bg-zinc-800 text-zinc-400"}`}
       >
         {labels[status] || status}
       </span>
@@ -375,9 +375,9 @@ export default function AdminWithdrawalsContent() {
 
   const detailRow = (label: string, value: string | null, mono = false) => (
     <div className="flex gap-4 py-1 text-sm">
-      <span className="w-32 shrink-0 text-gray-500">{label}</span>
+      <span className="w-32 shrink-0 text-zinc-500">{label}</span>
       <span
-        className={`break-all ${mono ? "font-mono text-xs text-gray-400" : "text-gray-300"}`}
+        className={`break-all ${mono ? "font-mono text-xs text-zinc-400" : "text-zinc-300"}`}
       >
         {value || "—"}
       </span>
@@ -386,7 +386,7 @@ export default function AdminWithdrawalsContent() {
 
   const detailSection = (title: string, rows: React.ReactNode) => (
     <div>
-      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-500">
+      <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">
         {title}
       </h3>
       {rows}
@@ -473,7 +473,7 @@ export default function AdminWithdrawalsContent() {
     const isLoading = actionLoading === w.id;
 
     if (isLoading) {
-      return <span className="text-xs text-gray-500">Processing...</span>;
+      return <span className="text-xs text-zinc-500">Processing...</span>;
     }
 
     switch (w.status) {
@@ -520,7 +520,7 @@ export default function AdminWithdrawalsContent() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white" />
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent-soft" />
       </div>
     );
   }
@@ -529,8 +529,8 @@ export default function AdminWithdrawalsContent() {
     <div>
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-white">Withdrawals</h1>
-          <p className="mt-1 text-sm text-gray-500">
+          <h1 className="text-2xl font-bold text-fg">Withdrawals</h1>
+          <p className="mt-1 text-sm text-zinc-500">
             Manage withdrawal requests across all organizations.
           </p>
         </div>
@@ -538,13 +538,13 @@ export default function AdminWithdrawalsContent() {
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
           aria-label="Filter withdrawals by status"
-          className="rounded-lg border border-gray-700 bg-transparent px-3 py-2 text-sm text-white focus:border-gray-500 focus:outline-none"
+          className="rounded-lg border border-white/8 bg-surface px-3 py-2 text-sm text-fg focus:border-white/20 focus:outline-none transition-colors"
         >
           {STATUS_OPTIONS.map((opt) => (
             <option
               key={opt.value}
               value={opt.value}
-              className="bg-gray-950 text-white"
+              className="bg-surface text-fg"
             >
               {opt.label}
             </option>
@@ -553,7 +553,7 @@ export default function AdminWithdrawalsContent() {
       </div>
 
       {error && (
-        <div className="mb-6 p-4 bg-red-900/30 border border-red-800 rounded-lg flex items-center gap-2 text-red-400">
+        <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-lg flex items-center gap-2 text-red-400">
           <span className="flex-1 text-sm">{error}</span>
           <button
             onClick={() => setError(null)}
@@ -567,8 +567,8 @@ export default function AdminWithdrawalsContent() {
 
       {!withdrawals || withdrawals.length === 0 ? (
         <div className="py-16 text-center">
-          <p className="text-gray-500 mb-1">No withdrawals found</p>
-          <p className="text-sm text-gray-600">
+          <p className="text-zinc-500 mb-1">No withdrawals found</p>
+          <p className="text-sm text-zinc-600">
             {statusFilter
               ? "Try a different status filter."
               : "Withdrawals will appear here once organizations request payouts."}
@@ -578,29 +578,29 @@ export default function AdminWithdrawalsContent() {
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-gray-800">
-                <th className="pb-3 pr-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <tr className="border-b border-white/8">
+                <th className="pb-3 pr-4 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
                   ID
                 </th>
-                <th className="pb-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="pb-3 px-4 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
                   Organization
                 </th>
-                <th className="pb-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="pb-3 px-4 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
                   Amount
                 </th>
-                <th className="pb-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="pb-3 px-4 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
                   Fee
                 </th>
-                <th className="pb-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="pb-3 px-4 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
                   Net
                 </th>
-                <th className="pb-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="pb-3 px-4 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
                   Status
                 </th>
-                <th className="pb-3 px-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="pb-3 px-4 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">
                   Requested
                 </th>
-                <th className="pb-3 pl-4 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="pb-3 pl-4 text-right text-xs font-medium text-zinc-500 uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
@@ -628,33 +628,33 @@ export default function AdminWithdrawalsContent() {
                           toggle();
                         }
                       }}
-                      className="border-b border-gray-800/50 hover:bg-white/5 transition-colors cursor-pointer"
+                      className="border-b border-white/5 hover:bg-elevated transition-colors cursor-pointer"
                     >
-                      <td className="py-4 pr-4 font-mono text-xs text-gray-500">
+                      <td className="py-4 pr-4 font-mono text-xs text-zinc-500">
                         <div className="flex items-center gap-2">
                           <span
                             aria-hidden
-                            className="select-none text-gray-500 w-3 inline-block"
+                            className="select-none text-zinc-500 w-3 inline-block"
                           >
                             {isExpanded ? "▾" : "▸"}
                           </span>
                           {truncateId(w.id)}
                         </div>
                       </td>
-                      <td className="py-4 px-4 font-mono text-xs text-gray-500">
+                      <td className="py-4 px-4 font-mono text-xs text-zinc-500">
                         {truncateId(w.organization_id)}
                       </td>
-                      <td className="py-4 px-4 text-sm text-gray-300 font-mono">
+                      <td className="py-4 px-4 text-sm text-zinc-300 font-mono">
                         {formatAmount(w.amount)}
                       </td>
-                      <td className="py-4 px-4 text-sm text-gray-500 font-mono">
+                      <td className="py-4 px-4 text-sm text-zinc-500 font-mono">
                         {formatAmount(w.fee)}
                       </td>
-                      <td className="py-4 px-4 text-sm text-white font-mono font-medium">
+                      <td className="py-4 px-4 text-sm text-fg font-mono font-medium">
                         {formatAmount(w.net_amount)}
                       </td>
                       <td className="py-4 px-4">{statusBadge(w.status)}</td>
-                      <td className="py-4 px-4 text-sm text-gray-500">
+                      <td className="py-4 px-4 text-sm text-zinc-500">
                         {timeAgo(w.created_at)}
                       </td>
                       <td
@@ -665,7 +665,7 @@ export default function AdminWithdrawalsContent() {
                       </td>
                     </tr>
                     {isExpanded && (
-                      <tr className="border-b border-gray-800/50 bg-gray-900/40">
+                      <tr className="border-b border-white/5 bg-surface">
                         <td colSpan={8} className="px-6 py-6">
                           {renderDetailPanel(w)}
                         </td>
@@ -684,7 +684,7 @@ export default function AdminWithdrawalsContent() {
           <button
             onClick={() => nextCursor && fetchWithdrawals(nextCursor)}
             disabled={loadingMore || !nextCursor}
-            className="px-5 py-2 text-sm border border-gray-700 rounded-lg text-gray-400 hover:bg-white/5 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="px-5 py-2 text-sm border border-white/8 rounded-lg text-zinc-400 hover:bg-elevated hover:text-fg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {loadingMore ? "Loading..." : "Load More"}
           </button>
@@ -692,7 +692,7 @@ export default function AdminWithdrawalsContent() {
       )}
 
       {withdrawals.length > 0 && (
-        <div className="mt-4 text-xs text-gray-600 text-center">
+        <div className="mt-4 text-xs text-zinc-600 text-center">
           Showing {withdrawals.length}
           {total !== null && ` of ${total}`} withdrawal
           {withdrawals.length !== 1 ? "s" : ""}

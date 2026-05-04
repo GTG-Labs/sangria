@@ -24,8 +24,8 @@ export default function NavLinks() {
             aria-current={active ? "page" : undefined}
             className={`text-sm transition-colors ${
               active
-                ? "text-white font-medium"
-                : "text-gray-400 hover:text-white"
+                ? "text-accent-soft font-medium"
+                : "text-zinc-500 hover:text-zinc-300"
             }`}
           >
             {item.label}

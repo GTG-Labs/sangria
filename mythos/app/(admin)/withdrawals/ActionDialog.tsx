@@ -56,11 +56,11 @@ export default function ActionDialog({
 
   const confirmClass =
     confirmVariant === "destructive"
-      ? "text-red-400 border-red-900/60 hover:bg-red-900/40"
-      : "text-green-400 border-green-900/60 hover:bg-green-900/40";
+      ? "text-red-400 border-red-500/30 hover:bg-red-500/10"
+      : "text-green-400 border-green-500/30 hover:bg-green-500/10";
 
   const inputClass =
-    "w-full rounded-lg border border-gray-700 bg-transparent px-3 py-2 text-sm text-white placeholder-gray-600 focus:border-gray-500 focus:outline-none";
+    "w-full rounded-lg border border-white/8 bg-elevated px-3 py-2 text-sm text-fg placeholder-zinc-600 focus:border-white/20 focus:outline-none transition-colors";
 
   return (
     <div
@@ -72,18 +72,18 @@ export default function ActionDialog({
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={message ? messageId : undefined}
-        className="w-full max-w-md rounded-xl border border-gray-800 bg-gray-950 p-6"
+        className="w-full max-w-md rounded-xl border border-white/10 bg-surface p-6"
         onClick={(e) => e.stopPropagation()}
       >
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="flex items-start justify-between">
-            <h2 id={titleId} className="text-lg font-semibold text-white">
+            <h2 id={titleId} className="text-lg font-semibold text-fg">
               {title}
             </h2>
             <button
               type="button"
               onClick={onCancel}
-              className="text-gray-500 hover:text-white transition-colors"
+              className="text-zinc-500 hover:text-fg transition-colors"
               aria-label="Close"
             >
               <svg
@@ -103,7 +103,7 @@ export default function ActionDialog({
           </div>
 
           {message && (
-            <p id={messageId} className="text-sm text-gray-400">
+            <p id={messageId} className="text-sm text-zinc-400">
               {message}
             </p>
           )}
@@ -115,7 +115,7 @@ export default function ActionDialog({
               <div key={field.name}>
                 <label
                   htmlFor={inputId}
-                  className="mb-1 block text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  className="mb-1 block text-xs font-medium text-zinc-500 uppercase tracking-wider"
                 >
                   {field.label}
                 </label>
@@ -160,7 +160,7 @@ export default function ActionDialog({
             <button
               type="button"
               onClick={onCancel}
-              className="px-3 py-1.5 text-sm text-gray-400 rounded-md hover:text-white hover:bg-white/5 transition-colors"
+              className="px-3 py-1.5 text-sm text-zinc-400 rounded-md hover:text-fg hover:bg-elevated transition-colors"
             >
               Cancel
             </button>
