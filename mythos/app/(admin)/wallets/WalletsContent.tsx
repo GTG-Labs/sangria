@@ -96,8 +96,12 @@ export default function WalletsContent() {
     return () => controller.abort();
   }, []);
 
-  const copyAddress = (address: string) => {
-    navigator.clipboard.writeText(address);
+  const copyAddress = async (address: string) => {
+    try {
+      await navigator.clipboard.writeText(address);
+    } catch {
+      return;
+    }
     setCopiedAddress(address);
     setTimeout(() => setCopiedAddress((prev) => (prev === address ? null : prev)), 1500);
   };
@@ -190,7 +194,7 @@ export default function WalletsContent() {
                     </code>
                     {wallet.type === "evm" && (
                       <a
-                        href={`https://${networks.includes("base-sepolia") ? "sepolia.basescan.org" : "basescan.org"}/address/${wallet.address}`}
+                        href={`https://${networks.includes("base") ? "basescan.org" : "sepolia.basescan.org"}/address/${wallet.address}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="group/scan flex items-center gap-1 text-zinc-600 hover:text-fg transition-all p-1"
