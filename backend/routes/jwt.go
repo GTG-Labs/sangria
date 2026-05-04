@@ -20,6 +20,13 @@ func RegisterJWTRoutes(app *fiber.App, pool *pgxpool.Pool) {
 		adminHandlers.AcceptOrganizationInvitation(pool),
 	)
 
+	// Auth callback endpoint (WorkOS JWT only - no CSRF for server-side operations)
+	app.Post("/auth/users",
+		auth.WorkosAuthMiddleware,
+		ratelimit.PerUserLimiter(config.RateLimit.InternalPerMin, "auth-callback"),
+		auth.CreateUser(pool),
+	)
+
 	// Authenticated endpoints (WorkOS JWT + CSRF + per-user rate limit).
 	internal := app.Group("/internal",
 		auth.WorkosAuthMiddleware,
