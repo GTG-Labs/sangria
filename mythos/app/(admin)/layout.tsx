@@ -22,19 +22,28 @@ export default async function AdminLayout({
   }
 
   return (
-    <div className="min-h-screen bg-black text-white">
-      <nav className="border-b border-gray-800">
+    <div className="min-h-screen bg-page text-fg">
+      <nav className="border-b border-white/8">
         <div className="mx-auto max-w-6xl px-6 flex items-center justify-between h-14">
-          <div className="flex items-center gap-8">
-            <Link href="/transactions" className="text-lg font-bold">
-              mythos
+          <div className="flex items-center gap-6">
+            <Link href="/transactions" className="flex items-center gap-1.5 text-lg font-serif">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/mythos_logo.png"
+                alt="Mythos"
+                width={28}
+                height={28}
+                className="rounded"
+              />
+              <span className="translate-y-0.5">Mythos</span>
             </Link>
+            <div className="h-5 w-px bg-white/10" />
             <NavLinks />
           </div>
           <form action={handleSignOut}>
             <button
               type="submit"
-              className="text-sm text-gray-500 hover:text-white transition-colors"
+              className="text-sm text-zinc-500 hover:text-zinc-300 transition-colors"
             >
               Sign Out
             </button>

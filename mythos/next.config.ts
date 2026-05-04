@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  devIndicators: false,
   // Security headers. CSP is set in proxy.ts because it needs a per-request
   // nonce. X-Frame-Options is handled via CSP's `frame-ancestors 'none'`.
   async headers() {

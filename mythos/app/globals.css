@@ -1,1 +1,11 @@
 @import "tailwindcss";
+
+@theme {
+  --color-page: #151515;
+  --color-surface: #1c1c1c;
+  --color-elevated: #262626;
+  --color-accent: #f59e0b;
+  --color-accent-soft: #fbbf24;
+  --color-fg: #e4e4e7;
+  --color-fg-muted: #a1a1aa;
+}
