@@ -213,6 +213,7 @@ export default function WalletsContent() {
                   </div>
                   <button
                     onClick={() => copyAddress(wallet.address)}
+                    aria-label={`Copy address ${wallet.address}`}
                     className="text-zinc-600 hover:text-fg transition-colors p-1"
                     title="Copy address"
                   >
