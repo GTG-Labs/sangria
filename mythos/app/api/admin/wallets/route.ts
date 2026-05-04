@@ -24,6 +24,8 @@ interface WalletAccount {
   balances: Record<string, TokenBalance[]>;
 }
 
+const CDP_TIMEOUT_MS = 30_000;
+
 export async function GET() {
   const { accessToken } = await withAuth();
   if (!accessToken) {
@@ -40,12 +42,15 @@ export async function GET() {
     walletSecret: env.CDP_WALLET_SECRET,
   });
 
+  const timeout = AbortSignal.timeout(CDP_TIMEOUT_MS);
   const wallets: WalletAccount[] = [];
+  const warnings: string[] = [];
 
   // Fetch all EVM accounts
   const evmAccounts: Array<{ address: string; name?: string }> = [];
   let evmPageToken: string | undefined;
   do {
+    if (timeout.aborted) break;
     const page = await cdp.evm.listAccounts({
       pageSize: 100,
       ...(evmPageToken ? { pageToken: evmPageToken } : {}),
@@ -63,6 +68,7 @@ export async function GET() {
   const solanaAccounts: Array<{ address: string; name?: string }> = [];
   let solPageToken: string | undefined;
   do {
+    if (timeout.aborted) break;
     const page = await cdp.solana.listAccounts({
       pageSize: 100,
       ...(solPageToken ? { pageToken: solPageToken } : {}),
@@ -98,8 +104,10 @@ export async function GET() {
         if (tokens.length > 0) {
           balances[network] = tokens;
         }
-      } catch {
-        // Skip networks that fail (account may not exist on that network)
+      } catch (err) {
+        const msg = `Failed to fetch ${network} balances for ${acct.address}`;
+        console.error(msg, err);
+        warnings.push(msg);
       }
     });
     await Promise.all(networkFetches);
@@ -133,8 +141,10 @@ export async function GET() {
         if (tokens.length > 0) {
           balances[network] = tokens;
         }
-      } catch {
-        // Skip networks that fail
+      } catch (err) {
+        const msg = `Failed to fetch ${network} balances for ${acct.address}`;
+        console.error(msg, err);
+        warnings.push(msg);
       }
     });
     await Promise.all(networkFetches);
@@ -152,5 +162,9 @@ export async function GET() {
   ]);
   wallets.push(...allResults);
 
-  return Response.json({ wallets });
+  if (timeout.aborted) {
+    warnings.push("Request timed out — some accounts may be missing");
+  }
+
+  return Response.json({ wallets, warnings });
 }

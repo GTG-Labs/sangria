@@ -57,6 +57,7 @@ export default function WalletsContent() {
   const [wallets, setWallets] = useState<WalletAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [warnings, setWarnings] = useState<string[]>([]);
   const [copiedAddress, setCopiedAddress] = useState<string | null>(null);
   const controllerRef = useRef<AbortController | null>(null);
 
@@ -79,7 +80,10 @@ export default function WalletsContent() {
       })
       .then((data) => {
         if (controller.signal.aborted) return;
-        if (data) setWallets(data.wallets ?? []);
+        if (data) {
+          setWallets(data.wallets ?? []);
+          setWarnings(data.warnings ?? []);
+        }
       })
       .catch((err) => {
         if (controller.signal.aborted) return;
@@ -143,6 +147,12 @@ export default function WalletsContent() {
       {error && (
         <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">
           {error}
+        </div>
+      )}
+
+      {!error && warnings.length > 0 && (
+        <div className="mb-6 p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg text-amber-400 text-sm">
+          Some balances could not be loaded ({warnings.length} network{warnings.length !== 1 ? "s" : ""} failed)
         </div>
       )}
 
