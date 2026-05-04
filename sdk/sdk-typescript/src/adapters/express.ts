@@ -66,6 +66,12 @@ export function fixedPrice(
         return res.status(result.status).json(result.body);
       }
 
+      // Attach x402 PAYMENT-RESPONSE header to the outgoing response
+      if (result.headers) {
+        for (const [key, value] of Object.entries(result.headers)) {
+          res.setHeader(key, value);
+        }
+      }
       req.sangria = result.data;
       return next();
     } catch (err) {

@@ -65,6 +65,11 @@ class PaymentProceeded:
     amount: float
     """Amount charged in dollars."""
     transaction: str | None = None
+    network: str | None = None
+    """CAIP-2 network identifier (e.g. "eip155:8453")."""
+    payer: str | None = None
+    """Payer wallet address."""
+    headers: dict[str, str] = field(default_factory=dict)
 
 
 PaymentResult = PaymentResponse | PaymentProceeded

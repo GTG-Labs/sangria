@@ -84,6 +84,8 @@ export class Sangria {
     )) as {
       success: boolean;
       transaction?: string;
+      network?: string;
+      payer?: string;
       error_reason?: string;
       error_message?: string;
     };
@@ -99,13 +101,25 @@ export class Sangria {
       };
     }
 
+    const paymentResponse = btoa(
+      JSON.stringify({
+        success: true,
+        transaction: result.transaction,
+        network: result.network,
+        payer: result.payer,
+      })
+    );
+
     return {
       action: "proceed",
       data: {
         paid: true,
         amount: options.price,
         transaction: result.transaction,
+        network: result.network,
+        payer: result.payer,
       },
+      headers: { "PAYMENT-RESPONSE": paymentResponse },
     };
   }
 
