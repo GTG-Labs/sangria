@@ -1,4 +1,4 @@
-export type SangriaOperation = "generate" | "settle";
+export type SangriaOperation = "generate" | "settle" | "verify";
 
 interface SangriaErrorOptions {
   operation: SangriaOperation;

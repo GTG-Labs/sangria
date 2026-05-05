@@ -1,11 +1,16 @@
 import type {
   SangriaConfig,
   FixedPriceOptions,
+  UptoPriceOptions,
   PaymentContext,
   PaymentResult,
+  VerifyResult,
+  SettleResult,
   X402ChallengePayload,
+  Settled,
+  SettleFn,
 } from "./types.js";
-import { toMicrounits } from "./types.js";
+import { toMicrounits, fromMicrounits, _createSettled, validateUptoPriceOptions } from "./types.js";
 import {
   SangriaAPIStatusError,
   SangriaConnectionError,
@@ -15,11 +20,20 @@ import {
 
 const DEFAULT_BASE_URL = "https://api.getsangria.com";
 
+export function toBase64(str: string): string {
+  if (typeof Buffer !== "undefined") {
+    return Buffer.from(str, "utf-8").toString("base64");
+  }
+  return btoa(new TextEncoder().encode(str).reduce((s, b) => s + String.fromCharCode(b), ""));
+}
+
 export function validateFixedPriceOptions(options: FixedPriceOptions): void {
   if (!Number.isFinite(options.price) || options.price <= 0) {
     throw new Error("Sangria: price must be a positive number (dollars)");
   }
 }
+
+export { validateUptoPriceOptions } from "./types.js";
 
 export class Sangria {
   private apiKey: string;
@@ -34,6 +48,8 @@ export class Sangria {
     this.baseUrl = (config.baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, "");
   }
 
+  // ── Exact (fixed price) ──────────────────────────────────────────
+
   async handleFixedPrice(
     ctx: PaymentContext,
     options: FixedPriceOptions
@@ -45,8 +61,6 @@ export class Sangria {
     }
   }
 
-  // if we dont have a payment header, it means that we need to hit the generate-payment endpoint on our backend,
-  // and send the client a 402 response with details on how to pay us
   private async generatePayment(
     ctx: PaymentContext,
     options: FixedPriceOptions
@@ -61,8 +75,7 @@ export class Sangria {
       "generate"
     )) as X402ChallengePayload;
 
-    // you gotta encode the payload before sending it back (part of the spec)
-    const encoded = btoa(JSON.stringify(x402_responsePayload));
+    const encoded = toBase64(JSON.stringify(x402_responsePayload));
 
     return {
       action: "respond",
@@ -72,7 +85,6 @@ export class Sangria {
     };
   }
 
-  // there was a payment header so we try to settle the payment
   private async settlePayment(
     paymentHeader: string,
     options: FixedPriceOptions
@@ -81,14 +93,7 @@ export class Sangria {
       "/v1/settle-payment",
       { payment_payload: paymentHeader },
       "settle"
-    )) as {
-      success: boolean;
-      transaction?: string;
-      network?: string;
-      payer?: string;
-      error_reason?: string;
-      error_message?: string;
-    };
+    )) as SettleResult;
 
     if (!result.success) {
       return {
@@ -101,7 +106,7 @@ export class Sangria {
       };
     }
 
-    const paymentResponse = btoa(
+    const paymentResponse = toBase64(
       JSON.stringify({
         success: true,
         transaction: result.transaction,
@@ -122,6 +127,93 @@ export class Sangria {
       headers: { "PAYMENT-RESPONSE": paymentResponse },
     };
   }
+
+  // ── Upto (variable price) ────────────────────────────────────────
+
+  async generateUptoPayment(
+    ctx: PaymentContext,
+    options: UptoPriceOptions
+  ): Promise<PaymentResult> {
+    const x402_responsePayload = (await this.postToSangriaBackend(
+      "/v1/generate-payment",
+      {
+        scheme: "upto",
+        max_amount: toMicrounits(options.maxPrice),
+        resource: ctx.resourceUrl,
+        description: options.description,
+      },
+      "generate"
+    )) as X402ChallengePayload;
+
+    const encoded = toBase64(JSON.stringify(x402_responsePayload));
+
+    return {
+      action: "respond",
+      status: 402,
+      body: x402_responsePayload,
+      headers: { "PAYMENT-REQUIRED": encoded },
+    };
+  }
+
+  async verifyPayment(
+    paymentHeader: string,
+    maxAmountMicrounits: number
+  ): Promise<VerifyResult> {
+    return (await this.postToSangriaBackend(
+      "/v1/verify-payment",
+      {
+        payment_payload: paymentHeader,
+        scheme: "upto",
+        max_amount: maxAmountMicrounits,
+      },
+      "verify"
+    )) as VerifyResult;
+  }
+
+  async settleUptoPayment(
+    paymentHeader: string,
+    settlementAmountMicrounits: number
+  ): Promise<SettleResult> {
+    return (await this.postToSangriaBackend(
+      "/v1/settle-payment",
+      {
+        payment_payload: paymentHeader,
+        scheme: "upto",
+        settlement_amount: settlementAmountMicrounits,
+      },
+      "settle"
+    )) as SettleResult;
+  }
+
+  createSettleFn(
+    paymentHeader: string,
+    maxPrice: number
+  ): { settleFn: SettleFn; getResult: () => { amount: number; body: unknown } | undefined } {
+    let called = false;
+    let result: { amount: number; body: unknown } | undefined;
+
+    const settleFn: SettleFn = (amount: number, body: unknown): Settled => {
+      if (!Number.isFinite(amount) || amount < 0) {
+        throw new Error("Sangria: settle amount must be a non-negative finite number");
+      }
+      if (amount > maxPrice) {
+        console.warn(
+          `[sangria-sdk] settle amount $${amount} exceeds maxPrice $${maxPrice}, clamping to maxPrice`
+        );
+        amount = maxPrice;
+      }
+      if (called) {
+        return _createSettled(result!.amount, result!.body);
+      }
+      called = true;
+      result = { amount, body };
+      return _createSettled(amount, body);
+    };
+
+    return { settleFn, getResult: () => result };
+  }
+
+  // ── HTTP transport ───────────────────────────────────────────────
 
   private async postToSangriaBackend(
     path: string,
