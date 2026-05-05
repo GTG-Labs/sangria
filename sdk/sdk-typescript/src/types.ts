@@ -47,6 +47,18 @@ export function fromMicrounits(microunits: number): number {
   return microunits / MICROUNITS_PER_DOLLAR;
 }
 
+export interface UptoPriceOptions {
+  /** Maximum price in dollars (e.g. 0.10 for ten cents). The agent authorizes up to this amount. */
+  maxPrice: number;
+  description?: string;
+}
+
+export function validateUptoPriceOptions(options: UptoPriceOptions): void {
+  if (!Number.isFinite(options.maxPrice) || options.maxPrice <= 0) {
+    throw new Error("Sangria: maxPrice must be a positive number (dollars)");
+  }
+}
+
 /** Opaque x402 challenge payload returned by the payment backend */
 export type X402ChallengePayload = Record<string, unknown>;
 
@@ -65,3 +77,52 @@ export type PaymentResult =
       headers?: Record<string, string>;
     }
   | { action: "proceed"; data: SangriaRequestData; headers?: Record<string, string> };
+
+/** Result from /v1/verify-payment */
+export interface VerifyResult {
+  valid: boolean;
+  payer?: string;
+  reason?: string;
+  message?: string;
+}
+
+/** Result from /v1/settle-payment for upto scheme */
+export interface SettleResult {
+  success: boolean;
+  transaction?: string;
+  network?: string;
+  payer?: string;
+  error_reason?: string;
+  error_message?: string;
+}
+
+const __settled: unique symbol = Symbol("settled");
+
+/**
+ * Branded type returned by the settle function inside uptoPrice handlers.
+ * Only the SDK's internal settle function can produce this type, so handlers
+ * that forget to call settle() get a compile error.
+ */
+export type Settled = {
+  readonly [__settled]: true;
+  readonly __amount: number;
+  readonly __body: unknown;
+};
+
+/** Creates a Settled value. Internal — not exported to consumers. */
+export function _createSettled(amount: number, body: unknown): Settled {
+  return { [__settled]: true, __amount: amount, __body: body } as Settled;
+}
+
+/** Extracts the amount from a Settled value. Internal. */
+export function _settledAmount(s: Settled): number {
+  return s.__amount;
+}
+
+/** Extracts the body from a Settled value. Internal. */
+export function _settledBody(s: Settled): unknown {
+  return s.__body;
+}
+
+/** The settle function signature passed to upto handlers. */
+export type SettleFn = (amount: number, body: unknown) => Settled;
