@@ -198,9 +198,12 @@ func validateLines(lines []LedgerLine) error {
 //   - confirmed → returns ErrAlreadySettled
 //   - failed    → returns ErrPreviouslyFailed
 //   - pending   → returns the existing Transaction and entries (concurrent dup)
-func InsertPendingTransaction(ctx context.Context, pool *pgxpool.Pool, idempotencyKey string, lines []LedgerLine) (Transaction, []LedgerEntry, error) {
+func InsertPendingTransaction(ctx context.Context, pool *pgxpool.Pool, idempotencyKey string, scheme PaymentScheme, lines []LedgerLine) (Transaction, []LedgerEntry, error) {
 	if idempotencyKey == "" {
 		return Transaction{}, nil, fmt.Errorf("idempotency key must not be empty")
+	}
+	if scheme == "" {
+		scheme = PaymentSchemeExact
 	}
 	if err := validateLines(lines); err != nil {
 		return Transaction{}, nil, err
@@ -215,12 +218,12 @@ func InsertPendingTransaction(ctx context.Context, pool *pgxpool.Pool, idempoten
 	// Attempt to insert with status='pending'.
 	var txn Transaction
 	err = tx.QueryRow(ctx,
-		`INSERT INTO transactions (idempotency_key, status)
-		 VALUES ($1, 'pending')
+		`INSERT INTO transactions (idempotency_key, status, scheme)
+		 VALUES ($1, 'pending', $2)
 		 ON CONFLICT (idempotency_key) DO NOTHING
-		 RETURNING id, idempotency_key, status, tx_hash, created_at`,
-		idempotencyKey,
-	).Scan(&txn.ID, &txn.IdempotencyKey, &txn.Status, &txn.TxHash, &txn.CreatedAt)
+		 RETURNING id, idempotency_key, status, tx_hash, scheme, created_at`,
+		idempotencyKey, scheme,
+	).Scan(&txn.ID, &txn.IdempotencyKey, &txn.Status, &txn.TxHash, &txn.Scheme, &txn.CreatedAt)
 
 	if errors.Is(err, pgx.ErrNoRows) {
 		// Idempotency key already exists — inspect the existing row.
@@ -267,10 +270,10 @@ func InsertPendingTransaction(ctx context.Context, pool *pgxpool.Pool, idempoten
 func handleExistingTransaction(ctx context.Context, pool *pgxpool.Pool, idempotencyKey string) (Transaction, []LedgerEntry, error) {
 	var txn Transaction
 	err := pool.QueryRow(ctx,
-		`SELECT id, idempotency_key, status, tx_hash, created_at
+		`SELECT id, idempotency_key, status, tx_hash, scheme, created_at
 		 FROM transactions WHERE idempotency_key = $1`,
 		idempotencyKey,
-	).Scan(&txn.ID, &txn.IdempotencyKey, &txn.Status, &txn.TxHash, &txn.CreatedAt)
+	).Scan(&txn.ID, &txn.IdempotencyKey, &txn.Status, &txn.TxHash, &txn.Scheme, &txn.CreatedAt)
 	if err != nil {
 		return Transaction{}, nil, fmt.Errorf("fetch existing transaction: %w", err)
 	}
