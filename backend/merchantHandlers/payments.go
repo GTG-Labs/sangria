@@ -392,13 +392,14 @@ func SettlePayment(pool *pgxpool.Pool) fiber.Handler {
 			return c.Status(400).JSON(fiber.Map{"error": "invalid payment_payload JSON"})
 		}
 
-		slog.Info("settle payment: decoded payload", "payload", string(payloadBytes))
+		slog.Debug("settle payment: decoded payload", "payload", string(payloadBytes))
 
 		// ── 2. Extract wallet address + amounts (scheme-dependent) ───────
 
 		var (
-			toAddress    string
-			chargeAmount int64 // the amount used for ledger lines + fee
+			toAddress        string
+			chargeAmount     int64  // the amount used for ledger lines + fee
+			maxAuthorizedStr string // upto only: max authorized from Permit2 envelope
 		)
 		var canonicalRequirements x402Handlers.PaymentRequirements
 
@@ -432,7 +433,7 @@ func SettlePayment(pool *pgxpool.Pool) fiber.Handler {
 				return c.Status(400).JSON(fiber.Map{"error": "invalid permit2 payment payload structure"})
 			}
 			toAddress = envelope.Payload.Permit2Authorization.Witness.To
-			maxAuthorizedStr := envelope.Payload.Permit2Authorization.Permitted.Amount.String()
+			maxAuthorizedStr = envelope.Payload.Permit2Authorization.Permitted.Amount.String()
 			if toAddress == "" || maxAuthorizedStr == "" {
 				return c.Status(400).JSON(fiber.Map{"error": "missing witness.to or permitted.amount in permit2 payload"})
 			}
@@ -488,13 +489,6 @@ func SettlePayment(pool *pgxpool.Pool) fiber.Handler {
 				},
 			}
 		case "upto":
-			// Re-parse max authorized for the requirements (already validated above).
-			var envelope permit2PayloadEnvelope
-			dec := json.NewDecoder(bytes.NewReader(payloadBytes))
-			dec.UseNumber()
-			_ = dec.Decode(&envelope)
-			maxAuthorizedStr := envelope.Payload.Permit2Authorization.Permitted.Amount.String()
-
 			canonicalRequirements = x402Handlers.PaymentRequirements{
 				Scheme:            "upto",
 				Network:           netConfig.CAIP2,

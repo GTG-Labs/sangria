@@ -285,7 +285,8 @@ func Verify(ctx context.Context, payload json.RawMessage, requirements PaymentRe
 		return nil, fmt.Errorf("build verify request: %w", err)
 	}
 
-	slog.Info("facilitator verify request", "url", facilitatorURL+"/verify", "body", string(body))
+	slog.Info("facilitator verify request", "url", facilitatorURL+"/verify", "body_len", len(body))
+	slog.Debug("facilitator verify request body", "body", string(body))
 
 	respBody, statusCode, err := doFacilitatorRequestIdempotent(
 		ctx, http.MethodPost, facilitatorURL+"/verify",
@@ -295,7 +296,8 @@ func Verify(ctx context.Context, payload json.RawMessage, requirements PaymentRe
 		return nil, fmt.Errorf("facilitator verify: %w", err)
 	}
 
-	slog.Info("facilitator verify response", "status", statusCode, "body", string(respBody))
+	slog.Info("facilitator verify response", "status", statusCode, "body_len", len(respBody))
+	slog.Debug("facilitator verify response body", "body", string(respBody))
 
 	if statusCode != http.StatusOK {
 		return nil, fmt.Errorf("facilitator verify returned status %d", statusCode)
@@ -319,7 +321,8 @@ func Settle(ctx context.Context, payload json.RawMessage, requirements PaymentRe
 		return nil, fmt.Errorf("build settle request: %w", err)
 	}
 
-	slog.Info("facilitator settle request", "url", facilitatorURL+"/settle", "body", string(body))
+	slog.Info("facilitator settle request", "url", facilitatorURL+"/settle", "body_len", len(body))
+	slog.Debug("facilitator settle request body", "body", string(body))
 
 	// Settle uses doFacilitatorRequestOnce (no retries) because x402 settle
 	// is NOT HTTP-idempotent — see root CLAUDE.md.
@@ -331,7 +334,8 @@ func Settle(ctx context.Context, payload json.RawMessage, requirements PaymentRe
 		return nil, fmt.Errorf("facilitator settle: %w", err)
 	}
 
-	slog.Info("facilitator settle response", "status", statusCode, "body", string(respBody))
+	slog.Info("facilitator settle response", "status", statusCode, "body_len", len(respBody))
+	slog.Debug("facilitator settle response body", "body", string(respBody))
 
 	if statusCode != http.StatusOK {
 		return nil, fmt.Errorf("facilitator settle returned status %d", statusCode)
