@@ -101,11 +101,19 @@ const (
 	TransactionStatusFailed    TransactionStatus = "failed"
 )
 
+type PaymentScheme string
+
+const (
+	PaymentSchemeExact PaymentScheme = "exact"
+	PaymentSchemeUpto  PaymentScheme = "upto"
+)
+
 type Transaction struct {
 	ID             string            `json:"id"`
 	IdempotencyKey string            `json:"idempotency_key"`
 	Status         TransactionStatus `json:"status"`
 	TxHash         *string           `json:"tx_hash"`
+	Scheme         PaymentScheme     `json:"scheme"`
 	CreatedAt      time.Time         `json:"created_at"`
 }
 

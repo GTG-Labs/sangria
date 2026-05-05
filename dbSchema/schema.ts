@@ -20,6 +20,7 @@ export const transactionStatusEnum = pgEnum("transaction_status", [
   "confirmed",
   "failed",
 ]);
+export const paymentSchemeEnum = pgEnum("payment_scheme", ["exact", "upto"]);
 export const directionEnum = pgEnum("direction", ["DEBIT", "CREDIT"]);
 export const currencyEnum = pgEnum("currency", ["USD", "USDC", "ETH"]);
 export const accountTypeEnum = pgEnum("account_type", [
@@ -132,6 +133,7 @@ export const transactions = pgTable(
     idempotencyKey: varchar("idempotency_key", { length: 255 }).notNull(),
     status: transactionStatusEnum().notNull().default("confirmed"),
     txHash: varchar("tx_hash", { length: 255 }),
+    scheme: paymentSchemeEnum().notNull().default("exact"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
