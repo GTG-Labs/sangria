@@ -73,3 +73,62 @@ class PaymentProceeded:
 
 
 PaymentResult = PaymentResponse | PaymentProceeded
+
+
+@dataclass(slots=True)
+class UptoPriceOptions:
+    """Maximum price in dollars (e.g. 0.10 for ten cents). The agent authorizes up to this amount."""
+    max_price: float
+    resource: str
+    description: str | None = None
+
+    def __post_init__(self) -> None:
+        import math
+        if isinstance(self.max_price, bool) or not isinstance(self.max_price, (int, float)) or not math.isfinite(self.max_price) or self.max_price <= 0:
+            raise ValueError("max_price must be a positive number (dollars)")
+
+    def to_generate_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "scheme": "upto",
+            "max_amount": to_microunits(self.max_price),
+            "resource": self.resource,
+        }
+        if self.description:
+            payload["description"] = self.description
+        return payload
+
+
+@dataclass(slots=True)
+class VerifyResult:
+    """Result from /v1/verify-payment."""
+    valid: bool
+    payer: str | None = None
+    reason: str | None = None
+    message: str | None = None
+
+
+@dataclass(slots=True)
+class SettleResult:
+    """Result from /v1/settle-payment for upto scheme."""
+    success: bool
+    transaction: str | None = None
+    network: str | None = None
+    payer: str | None = None
+    error_reason: str | None = None
+    error_message: str | None = None
+
+
+_SETTLE_GUARD = object()
+
+
+class Settled:
+    """Opaque return value — only the settle function created by the SDK can produce instances."""
+    __slots__ = ("_amount", "_body")
+
+    def __init__(self, _guard: object, amount: float, body: Any) -> None:
+        if _guard is not _SETTLE_GUARD:
+            raise TypeError(
+                "Settled cannot be instantiated directly — use the settle() function provided by the SDK"
+            )
+        self._amount = amount
+        self._body = body
