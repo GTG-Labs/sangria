@@ -6,6 +6,7 @@ dependencies = [
   "fastapi>=0.135.1",
   "uvicorn>=0.41.0",
   "sangria-core",
+  "python-dotenv>=1.2.2",
 ]
 
 [build-system]

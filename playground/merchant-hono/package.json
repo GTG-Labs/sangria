@@ -9,8 +9,9 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
-    "@sangria-sdk/core": "file:../../sdk/sdk-typescript",
     "@hono/node-server": "^1.19.11",
+    "@sangria-sdk/core": "file:../../sdk/sdk-typescript",
+    "dotenv": "^17.4.2",
     "hono": "^4.0.0"
   },
   "devDependencies": {

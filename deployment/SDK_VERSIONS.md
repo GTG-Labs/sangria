@@ -1,13 +1,13 @@
 ## TypeScript SDK (@sangria-sdk/core)
 
 ```text
-VERSION: 0.1.2
-DESCRIPTION: Initial TypeScript SDK with Express, Fastify, Hono, and Next.js adapters
+VERSION: 0.2.0
+DESCRIPTION: Add upto (variable price) payment scheme — uptoPrice() for Express, Hono, Next.js; fixedPrice + uptoPrice wrappers for Fastify (breaking: Fastify fixedPrice is now a wrapper, not a preHandler)
 ```
 
 ## Python SDK (sangria-core)
 
 ```text
-VERSION: 0.1.1
-DESCRIPTION: Initial Python SDK with FastAPI adapter for Sangria payments
+VERSION: 0.2.0
+DESCRIPTION: Add upto (variable price) payment scheme — require_upto_price decorator for FastAPI, verify/settle client methods, Settled type
 ```
