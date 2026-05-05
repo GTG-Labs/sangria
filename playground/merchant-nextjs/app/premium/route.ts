@@ -12,7 +12,7 @@ const sangria = new Sangria({
   baseUrl: process.env.SANGRIA_URL ?? "http://localhost:8080",
 });
 
-// GET /api/premium → $0.01 (fixed)
+// GET /premium → $0.01 (fixed)
 export const GET = fixedPrice(
   sangria,
   { price: 0.01, description: "Access premium content" },

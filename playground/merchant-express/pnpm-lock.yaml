@@ -5,9 +5,12 @@ settings:
   excludeLinksFromLockfile: false
 
 dependencies:
-  '@sangria/core':
+  '@sangria-sdk/core':
     specifier: file:../../sdk/sdk-typescript
     version: file:../../sdk/sdk-typescript(express@4.22.1)
+  dotenv:
+    specifier: ^17.4.2
+    version: 17.4.2
   express:
     specifier: ^4.21.0
     version: 4.22.1
@@ -413,6 +416,11 @@ packages:
   /destroy@1.2.0:
     resolution: {integrity: sha512-2sJGJTaXIIaR1w4iJSNoN0hnMY7Gpc/n8D4qSCJw8QqFWXf7cuAgnEHxBpweaVcPevC2l3KpjYCx3NypQQgaJg==}
     engines: {node: '>= 0.8', npm: 1.2.8000 || >= 1.4.16}
+    dev: false
+
+  /dotenv@17.4.2:
+    resolution: {integrity: sha512-nI4U3TottKAcAD9LLud4Cb7b2QztQMUEfHbvhTH09bqXTxnSie8WnjPALV/WMCrJZ6UV/qHJ6L03OqO3LcdYZw==}
+    engines: {node: '>=12'}
     dev: false
 
   /dunder-proto@1.0.1:
@@ -894,18 +902,21 @@ packages:
   file:../../sdk/sdk-typescript(express@4.22.1):
     resolution: {directory: ../../sdk/sdk-typescript, type: directory}
     id: file:../../sdk/sdk-typescript
-    name: '@sangria/core'
+    name: '@sangria-sdk/core'
     engines: {node: '>=18'}
     peerDependencies:
       express: '>=4.0.0'
       fastify: '>=4.0.0'
       hono: '>=4.0.0'
+      next: '>=14.0.0'
     peerDependenciesMeta:
       express:
         optional: true
       fastify:
         optional: true
       hono:
+        optional: true
+      next:
         optional: true
     dependencies:
       express: 4.22.1

@@ -5,9 +5,12 @@ settings:
   excludeLinksFromLockfile: false
 
 dependencies:
-  '@sangria/core':
+  '@sangria-sdk/core':
     specifier: file:../../sdk/sdk-typescript
     version: file:../../sdk/sdk-typescript(fastify@5.8.4)
+  dotenv:
+    specifier: ^17.4.2
+    version: 17.4.2
   fastify:
     specifier: ^5.0.0
     version: 5.8.4
@@ -341,6 +344,11 @@ packages:
     engines: {node: '>=6'}
     dev: false
 
+  /dotenv@17.4.2:
+    resolution: {integrity: sha512-nI4U3TottKAcAD9LLud4Cb7b2QztQMUEfHbvhTH09bqXTxnSie8WnjPALV/WMCrJZ6UV/qHJ6L03OqO3LcdYZw==}
+    engines: {node: '>=12'}
+    dev: false
+
   /esbuild@0.27.7:
     resolution: {integrity: sha512-IxpibTjyVnmrIQo5aqNpCgoACA/dTKLTlhMHihVHhdkxKyPO1uBBthumT0rdHmcsk9uMonIWS0m4FljWzILh3w==}
     engines: {node: '>=18'}
@@ -621,18 +629,21 @@ packages:
   file:../../sdk/sdk-typescript(fastify@5.8.4):
     resolution: {directory: ../../sdk/sdk-typescript, type: directory}
     id: file:../../sdk/sdk-typescript
-    name: '@sangria/core'
+    name: '@sangria-sdk/core'
     engines: {node: '>=18'}
     peerDependencies:
       express: '>=4.0.0'
       fastify: '>=4.0.0'
       hono: '>=4.0.0'
+      next: '>=14.0.0'
     peerDependenciesMeta:
       express:
         optional: true
       fastify:
         optional: true
       hono:
+        optional: true
+      next:
         optional: true
     dependencies:
       fastify: 5.8.4

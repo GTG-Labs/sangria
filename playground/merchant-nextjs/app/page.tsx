@@ -5,10 +5,13 @@ export default function Home() {
       <p>Routes:</p>
       <ul>
         <li>
-          <code>GET /api</code> → free
+          <code>GET /</code> → free (this page)
         </li>
         <li>
-          <code>GET /api/premium</code> → $0.01 (fixed)
+          <code>GET /premium</code> → $0.01 (fixed)
+        </li>
+        <li>
+          <code>GET /api/search?q=...</code> → up to $0.10 (variable)
         </li>
       </ul>
     </main>
