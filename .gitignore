@@ -1,7 +1,8 @@
 .env
 .env.*
 !.env.example
-.claude/
+.claude/*
+!.claude/skills/
 backend/backend
 __pycache__/
 *.pyc
