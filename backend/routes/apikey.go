@@ -20,5 +20,6 @@ func RegisterAPIKeyRoutes(app *fiber.App, pool *pgxpool.Pool) {
 	)
 
 	mk.Post("/generate-payment", merchantHandlers.GeneratePayment(pool))
+	mk.Post("/verify-payment", merchantHandlers.VerifyPayment(pool))
 	mk.Post("/settle-payment", merchantHandlers.SettlePayment(pool))
 }

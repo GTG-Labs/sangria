@@ -15,6 +15,7 @@ import (
 	dbengine "sangria/backend/dbEngine"
 	"sangria/backend/routes"
 	"sangria/backend/utils"
+	x402Handlers "sangria/backend/x402Handlers"
 )
 
 func main() {
@@ -69,6 +70,10 @@ func main() {
 		os.Exit(1)
 	}
 	slog.Info("x402 config loaded", "facilitator_url", config.X402.FacilitatorURL)
+
+	if err := x402Handlers.FetchFacilitatorAddresses(context.Background()); err != nil {
+		slog.Warn("failed to fetch facilitator addresses (upto scheme will not work)", "error", err)
+	}
 
 	if err := config.SetupWorkOS(); err != nil {
 		slog.Error("failed to setup WorkOS", "error", err)

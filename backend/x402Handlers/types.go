@@ -6,7 +6,8 @@ type PaymentRequirements struct {
 	Scheme            string         `json:"scheme"`
 	Network           string         `json:"network"`
 	Asset             string         `json:"asset"`
-	Amount            string         `json:"amount"`
+	Amount            string         `json:"amount,omitempty"`
+	MaxAmountRequired string         `json:"maxAmountRequired,omitempty"`
 	PayTo             string         `json:"payTo"`
 	MaxTimeoutSeconds int            `json:"maxTimeoutSeconds"`
 	Extra             map[string]any `json:"extra,omitempty"`
