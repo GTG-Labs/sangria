@@ -90,17 +90,19 @@ func GeneratePayment(pool *pgxpool.Pool) fiber.Handler {
 				"assetTransferMethod": "eip3009",
 			}
 		case "upto":
+			addr := x402Handlers.UptoFacilitatorAddress(netConfig.CAIP2)
+			if addr == "" {
+				slog.Error("generate payment: no upto facilitator address cached", "network", netConfig.CAIP2)
+				return c.Status(503).JSON(fiber.Map{"error": "upto scheme is not currently available on this network"})
+			}
 			requirements.Amount = strconv.FormatInt(amountMicro, 10)
 			requirements.MaxAmountRequired = strconv.FormatInt(amountMicro, 10)
-			extra := map[string]any{
+			requirements.Extra = map[string]any{
 				"name":                "USD Coin",
 				"version":             "2",
 				"assetTransferMethod": "permit2",
+				"facilitatorAddress":  addr,
 			}
-			if addr := x402Handlers.UptoFacilitatorAddress(netConfig.CAIP2); addr != "" {
-				extra["facilitatorAddress"] = addr
-			}
-			requirements.Extra = extra
 		}
 
 		return c.Status(200).JSON(fiber.Map{
