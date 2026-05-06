@@ -1,0 +1,18 @@
+[project]
+name = "merchant-exa"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+  "fastapi>=0.135.1",
+  "uvicorn>=0.41.0",
+  "exa-py>=1.0.7",
+  "python-dotenv>=1.0.0",
+  "sangria-core",
+]
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.uv.sources]
+sangria-core = { path = "../../sdk/python", editable = true }
