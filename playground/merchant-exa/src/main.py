@@ -6,16 +6,10 @@ load_dotenv()
 
 from exa_py import Exa
 from fastapi import FastAPI, Request
-
 from sangria_sdk import SangriaMerchantClient
 from sangria_sdk.adapters.fastapi import require_sangria_payment
 
 app = FastAPI(title="Merchant Exa")
-exa_key = os.getenv("EXA_API_KEY")
-if not exa_key:
-    raise RuntimeError("EXA_API_KEY environment variable is required")
-
-exa = Exa(api_key=exa_key)
 
 sangria_key = os.getenv("SANGRIA_SECRET_KEY")
 if not sangria_key:
@@ -25,6 +19,13 @@ client = SangriaMerchantClient(
     base_url=os.getenv("SANGRIA_URL", "http://localhost:8080"),
     api_key=sangria_key,
 )
+
+exa_key = os.getenv("EXA_API_KEY")
+if not exa_key:
+    raise RuntimeError("EXA_API_KEY environment variable is required")
+
+exa = Exa(api_key=exa_key)
+
 
 @app.get("/")
 async def health():
