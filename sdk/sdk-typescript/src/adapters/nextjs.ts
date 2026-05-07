@@ -187,12 +187,7 @@ export function uptoPrice(
 
     const { settleFn, getResult } = sangria.createSettleFn(paymentHeader, options.maxPrice);
 
-    try {
-      await handler(request, settleFn, context);
-    } catch (handlerErr) {
-      try { await sangria.settleUptoPayment(paymentHeader, 0); } catch { /* best-effort release */ }
-      throw handlerErr;
-    }
+    await handler(request, settleFn, context);
 
     const settleData = getResult();
     if (!settleData) {

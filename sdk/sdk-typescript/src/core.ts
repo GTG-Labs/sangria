@@ -193,8 +193,8 @@ export class Sangria {
     let result: { amount: number; body: unknown } | undefined;
 
     const settleFn: SettleFn = (amount: number, body: unknown): Settled => {
-      if (!Number.isFinite(amount) || amount < 0) {
-        throw new Error("Sangria: settle amount must be a non-negative finite number");
+      if (!Number.isFinite(amount) || amount <= 0) {
+        throw new Error("Sangria: settle amount must be a positive finite number");
       }
       if (amount > maxPrice) {
         console.warn(
