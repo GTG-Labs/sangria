@@ -134,6 +134,7 @@ export class Sangria {
     ctx: PaymentContext,
     options: UptoPriceOptions
   ): Promise<PaymentResult> {
+    validateUptoPriceOptions(options);
     const x402_responsePayload = (await this.postToSangriaBackend(
       "/v1/generate-payment",
       {
@@ -189,6 +190,9 @@ export class Sangria {
     paymentHeader: string,
     maxPrice: number
   ): { settleFn: SettleFn; getResult: () => { amount: number; body: unknown } | undefined } {
+    if (!Number.isFinite(maxPrice) || maxPrice <= 0) {
+      throw new Error("Sangria: maxPrice must be a positive finite number");
+    }
     let called = false;
     let result: { amount: number; body: unknown } | undefined;
 

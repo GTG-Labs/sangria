@@ -143,7 +143,10 @@ export function uptoPrice(
       const { settleFn, getResult } = sangria.createSettleFn("", options.maxPrice);
       await handler(request, settleFn, context);
       const settleData = getResult();
-      return new Response(JSON.stringify(settleData?.body), {
+      if (!settleData) {
+        throw new Error("Sangria: handler must call settle()");
+      }
+      return new Response(JSON.stringify(settleData.body), {
         status: 200,
         headers: { "Content-Type": "application/json" },
       });

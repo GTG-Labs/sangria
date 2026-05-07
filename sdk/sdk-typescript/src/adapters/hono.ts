@@ -116,7 +116,10 @@ export function uptoPrice(
       const { settleFn, getResult } = sangria.createSettleFn("", options.maxPrice);
       await handler(c, settleFn);
       const settleData = getResult();
-      return c.json(settleData?.body as Record<string, unknown>);
+      if (!settleData) {
+        throw new Error("Sangria: handler must call settle()");
+      }
+      return c.json(settleData.body as Record<string, unknown>);
     }
 
     const paymentHeader = c.req.header("payment-signature");
