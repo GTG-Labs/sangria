@@ -180,14 +180,7 @@ def require_upto_price(
             settle_fn, get_result = merchant_client.create_settle_fn(max_price)
             kwargs["settle"] = settle_fn
 
-            try:
-                result = await func(*args, **kwargs)
-            except Exception:
-                try:
-                    await merchant_client.settle_upto_payment(payment_header, 0)
-                except Exception:
-                    pass
-                raise
+            result = await func(*args, **kwargs)
 
             if not isinstance(result, Settled):
                 raise TypeError("Sangria: handler must return settle(amount, body)")

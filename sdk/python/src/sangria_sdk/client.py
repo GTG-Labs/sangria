@@ -201,8 +201,8 @@ class SangriaMerchantClient:
 
         def settle(amount: float, body: Any) -> Settled:
             nonlocal called, result_data
-            if not isinstance(amount, (int, float)) or not math.isfinite(amount) or amount < 0:
-                raise ValueError("Sangria: settle amount must be a non-negative finite number")
+            if not isinstance(amount, (int, float)) or not math.isfinite(amount) or amount <= 0:
+                raise ValueError("Sangria: settle amount must be a positive finite number")
             if amount > max_price:
                 logger.warning(
                     "[sangria-sdk] settle amount $%s exceeds max_price $%s, clamping to max_price",
