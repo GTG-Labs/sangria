@@ -196,6 +196,8 @@ class SangriaMerchantClient:
         self,
         max_price: float,
     ) -> tuple[Callable[[float, Any], Settled], Callable[[], tuple[float, Any] | None]]:
+        if not isinstance(max_price, (int, float)) or not math.isfinite(max_price) or max_price <= 0:
+            raise ValueError("Sangria: max_price must be a positive finite number")
         called = False
         result_data: tuple[float, Any] | None = None
 
