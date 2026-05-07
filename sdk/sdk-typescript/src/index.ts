@@ -1,4 +1,4 @@
-export { Sangria, validateFixedPriceOptions } from "./core.js";
+export { Sangria, validateFixedPriceOptions, validateUptoPriceOptions } from "./core.js";
 export {
   SangriaError,
   SangriaConnectionError,
@@ -14,8 +14,13 @@ export {
 export type {
   SangriaConfig,
   FixedPriceOptions,
+  UptoPriceOptions,
   SangriaRequestData,
   X402ChallengePayload,
   PaymentContext,
   PaymentResult,
+  VerifyResult,
+  SettleResult,
+  Settled,
+  SettleFn,
 } from "./types.js";

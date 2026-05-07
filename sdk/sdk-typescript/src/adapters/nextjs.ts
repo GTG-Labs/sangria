@@ -1,5 +1,6 @@
-import type { SangriaRequestData, FixedPriceOptions } from "../types.js";
-import { Sangria, validateFixedPriceOptions } from "../core.js";
+import type { SangriaRequestData, FixedPriceOptions, UptoPriceOptions, Settled, SettleFn } from "../types.js";
+import { toMicrounits } from "../types.js";
+import { Sangria, validateFixedPriceOptions, validateUptoPriceOptions, toBase64 } from "../core.js";
 
 /**
  * Minimal type stubs for Next.js request/response.
@@ -103,6 +104,136 @@ export function fixedPrice(
     }
 
     return handlerResponse;
+  };
+}
+
+// ── Upto (variable price): wrap a route handler to gate it behind payment ──
+//
+//   import { uptoPrice } from "@sangria-sdk/core/nextjs";
+//
+//   export const GET = uptoPrice(sangria, { maxPrice: 0.10 }, async (request, settle) => {
+//     const results = doSearch(new URL(request.url).searchParams.get("q"));
+//     return settle(results.length * 0.002, { results });
+//   });
+//
+export function uptoPrice(
+  sangria: Sangria,
+  options: UptoPriceOptions,
+  handler: (request: any, settle: SettleFn, context?: any) => Promise<Settled>,
+  config?: NextJSConfig
+): NextRouteHandler {
+  validateUptoPriceOptions(options);
+
+  return async (request: any, context?: any) => {
+    let shouldBypass = false;
+    if (config?.bypassPaymentIf) {
+      try {
+        const result = await config.bypassPaymentIf(request);
+        shouldBypass = result === true;
+      } catch (err) {
+        console.error(
+          "[sangria-sdk] bypassPaymentIf threw; falling through to payment required",
+          err,
+        );
+        shouldBypass = false;
+      }
+    }
+    if (shouldBypass) {
+      request.sangria = { paid: false, amount: 0 } as SangriaRequestData;
+      const { settleFn, getResult } = sangria.createSettleFn(options.maxPrice);
+      await handler(request, settleFn, context);
+      const settleData = getResult();
+      if (!settleData) {
+        throw new Error("Sangria: handler must call settle()");
+      }
+      return new Response(JSON.stringify(settleData.body), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    const paymentHeader =
+      request.headers.get("payment-signature") ?? undefined;
+    const resourceUrl = request.url;
+
+    if (!paymentHeader) {
+      const generateResult = await sangria.generateUptoPayment(
+        { paymentHeader: undefined, resourceUrl },
+        options
+      );
+      if (generateResult.action === "respond") {
+        const headers: Record<string, string> = {
+          "Content-Type": "application/json",
+          ...generateResult.headers,
+        };
+        return new Response(JSON.stringify(generateResult.body), {
+          status: generateResult.status,
+          headers,
+        });
+      }
+      throw new Error("Sangria: unexpected generate result");
+    }
+
+    const verifyResult = await sangria.verifyPayment(
+      paymentHeader,
+      toMicrounits(options.maxPrice)
+    );
+    if (!verifyResult.valid) {
+      return new Response(
+        JSON.stringify({
+          error: verifyResult.message ?? "Payment verification failed",
+          error_reason: verifyResult.reason,
+        }),
+        { status: 402, headers: { "Content-Type": "application/json" } }
+      );
+    }
+
+    const { settleFn, getResult } = sangria.createSettleFn(options.maxPrice);
+
+    await handler(request, settleFn, context);
+
+    const settleData = getResult();
+    if (!settleData) {
+      throw new Error("Sangria: handler must call settle()");
+    }
+
+    const settleResult = await sangria.settleUptoPayment(
+      paymentHeader,
+      toMicrounits(settleData.amount)
+    );
+
+    if (!settleResult.success) {
+      return new Response(
+        JSON.stringify({
+          error: settleResult.error_message ?? "Payment settlement failed",
+          error_reason: settleResult.error_reason,
+        }),
+        { status: 402, headers: { "Content-Type": "application/json" } }
+      );
+    }
+
+    const paymentResponse = toBase64(JSON.stringify({
+      success: true,
+      transaction: settleResult.transaction,
+      network: settleResult.network,
+      payer: settleResult.payer,
+    }));
+
+    request.sangria = {
+      paid: true,
+      amount: settleData.amount,
+      transaction: settleResult.transaction,
+      network: settleResult.network,
+      payer: settleResult.payer,
+    } as SangriaRequestData;
+
+    return new Response(JSON.stringify(settleData.body), {
+      status: 200,
+      headers: {
+        "Content-Type": "application/json",
+        "PAYMENT-RESPONSE": paymentResponse,
+      },
+    });
   };
 }
 
