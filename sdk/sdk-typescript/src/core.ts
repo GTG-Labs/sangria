@@ -187,7 +187,6 @@ export class Sangria {
   }
 
   createSettleFn(
-    paymentHeader: string,
     maxPrice: number
   ): { settleFn: SettleFn; getResult: () => { amount: number; body: unknown } | undefined } {
     if (!Number.isFinite(maxPrice) || maxPrice <= 0) {

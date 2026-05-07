@@ -113,7 +113,7 @@ export function uptoPrice(
     }
     if (shouldBypass) {
       c.set("sangria", { paid: false, amount: 0 });
-      const { settleFn, getResult } = sangria.createSettleFn("", options.maxPrice);
+      const { settleFn, getResult } = sangria.createSettleFn(options.maxPrice);
       await handler(c, settleFn);
       const settleData = getResult();
       if (!settleData) {
@@ -159,7 +159,7 @@ export function uptoPrice(
       );
     }
 
-    const { settleFn, getResult } = sangria.createSettleFn(paymentHeader, options.maxPrice);
+    const { settleFn, getResult } = sangria.createSettleFn(options.maxPrice);
 
     await handler(c, settleFn);
 
