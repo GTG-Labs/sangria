@@ -205,14 +205,14 @@ class SangriaMerchantClient:
             nonlocal called, result_data
             if isinstance(amount, bool) or not isinstance(amount, (int, float)) or not math.isfinite(amount) or amount <= 0:
                 raise ValueError("Sangria: settle amount must be a positive finite number")
+            if called:
+                raise RuntimeError("Sangria: settle() may only be called once per request")
             if amount > max_price:
                 logger.warning(
                     "[sangria-sdk] settle amount $%s exceeds max_price $%s, clamping to max_price",
                     amount, max_price,
                 )
                 amount = max_price
-            if called:
-                raise RuntimeError("Sangria: settle() may only be called once per request")
             called = True
             result_data = (amount, body)
             return Settled(_SETTLE_GUARD, amount, body)
