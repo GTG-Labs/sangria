@@ -1,13 +1,13 @@
 ## TypeScript SDK (@sangria-sdk/core)
 
 ```text
-VERSION: 0.1.2
-DESCRIPTION: Initial TypeScript SDK with Express, Fastify, Hono, and Next.js adapters
+VERSION: 0.2.0
+DESCRIPTION: Add upto (variable price) scheme with all framework adapters
 ```
 
 ## Python SDK (sangria-core)
 
 ```text
-VERSION: 0.1.1
-DESCRIPTION: Initial Python SDK with FastAPI adapter for Sangria payments
+VERSION: 0.2.0
+DESCRIPTION: Add upto (variable price) scheme with FastAPI adapter
 ```
