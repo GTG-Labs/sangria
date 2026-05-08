@@ -196,14 +196,14 @@ class SangriaMerchantClient:
         self,
         max_price: float,
     ) -> tuple[Callable[[float, Any], Settled], Callable[[], tuple[float, Any] | None]]:
-        if not isinstance(max_price, (int, float)) or not math.isfinite(max_price) or max_price <= 0:
+        if isinstance(max_price, bool) or not isinstance(max_price, (int, float)) or not math.isfinite(max_price) or max_price <= 0:
             raise ValueError("Sangria: max_price must be a positive finite number")
         called = False
         result_data: tuple[float, Any] | None = None
 
         def settle(amount: float, body: Any) -> Settled:
             nonlocal called, result_data
-            if not isinstance(amount, (int, float)) or not math.isfinite(amount) or amount <= 0:
+            if isinstance(amount, bool) or not isinstance(amount, (int, float)) or not math.isfinite(amount) or amount <= 0:
                 raise ValueError("Sangria: settle amount must be a positive finite number")
             if amount > max_price:
                 logger.warning(
@@ -212,7 +212,7 @@ class SangriaMerchantClient:
                 )
                 amount = max_price
             if called:
-                return Settled(_SETTLE_GUARD, result_data[0], result_data[1])  # type: ignore[index]
+                raise RuntimeError("Sangria: settle() may only be called once per request")
             called = True
             result_data = (amount, body)
             return Settled(_SETTLE_GUARD, amount, body)
