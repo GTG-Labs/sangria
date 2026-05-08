@@ -1,9 +1,13 @@
 import os
+import random
+
+from dotenv import load_dotenv
+load_dotenv()
 
 from fastapi import FastAPI, Request
 
 from sangria_sdk import SangriaMerchantClient
-from sangria_sdk.adapters.fastapi import require_sangria_payment
+from sangria_sdk.adapters.fastapi import require_sangria_payment, require_upto_price
 
 app = FastAPI(title="Merchant FastAPI")
 
@@ -26,6 +30,16 @@ async def health():
 @require_sangria_payment(client, amount=0.01, description="Access premium content")
 async def premium(request: Request):
     return {"message": "You accessed the premium endpoint!"}
+
+
+@app.get("/api/search")
+@require_upto_price(client, max_price=0.10, description="Search API — pay per result")
+async def search(request: Request, settle):
+    q = request.query_params.get("q", "")
+    count = random.randint(1, 50)
+    results = [f'Result {i + 1} for "{q}"' for i in range(count)]
+    cost = len(results) * 0.002
+    return settle(cost, {"query": q, "results": results, "cost": cost})
 
 
 if __name__ == "__main__":

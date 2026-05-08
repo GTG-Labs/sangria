@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@sangria-sdk/core": "file:../../sdk/sdk-typescript",
+    "dotenv": "^17.4.2",
     "fastify": "^5.0.0"
   },
   "devDependencies": {

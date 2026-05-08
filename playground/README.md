@@ -1,11 +1,11 @@
 # Sangria Playground
 
-Test implementations for the [x402 payment protocol](https://www.x402.org/) integrated with the Sangria backend. Includes merchant servers in multiple frameworks and a test client for end-to-end payment testing.
+Example merchant servers and a test client for end-to-end [x402 payment protocol](https://www.x402.org/) testing against the Sangria backend.
 
 ## How it works
 
 ```
-Buyer (e2e_test/client.py)           Merchant Server (:<port>)             Sangria Backend (:8080)
+Buyer (agent-test)                   Merchant Server (:<port>)             Sangria Backend (:8080)
        |                                     |                                    |
        |  GET /premium                       |                                    |
        |------------------------------------>|                                    |
@@ -32,44 +32,85 @@ Buyer (e2e_test/client.py)           Merchant Server (:<port>)             Sangr
 
 ```
 playground/
-├── e2e_test/
-│   ├── client.py              # Test buyer — step-by-step x402 payment flow
-│   └── README.md              # Full e2e test instructions
-├── merchant-fastapi/          # Merchant server using Sangria Python SDK + FastAPI
-├── merchant-express/          # Merchant server using Sangria JS SDK + Express
-├── merchant-fastify/          # Merchant server using Sangria JS SDK + Fastify
-├── merchant-hono/             # Merchant server using Sangria JS SDK + Hono
+├── .env                       # CDP credentials (single source of truth)
+├── agent-test/                # Buyer/agent test client (TypeScript)
+│   ├── src/index.ts           # Tests exact + upto payment flows
+│   ├── .env                   # PRIVATE_KEY + MERCHANT_URL only
+│   ├── export-key.py          # Export a private key from CDP
+│   └── list-wallets.py        # List all CDP accounts
+├── merchant-express/          # Merchant server — Express
+├── merchant-fastify/          # Merchant server — Fastify
+├── merchant-hono/             # Merchant server — Hono
+├── merchant-fastapi/          # Merchant server — FastAPI (Python)
+├── merchant-nextjs/           # Merchant server — Next.js
 ├── wallet/
-│   └── wallet.py              # TestnetWallet — create, fund, and check CDP wallets
+│   └── wallet.py              # CDP wallet helpers (create, fund, check balances)
+├── e2e_test/                  # (Legacy) Python-based e2e test
 ├── merchant_server/           # (Legacy) Standalone demo without Sangria backend
 └── main.py                    # (Legacy) Standalone buyer client
 ```
 
+## Credentials setup
+
+### CDP credentials (`playground/.env`)
+
+CDP credentials live in `playground/.env` — this is the **single source of truth**. All Python scripts and wallet helpers load from here.
+
+```bash
+cp .env.example .env
+```
+
+Then fill in from the [CDP Portal](https://portal.cdp.coinbase.com) under your project's API Keys and Server Wallet settings:
+
+```
+CDP_API_KEY=<API key ID from portal>
+CDP_SECRET_KEY=<API key secret>
+CDP_WALLET_SECRET=<wallet secret from Server Wallet dashboard>
+```
+
+These are scoped to a single CDP project. All accounts created via the API or the portal under that project will be accessible.
+
+### Agent test credentials (`agent-test/.env`)
+
+The agent-test client only needs a buyer wallet private key and the merchant URL. **No CDP keys here** — those live in `playground/.env`.
+
+```bash
+cd agent-test && cp .env.example .env
+```
+
+```
+PRIVATE_KEY=0x<exported private key>
+MERCHANT_URL=http://localhost:4001
+```
+
+To export a private key from one of your CDP accounts:
+```bash
+cd playground
+uv run python agent-test/export-key.py 0xYOUR_ACCOUNT_ADDRESS
+```
+
+### Merchant server credentials
+
+Each merchant server needs a Sangria API key in its own `.env`:
+```
+SANGRIA_SECRET_KEY=sg_test_xxx
+```
+
 ## Quick start
-
-### Prerequisites
-
-- Sangria backend running on `localhost:8080` (see `backend/README.md`)
-- A merchant API key (create via `POST /merchants` on the backend)
-- CDP credentials in `playground/.env`:
-  ```
-  CDP_API_KEY=<your key ID>
-  CDP_SECRET_KEY=<your key secret>
-  CDP_WALLET_SECRET=<your wallet secret>
-  ```
-- A buyer wallet funded with testnet USDC + ETH (see below)
-- [uv](https://docs.astral.sh/uv/) for Python, or npm for Node.js servers
 
 ### 1. Install dependencies
 
 ```bash
 cd playground
-uv sync
+uv sync                          # Python deps
+cd agent-test && pnpm install    # agent-test deps
+cd ../merchant-hono && pnpm install  # (or whichever merchant server)
 ```
 
 ### 2. Create and fund a buyer wallet (one-time)
 
 ```bash
+cd playground
 uv run python -c "
 import asyncio
 from wallet import TestnetWallet
@@ -82,47 +123,59 @@ asyncio.run(setup())
 "
 ```
 
-Save the address for step 4.
-
-### 3. Start a merchant server
-
+Then export the private key and put it in `agent-test/.env`:
 ```bash
-# FastAPI example
-cd merchant-fastapi
-SANGRIA_URL=http://localhost:8080 SANGRIA_SECRET_KEY="sg_test_xxx" uv run python src/main.py
+uv run python agent-test/export-key.py 0xTHE_ADDRESS_FROM_ABOVE
+# Copy the output into agent-test/.env as PRIVATE_KEY
 ```
 
-Replace `sg_test_xxx` with your actual merchant API key.
-
-### 4. Run the e2e test
+### 3. Start the backend + a merchant server
 
 ```bash
-cd playground
-MERCHANT_URL=http://localhost:4004 uv run python -m e2e_test.client --buyer-address 0x...
+# Terminal 1: backend
+cd backend && go run .
+
+# Terminal 2: merchant (pick one)
+cd playground/merchant-hono && pnpm dev
 ```
 
-See `e2e_test/README.md` for full details and expected output.
+### 4. Run the agent test
+
+```bash
+cd playground/agent-test
+pnpm test          # both exact + upto
+pnpm test:exact    # exact scheme only (/premium)
+pnpm test:upto     # upto scheme only (/api/search)
+```
 
 ## Merchant server implementations
 
-Each merchant server demonstrates integrating the Sangria SDK in a different framework. They all do the same thing:
-- Expose a `GET /premium` endpoint
-- Use the Sangria SDK's `@require_sangria_payment` decorator (or equivalent)
-- The SDK handles the full 402 → generate → settle flow automatically
+Each merchant server demonstrates integrating the Sangria SDK in a different framework. They all expose:
+- `GET /premium` — fixed-price endpoint (exact scheme, $0.01)
+- `GET /api/search` — variable-price endpoint (upto scheme, up to $0.10)
 
-| Directory | Framework | Language |
-|---|---|---|
-| `merchant-fastapi/` | FastAPI | Python |
-| `merchant-express/` | Express | Node.js |
-| `merchant-fastify/` | Fastify | Node.js |
-| `merchant-hono/` | Hono | Node.js |
+| Directory | Framework | Language | Default Port |
+|---|---|---|---|
+| `merchant-express/` | Express | Node.js | 4001 |
+| `merchant-fastify/` | Fastify | Node.js | 4002 |
+| `merchant-hono/` | Hono | Node.js | 4003 |
+| `merchant-fastapi/` | FastAPI | Python | 4004 |
+| `merchant-nextjs/` | Next.js | Node.js | 3000 |
+
+## Utility scripts
+
+Run all Python scripts from the `playground/` directory:
+
+```bash
+cd playground
+
+# List all CDP accounts in your project
+uv run python agent-test/list-wallets.py
+
+# Export a private key
+uv run python agent-test/export-key.py 0xADDRESS
+```
 
 ## Legacy files
 
-`main.py` and `merchant_server/` are the original standalone demo that talks directly to the x402 facilitator without the Sangria backend. Kept for reference.
-
-## Important notes
-
-- Runs on **Base Sepolia testnet** — all funds are fake
-- CDP manages private keys server-side, encrypted with your `CDP_WALLET_SECRET`
-- The buyer's private key is exported from CDP only to sign x402 payment headers
+`main.py`, `merchant_server/`, and `e2e_test/` are the original standalone demo that talks directly to the x402 facilitator without the Sangria backend. Kept for reference.
