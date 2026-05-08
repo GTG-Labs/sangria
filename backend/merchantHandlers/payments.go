@@ -172,6 +172,9 @@ func VerifyPayment(pool *pgxpool.Pool) fiber.Handler {
 		if req.MaxAmount <= 0 {
 			return c.Status(400).JSON(fiber.Map{"error": "max_amount must be a positive integer (microunits)"})
 		}
+		if req.MaxAmount > config.PaymentConfig.MaxAmountMicrounits {
+			return c.Status(400).JSON(fiber.Map{"error": "max_amount exceeds maximum"})
+		}
 
 		payloadBytes, err := base64.StdEncoding.DecodeString(req.PaymentPayload)
 		if err != nil {
