@@ -163,7 +163,7 @@ func sendInvitationEmail(ctx context.Context, inviteeEmail, inviterName, orgName
                 This invitation expires in 7 days. If you have questions, contact the person who invited you.
             </p>
             <p style="font-size: 12px; color: #999999; margin: 0;">
-                This email contains a unique invitation link. Do not forward it — it grants access to the organization.
+                This email contains a unique invitation link. Do not forward it — it grants access to the organization. Sangria will never ask you to share this link.
             </p>
         </div>
 
@@ -193,7 +193,7 @@ What happens next?
 2. Sign in with your email address
 3. You'll be automatically added to the organization
 
-This invitation expires in 7 days.
+This invitation expires in 7 days. Do not forward this email — it contains a unique link that grants access to the organization. Sangria will never ask you to share this link.
 
 —
 Sangria · getsangria.com`,
