@@ -35,6 +35,14 @@ export function validateFixedPriceOptions(options: FixedPriceOptions): void {
 
 export { validateUptoPriceOptions } from "./types.js";
 
+function normalizeMaxTimeoutSeconds(value: number | undefined): number | undefined {
+  if (value == null) return undefined;
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new Error("Sangria: maxTimeoutSeconds must be a positive integer");
+  }
+  return Math.min(value, 900);
+}
+
 export class Sangria {
   private apiKey: string;
   private baseUrl: string;
@@ -71,6 +79,9 @@ export class Sangria {
         amount: toMicrounits(options.price),
         resource: ctx.resourceUrl,
         description: options.description,
+        ...(normalizeMaxTimeoutSeconds(options.maxTimeoutSeconds) != null && {
+          max_timeout_seconds: normalizeMaxTimeoutSeconds(options.maxTimeoutSeconds),
+        }),
       },
       "generate"
     )) as X402ChallengePayload;
@@ -142,6 +153,9 @@ export class Sangria {
         max_amount: toMicrounits(options.maxPrice),
         resource: ctx.resourceUrl,
         description: options.description,
+        ...(normalizeMaxTimeoutSeconds(options.maxTimeoutSeconds) != null && {
+          max_timeout_seconds: normalizeMaxTimeoutSeconds(options.maxTimeoutSeconds),
+        }),
       },
       "generate"
     )) as X402ChallengePayload;

@@ -34,11 +34,17 @@ class FixedPriceOptions:
     price: float
     resource: str
     description: str | None = None
+    max_timeout_seconds: int | None = None
 
     def __post_init__(self) -> None:
         import math
         if isinstance(self.price, bool) or not isinstance(self.price, (int, float)) or not math.isfinite(self.price) or self.price <= 0:
             raise ValueError("price must be a positive number (dollars)")
+        if self.max_timeout_seconds is not None:
+            if isinstance(self.max_timeout_seconds, bool) or not isinstance(self.max_timeout_seconds, int):
+                raise TypeError("max_timeout_seconds must be an integer")
+            if self.max_timeout_seconds <= 0 or self.max_timeout_seconds > 900:
+                raise ValueError("max_timeout_seconds must be a positive integer <= 900")
 
     def to_generate_dict(self) -> dict[str, Any]:
         payload: dict[str, Any] = {
@@ -47,6 +53,8 @@ class FixedPriceOptions:
         }
         if self.description:
             payload["description"] = self.description
+        if self.max_timeout_seconds is not None:
+            payload["max_timeout_seconds"] = self.max_timeout_seconds
         return payload
 
 
@@ -81,11 +89,17 @@ class UptoPriceOptions:
     max_price: float
     resource: str
     description: str | None = None
+    max_timeout_seconds: int | None = None
 
     def __post_init__(self) -> None:
         import math
         if isinstance(self.max_price, bool) or not isinstance(self.max_price, (int, float)) or not math.isfinite(self.max_price) or self.max_price <= 0:
             raise ValueError("max_price must be a positive number (dollars)")
+        if self.max_timeout_seconds is not None:
+            if isinstance(self.max_timeout_seconds, bool) or not isinstance(self.max_timeout_seconds, int):
+                raise TypeError("max_timeout_seconds must be an integer")
+            if self.max_timeout_seconds <= 0 or self.max_timeout_seconds > 900:
+                raise ValueError("max_timeout_seconds must be a positive integer <= 900")
 
     def to_generate_dict(self) -> dict[str, Any]:
         payload: dict[str, Any] = {
@@ -95,6 +109,8 @@ class UptoPriceOptions:
         }
         if self.description:
             payload["description"] = self.description
+        if self.max_timeout_seconds is not None:
+            payload["max_timeout_seconds"] = self.max_timeout_seconds
         return payload
 
 

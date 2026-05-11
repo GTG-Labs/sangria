@@ -18,7 +18,8 @@ import (
 	x402Handlers "sangria/backend/x402Handlers"
 )
 
-const maxTimeoutSeconds = 60
+const defaultMaxTimeoutSeconds = 60
+const maxAllowedTimeoutSeconds = 900
 
 // GeneratePayment handles POST /v1/generate-payment.
 // Stateless: looks up the wallet for the network and returns x402 payment terms.
@@ -26,14 +27,23 @@ const maxTimeoutSeconds = 60
 func GeneratePayment(pool *pgxpool.Pool) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		var req struct {
-			Amount      int64  `json:"amount"`
-			MaxAmount   int64  `json:"max_amount"`
-			Scheme      string `json:"scheme"`
-			Description string `json:"description"`
-			Resource    string `json:"resource"`
+			Amount            int64  `json:"amount"`
+			MaxAmount         int64  `json:"max_amount"`
+			Scheme            string `json:"scheme"`
+			Description       string `json:"description"`
+			Resource          string `json:"resource"`
+			MaxTimeoutSeconds int    `json:"max_timeout_seconds"`
 		}
 		if err := c.Bind().JSON(&req); err != nil {
 			return c.Status(400).JSON(fiber.Map{"error": "invalid request body"})
+		}
+
+		timeout := defaultMaxTimeoutSeconds
+		if req.MaxTimeoutSeconds > 0 {
+			timeout = req.MaxTimeoutSeconds
+		}
+		if timeout > maxAllowedTimeoutSeconds {
+			timeout = maxAllowedTimeoutSeconds
 		}
 
 		scheme := req.Scheme
@@ -78,7 +88,7 @@ func GeneratePayment(pool *pgxpool.Pool) fiber.Handler {
 			Network:           netConfig.CAIP2,
 			Asset:             netConfig.USDCAddress,
 			PayTo:             wallet.Address,
-			MaxTimeoutSeconds: maxTimeoutSeconds,
+			MaxTimeoutSeconds: timeout,
 		}
 
 		switch scheme {
@@ -150,6 +160,16 @@ type permit2PayloadEnvelope struct {
 	} `json:"payload"`
 }
 
+// acceptedTimeoutEnvelope extracts maxTimeoutSeconds from the accepted
+// field of a decoded payment payload. The agent echoes the original
+// PaymentRequirements in accepted, so verify/settle must use the same
+// timeout that was generated rather than a hardcoded default.
+type acceptedTimeoutEnvelope struct {
+	Accepted struct {
+		MaxTimeoutSeconds int `json:"maxTimeoutSeconds"`
+	} `json:"accepted"`
+}
+
 // VerifyPayment handles POST /v1/verify-payment.
 // Stateless: verifies a Permit2 (upto scheme) payment authorization with the
 // facilitator without touching the ledger. The SDK calls this before running
@@ -207,6 +227,15 @@ func VerifyPayment(pool *pgxpool.Pool) fiber.Handler {
 			return c.Status(500).JSON(fiber.Map{"error": "network config not found for wallet"})
 		}
 
+		timeout := defaultMaxTimeoutSeconds
+		var acceptedTimeout acceptedTimeoutEnvelope
+		if err := json.Unmarshal(payloadBytes, &acceptedTimeout); err == nil && acceptedTimeout.Accepted.MaxTimeoutSeconds > 0 {
+			timeout = acceptedTimeout.Accepted.MaxTimeoutSeconds
+		}
+		if timeout > maxAllowedTimeoutSeconds {
+			timeout = maxAllowedTimeoutSeconds
+		}
+
 		canonicalRequirements := x402Handlers.PaymentRequirements{
 			Scheme:            "upto",
 			Network:           netConfig.CAIP2,
@@ -214,7 +243,7 @@ func VerifyPayment(pool *pgxpool.Pool) fiber.Handler {
 			MaxAmountRequired: strconv.FormatInt(req.MaxAmount, 10),
 			Asset:             netConfig.USDCAddress,
 			PayTo:             wallet.Address,
-			MaxTimeoutSeconds: maxTimeoutSeconds,
+			MaxTimeoutSeconds: timeout,
 			Extra: map[string]any{
 				"name":                "USD Coin",
 				"version":             "2",
@@ -475,6 +504,15 @@ func SettlePayment(pool *pgxpool.Pool) fiber.Handler {
 			return c.Status(500).JSON(fiber.Map{"error": "network config not found for wallet"})
 		}
 
+		settleTimeout := defaultMaxTimeoutSeconds
+		var acceptedTimeout acceptedTimeoutEnvelope
+		if err := json.Unmarshal(payloadBytes, &acceptedTimeout); err == nil && acceptedTimeout.Accepted.MaxTimeoutSeconds > 0 {
+			settleTimeout = acceptedTimeout.Accepted.MaxTimeoutSeconds
+		}
+		if settleTimeout > maxAllowedTimeoutSeconds {
+			settleTimeout = maxAllowedTimeoutSeconds
+		}
+
 		switch scheme {
 		case "exact":
 			canonicalRequirements = x402Handlers.PaymentRequirements{
@@ -483,7 +521,7 @@ func SettlePayment(pool *pgxpool.Pool) fiber.Handler {
 				Amount:            strconv.FormatInt(chargeAmount, 10),
 				Asset:             netConfig.USDCAddress,
 				PayTo:             wallet.Address,
-				MaxTimeoutSeconds: maxTimeoutSeconds,
+				MaxTimeoutSeconds: settleTimeout,
 				Extra: map[string]any{
 					"name":                "USD Coin",
 					"version":             "2",
@@ -498,7 +536,7 @@ func SettlePayment(pool *pgxpool.Pool) fiber.Handler {
 				Amount:            strconv.FormatInt(chargeAmount, 10),
 				Asset:             netConfig.USDCAddress,
 				PayTo:             wallet.Address,
-				MaxTimeoutSeconds: maxTimeoutSeconds,
+				MaxTimeoutSeconds: settleTimeout,
 				Extra: map[string]any{
 					"name":                "USD Coin",
 					"version":             "2",
