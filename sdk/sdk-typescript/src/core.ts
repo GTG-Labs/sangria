@@ -71,6 +71,7 @@ export class Sangria {
         amount: toMicrounits(options.price),
         resource: ctx.resourceUrl,
         description: options.description,
+        ...(options.maxTimeoutSeconds != null && { max_timeout_seconds: options.maxTimeoutSeconds }),
       },
       "generate"
     )) as X402ChallengePayload;
@@ -142,6 +143,7 @@ export class Sangria {
         max_amount: toMicrounits(options.maxPrice),
         resource: ctx.resourceUrl,
         description: options.description,
+        ...(options.maxTimeoutSeconds != null && { max_timeout_seconds: options.maxTimeoutSeconds }),
       },
       "generate"
     )) as X402ChallengePayload;

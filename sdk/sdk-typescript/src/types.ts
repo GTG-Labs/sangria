@@ -7,6 +7,8 @@ export interface FixedPriceOptions {
   /** Price in dollars (e.g. 0.01 for one cent). Converted to microunits internally before sending to the backend. */
   price: number;
   description?: string;
+  /** How long the agent's signed authorization is valid (seconds). Default: 60. Max: 900. */
+  maxTimeoutSeconds?: number;
 }
 
 export interface SangriaRequestData {
@@ -51,6 +53,8 @@ export interface UptoPriceOptions {
   /** Maximum price in dollars (e.g. 0.10 for ten cents). The agent authorizes up to this amount. */
   maxPrice: number;
   description?: string;
+  /** How long the agent's signed authorization is valid (seconds). Default: 60. Max: 900. */
+  maxTimeoutSeconds?: number;
 }
 
 export function validateUptoPriceOptions(options: UptoPriceOptions): void {

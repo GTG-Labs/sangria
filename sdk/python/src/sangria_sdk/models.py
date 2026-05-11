@@ -34,6 +34,7 @@ class FixedPriceOptions:
     price: float
     resource: str
     description: str | None = None
+    max_timeout_seconds: int | None = None
 
     def __post_init__(self) -> None:
         import math
@@ -47,6 +48,8 @@ class FixedPriceOptions:
         }
         if self.description:
             payload["description"] = self.description
+        if self.max_timeout_seconds is not None:
+            payload["max_timeout_seconds"] = self.max_timeout_seconds
         return payload
 
 
@@ -81,6 +84,7 @@ class UptoPriceOptions:
     max_price: float
     resource: str
     description: str | None = None
+    max_timeout_seconds: int | None = None
 
     def __post_init__(self) -> None:
         import math
@@ -95,6 +99,8 @@ class UptoPriceOptions:
         }
         if self.description:
             payload["description"] = self.description
+        if self.max_timeout_seconds is not None:
+            payload["max_timeout_seconds"] = self.max_timeout_seconds
         return payload
 
 
