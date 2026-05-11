@@ -75,8 +75,8 @@ class SangriaAPIStatusError(SangriaError):
         self.status_code = status_code
 
 
-class SangriaHandlerError(Exception):
-    """Throw from a require_upto_price/require_sangria_payment handler to
+class SangriaHandlerException(Exception):
+    """Raise from a require_upto_price/require_sangria_payment handler to
     return a structured HTTP error without settling."""
 
     def __init__(self, status_code: int, body: Any) -> None:

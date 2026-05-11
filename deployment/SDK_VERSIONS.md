@@ -9,5 +9,5 @@ DESCRIPTION: Add SangriaHandlerError — throw from uptoPrice/fixedPrice handler
 
 ```text
 VERSION: 0.3.1
-DESCRIPTION: Add SangriaHandlerError — raise from require_upto_price/require_sangria_payment handlers to return structured HTTP errors without settling
+DESCRIPTION: Add SangriaHandlerException — raise from require_upto_price/require_sangria_payment handlers to return structured HTTP errors without settling
 ```
