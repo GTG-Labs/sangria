@@ -49,7 +49,14 @@ export function fixedPrice(
     }
     if (shouldBypass) {
       request.sangria = { paid: false, amount: 0 };
-      return handler(request, reply);
+      try {
+        return await handler(request, reply);
+      } catch (err) {
+        if (err instanceof SangriaHandlerError) {
+          return reply.status(err.statusCode).send(err.body);
+        }
+        throw err;
+      }
     }
 
     const result = await sangria.handleFixedPrice(
@@ -73,7 +80,14 @@ export function fixedPrice(
       reply.headers(result.headers);
     }
     request.sangria = result.data;
-    return handler(request, reply);
+    try {
+      return await handler(request, reply);
+    } catch (err) {
+      if (err instanceof SangriaHandlerError) {
+        return reply.status(err.statusCode).send(err.body);
+      }
+      throw err;
+    }
   };
 }
 
