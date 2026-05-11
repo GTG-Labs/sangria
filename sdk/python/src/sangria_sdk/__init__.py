@@ -1,3 +1,4 @@
+# v0.3.2
 from .client import SangriaMerchantClient, validate_fixed_price_options
 from .errors import (
     SangriaAPIStatusError,
