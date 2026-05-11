@@ -58,3 +58,20 @@ export class SangriaAPIStatusError extends SangriaError {
     this.request = options.request;
   }
 }
+
+/**
+ * Throw from an uptoPrice/fixedPrice handler to return a structured HTTP
+ * error response without settling. The adapter catches this and converts
+ * it to `Response(JSON.stringify(body), { status: statusCode })`.
+ */
+export class SangriaHandlerError extends Error {
+  readonly statusCode: number;
+  readonly body: unknown;
+
+  constructor(statusCode: number, body: unknown) {
+    super("Handler aborted");
+    this.name = "SangriaHandlerError";
+    this.statusCode = statusCode;
+    this.body = body;
+  }
+}

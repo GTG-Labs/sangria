@@ -3,6 +3,7 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { SangriaRequestData, FixedPriceOptions, UptoPriceOptions, Settled, SettleFn } from "../types.js";
 import { toMicrounits } from "../types.js";
 import { Sangria, validateFixedPriceOptions, validateUptoPriceOptions, toBase64 } from "../core.js";
+import { SangriaHandlerError } from "../errors.js";
 
 type SangriaEnv = {
   Variables: {
@@ -114,7 +115,14 @@ export function uptoPrice(
     if (shouldBypass) {
       c.set("sangria", { paid: false, amount: 0 });
       const { settleFn, getResult } = sangria.createSettleFn(options.maxPrice);
-      await handler(c, settleFn);
+      try {
+        await handler(c, settleFn);
+      } catch (err) {
+        if (err instanceof SangriaHandlerError) {
+          return c.json(err.body as Record<string, unknown>, err.statusCode as ContentfulStatusCode);
+        }
+        throw err;
+      }
       const settleData = getResult();
       if (!settleData) {
         throw new Error("Sangria: handler must call settle()");
@@ -161,7 +169,14 @@ export function uptoPrice(
 
     const { settleFn, getResult } = sangria.createSettleFn(options.maxPrice);
 
-    await handler(c, settleFn);
+    try {
+      await handler(c, settleFn);
+    } catch (err) {
+      if (err instanceof SangriaHandlerError) {
+        return c.json(err.body as Record<string, unknown>, err.statusCode as ContentfulStatusCode);
+      }
+      throw err;
+    }
 
     const settleData = getResult();
     if (!settleData) {

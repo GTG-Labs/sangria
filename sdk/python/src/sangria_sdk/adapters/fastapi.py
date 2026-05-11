@@ -13,6 +13,7 @@ from fastapi.responses import JSONResponse
 from starlette.responses import Response
 
 from ..client import SangriaMerchantClient, validate_fixed_price_options
+from ..errors import SangriaHandlerException
 from ..models import (
     FixedPriceOptions,
     PaymentProceeded,
@@ -68,7 +69,10 @@ def require_sangria_payment(
                     )
                     should_bypass = False
             if should_bypass:
-                return await func(*args, **kwargs)
+                try:
+                    return await func(*args, **kwargs)
+                except SangriaHandlerException as exc:
+                    return JSONResponse(status_code=exc.status_code, content=exc.body)
 
             result = await merchant_client.handle_fixed_price(
                 payment_header=request.headers.get("PAYMENT-SIGNATURE"),
@@ -87,7 +91,10 @@ def require_sangria_payment(
                 )
 
             request.state.sangria_payment = result
-            response = await func(*args, **kwargs)
+            try:
+                response = await func(*args, **kwargs)
+            except SangriaHandlerException as exc:
+                return JSONResponse(status_code=exc.status_code, content=exc.body)
 
             # Attach x402 PAYMENT-RESPONSE header to the handler's response
             if result.headers and isinstance(response, Response):
@@ -143,7 +150,10 @@ def require_upto_price(
                 request.state.sangria_payment = PaymentProceeded(paid=False, amount=0)
                 settle_fn, get_result = merchant_client.create_settle_fn(max_price)
                 kwargs["settle"] = settle_fn
-                result = await func(*args, **kwargs)
+                try:
+                    result = await func(*args, **kwargs)
+                except SangriaHandlerException as exc:
+                    return JSONResponse(status_code=exc.status_code, content=exc.body)
                 if not isinstance(result, Settled):
                     raise TypeError("Sangria: handler must return settle(amount, body)")
                 settle_data = get_result()
@@ -180,7 +190,10 @@ def require_upto_price(
             settle_fn, get_result = merchant_client.create_settle_fn(max_price)
             kwargs["settle"] = settle_fn
 
-            result = await func(*args, **kwargs)
+            try:
+                result = await func(*args, **kwargs)
+            except SangriaHandlerException as exc:
+                return JSONResponse(status_code=exc.status_code, content=exc.body)
 
             if not isinstance(result, Settled):
                 raise TypeError("Sangria: handler must return settle(amount, body)")

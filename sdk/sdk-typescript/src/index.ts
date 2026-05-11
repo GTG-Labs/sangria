@@ -4,6 +4,7 @@ export {
   SangriaConnectionError,
   SangriaTimeoutError,
   SangriaAPIStatusError,
+  SangriaHandlerError,
 } from "./errors.js";
 export type { SangriaOperation } from "./errors.js";
 export {

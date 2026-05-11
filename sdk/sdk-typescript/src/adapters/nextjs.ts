@@ -1,6 +1,7 @@
 import type { SangriaRequestData, FixedPriceOptions, UptoPriceOptions, Settled, SettleFn } from "../types.js";
 import { toMicrounits } from "../types.js";
 import { Sangria, validateFixedPriceOptions, validateUptoPriceOptions, toBase64 } from "../core.js";
+import { SangriaHandlerError } from "../errors.js";
 
 /**
  * Minimal type stubs for Next.js request/response.
@@ -60,7 +61,17 @@ export function fixedPrice(
     }
     if (shouldBypass) {
       request.sangria = { paid: false, amount: 0 } as SangriaRequestData;
-      return handler(request, context);
+      try {
+        return await handler(request, context);
+      } catch (err) {
+        if (err instanceof SangriaHandlerError) {
+          return new Response(JSON.stringify(err.body), {
+            status: err.statusCode,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+        throw err;
+      }
     }
 
     // 2. Extract payment context from the request
@@ -88,7 +99,18 @@ export function fixedPrice(
 
     // 5. Proceed: attach payment data to request, run handler
     request.sangria = result.data;
-    const handlerResponse = await handler(request, context);
+    let handlerResponse: any;
+    try {
+      handlerResponse = await handler(request, context);
+    } catch (err) {
+      if (err instanceof SangriaHandlerError) {
+        return new Response(JSON.stringify(err.body), {
+          status: err.statusCode,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      throw err;
+    }
 
     // Attach x402 PAYMENT-RESPONSE header to the handler's response
     if (result.headers && handlerResponse instanceof Response) {
@@ -141,7 +163,17 @@ export function uptoPrice(
     if (shouldBypass) {
       request.sangria = { paid: false, amount: 0 } as SangriaRequestData;
       const { settleFn, getResult } = sangria.createSettleFn(options.maxPrice);
-      await handler(request, settleFn, context);
+      try {
+        await handler(request, settleFn, context);
+      } catch (err) {
+        if (err instanceof SangriaHandlerError) {
+          return new Response(JSON.stringify(err.body), {
+            status: err.statusCode,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+        throw err;
+      }
       const settleData = getResult();
       if (!settleData) {
         throw new Error("Sangria: handler must call settle()");
@@ -190,7 +222,17 @@ export function uptoPrice(
 
     const { settleFn, getResult } = sangria.createSettleFn(options.maxPrice);
 
-    await handler(request, settleFn, context);
+    try {
+      await handler(request, settleFn, context);
+    } catch (err) {
+      if (err instanceof SangriaHandlerError) {
+        return new Response(JSON.stringify(err.body), {
+          status: err.statusCode,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      throw err;
+    }
 
     const settleData = getResult();
     if (!settleData) {

@@ -2,6 +2,7 @@ import type { Request, Response, NextFunction } from "express";
 import type { SangriaRequestData, FixedPriceOptions, UptoPriceOptions, Settled, SettleFn } from "../types.js";
 import { toMicrounits } from "../types.js";
 import { Sangria, validateFixedPriceOptions, validateUptoPriceOptions, toBase64 } from "../core.js";
+import { SangriaHandlerError } from "../errors.js";
 
 export interface ExpressConfig {
   bypassPaymentIf?: (req: Request) => boolean | Promise<boolean>;
@@ -117,7 +118,14 @@ export function uptoPrice(
       if (shouldBypass) {
         req.sangria = { paid: false, amount: 0 };
         const { settleFn, getResult } = sangria.createSettleFn(options.maxPrice);
-        await handler(req, settleFn);
+        try {
+          await handler(req, settleFn);
+        } catch (err) {
+          if (err instanceof SangriaHandlerError) {
+            return res.status(err.statusCode).json(err.body);
+          }
+          throw err;
+        }
         const settleData = getResult();
         if (!settleData) {
           throw new Error("Sangria: handler must call settle()");
@@ -159,7 +167,14 @@ export function uptoPrice(
 
       const { settleFn, getResult } = sangria.createSettleFn(options.maxPrice);
 
-      await handler(req, settleFn);
+      try {
+        await handler(req, settleFn);
+      } catch (err) {
+        if (err instanceof SangriaHandlerError) {
+          return res.status(err.statusCode).json(err.body);
+        }
+        throw err;
+      }
 
       const settleData = getResult();
       if (!settleData) {

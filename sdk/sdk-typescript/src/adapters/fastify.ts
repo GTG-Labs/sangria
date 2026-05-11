@@ -7,6 +7,7 @@ import fp from "fastify-plugin";
 import type { SangriaRequestData, FixedPriceOptions, UptoPriceOptions, Settled, SettleFn } from "../types.js";
 import { toMicrounits } from "../types.js";
 import { Sangria, validateFixedPriceOptions, validateUptoPriceOptions, toBase64 } from "../core.js";
+import { SangriaHandlerError } from "../errors.js";
 
 export interface FastifyConfig {
   bypassPaymentIf?: (request: FastifyRequest) => boolean | Promise<boolean>;
@@ -48,7 +49,14 @@ export function fixedPrice(
     }
     if (shouldBypass) {
       request.sangria = { paid: false, amount: 0 };
-      return handler(request, reply);
+      try {
+        return await handler(request, reply);
+      } catch (err) {
+        if (err instanceof SangriaHandlerError) {
+          return reply.status(err.statusCode).send(err.body);
+        }
+        throw err;
+      }
     }
 
     const result = await sangria.handleFixedPrice(
@@ -72,7 +80,14 @@ export function fixedPrice(
       reply.headers(result.headers);
     }
     request.sangria = result.data;
-    return handler(request, reply);
+    try {
+      return await handler(request, reply);
+    } catch (err) {
+      if (err instanceof SangriaHandlerError) {
+        return reply.status(err.statusCode).send(err.body);
+      }
+      throw err;
+    }
   };
 }
 
@@ -110,7 +125,14 @@ export function uptoPrice(
     if (shouldBypass) {
       request.sangria = { paid: false, amount: 0 };
       const { settleFn, getResult } = sangria.createSettleFn(options.maxPrice);
-      await handler(request, settleFn);
+      try {
+        await handler(request, settleFn);
+      } catch (err) {
+        if (err instanceof SangriaHandlerError) {
+          return reply.status(err.statusCode).send(err.body);
+        }
+        throw err;
+      }
       const settleData = getResult();
       if (!settleData) {
         throw new Error("Sangria: handler must call settle()");
@@ -150,7 +172,14 @@ export function uptoPrice(
 
     const { settleFn, getResult } = sangria.createSettleFn(options.maxPrice);
 
-    await handler(request, settleFn);
+    try {
+      await handler(request, settleFn);
+    } catch (err) {
+      if (err instanceof SangriaHandlerError) {
+        return reply.status(err.statusCode).send(err.body);
+      }
+      throw err;
+    }
 
     const settleData = getResult();
     if (!settleData) {
