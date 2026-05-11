@@ -33,8 +33,8 @@ export async function proxy(request: NextRequest, event: NextFetchEvent) {
   // Create Content Security Policy with nonce and strict-dynamic
   const cspHeader = `
     default-src 'self';
-    script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://workoscdn.com;
-    style-src 'self' 'nonce-${nonce}' https://fonts.googleapis.com;
+    script-src 'self' 'nonce-${nonce}' 'strict-dynamic' 'unsafe-eval' https://workoscdn.com;
+    style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
     img-src 'self' blob: data: https://workoscdn.com;
     font-src 'self' https://fonts.gstatic.com;
     connect-src 'self' https://api.workos.com https://api.github.com;
@@ -75,6 +75,15 @@ export async function proxy(request: NextRequest, event: NextFetchEvent) {
   // Add CSP and nonce headers
   response.headers.set('Content-Security-Policy', cspHeader);
   response.headers.set('x-nonce', nonce);
+
+  // Also set nonce as a cookie for client-side access
+  response.cookies.set('csp-nonce', nonce, {
+    httpOnly: false,  // Allow client-side access
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    maxAge: 60 * 60 * 1000  // 1 hour
+  });
+
   return response;
 }
 

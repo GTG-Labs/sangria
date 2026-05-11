@@ -6,6 +6,11 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   devIndicators: false,
 
+  experimental: {
+    // Enable CSP nonce support
+    optimizeCss: true,
+  },
+
   // Security headers (CSP is handled in middleware.ts with nonces)
   async headers() {
     return [
