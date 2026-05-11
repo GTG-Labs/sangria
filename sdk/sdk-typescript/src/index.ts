@@ -1,3 +1,4 @@
+// v0.3.2
 export { Sangria, validateFixedPriceOptions, validateUptoPriceOptions } from "./core.js";
 export {
   SangriaError,
