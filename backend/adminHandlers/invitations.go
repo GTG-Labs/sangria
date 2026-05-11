@@ -89,7 +89,7 @@ func generateSecureToken() (string, error) {
 	return hex.EncodeToString(bytes), nil
 }
 
-// sendInvitationEmail sends a beautiful invitation email via Resend
+// sendInvitationEmail sends an invitation email via Resend
 func sendInvitationEmail(ctx context.Context, inviteeEmail, inviterName, orgName, invitationURL, customMessage string) error {
 	// Resend client + sender are package-level singletons set up by
 	// InitEmailClient at startup; see config.LoadEmailConfig for validation.
@@ -99,106 +99,108 @@ func sendInvitationEmail(ctx context.Context, inviteeEmail, inviterName, orgName
 	// Create email subject
 	subject := fmt.Sprintf("You're invited to join %s", orgName)
 
-	// Create beautiful HTML email template
+	// Create HTML email template — matches Sangria docs/blog brand
 	htmlContent := fmt.Sprintf(`
 <!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Join %s</title>
+    <title>Join %s on Sangria</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap');
+    </style>
 </head>
-<body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-    <div style="background: linear-gradient(135deg, #667eea 0%%, #764ba2 100%%); padding: 40px 20px; text-align: center; border-radius: 10px 10px 0 0;">
-        <h1 style="color: white; margin: 0; font-size: 28px;">🎉 You're Invited!</h1>
-        <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0; font-size: 18px;">Join %s and start collaborating</p>
-    </div>
+<body style="font-family: 'IBM Plex Sans', 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333333; margin: 0; padding: 0; background-color: #f3f4f1;">
+    <div style="max-width: 560px; margin: 0 auto; padding: 40px 20px;">
 
-    <div style="background: white; padding: 40px 30px; border: 1px solid #e1e5e9; border-top: none; border-radius: 0 0 10px 10px;">
-        <p style="font-size: 16px; margin-bottom: 20px;">Hi there! 👋</p>
-
-        <p style="font-size: 16px; margin-bottom: 20px;">
-            <strong>%s</strong> has invited you to join <strong>%s</strong> on Sangria.
-        </p>
-
-        %s
-
-        <div style="text-align: center; margin: 40px 0;">
-            <a href="%s"
-               style="background: linear-gradient(135deg, #667eea 0%%, #764ba2 100%%);
-                      color: white;
-                      text-decoration: none;
-                      padding: 15px 30px;
-                      border-radius: 8px;
-                      font-size: 16px;
-                      font-weight: 600;
-                      display: inline-block;
-                      box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);">
-                🚀 Accept Invitation
-            </a>
+        <!-- Logo / wordmark -->
+        <div style="text-align: center; margin-bottom: 32px;">
+            <span style="font-family: 'IBM Plex Sans', 'Helvetica Neue', Arial, sans-serif; font-size: 20px; font-weight: 700; color: #a51c30; letter-spacing: -0.02em;">Sangria</span>
         </div>
 
-        <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; border-left: 4px solid #667eea; margin: 30px 0;">
-            <p style="margin: 0; font-size: 14px; color: #666;">
-                <strong>What happens next?</strong><br>
-                1. Click the button above to visit Sangria<br>
-                2. Sign in with your email address<br>
-                3. You'll be automatically added to the organization
+        <!-- Card -->
+        <div style="background: #fafaf8; border: 1px solid #ddddd8; border-radius: 12px; padding: 40px 36px;">
+
+            <h1 style="font-family: 'IBM Plex Sans', 'Helvetica Neue', Arial, sans-serif; font-size: 22px; font-weight: 600; color: #111111; margin: 0 0 24px 0;">
+                You've been invited to join %s
+            </h1>
+
+            <p style="font-size: 15px; color: #333333; margin: 0 0 20px 0;">
+                <strong style="color: #111111;">%s</strong> has invited you to join <strong style="color: #111111;">%s</strong> on Sangria.
+            </p>
+
+            %s
+
+            <div style="text-align: center; margin: 32px 0;">
+                <a href="%s"
+                   style="background-color: #a51c30;
+                          color: #ffffff;
+                          text-decoration: none;
+                          padding: 14px 32px;
+                          border-radius: 10px;
+                          font-family: 'IBM Plex Sans', 'Helvetica Neue', Arial, sans-serif;
+                          font-size: 15px;
+                          font-weight: 600;
+                          display: inline-block;">
+                    Accept Invitation
+                </a>
+            </div>
+
+            <div style="background: #f3f4f1; padding: 20px; border-radius: 8px; margin: 28px 0 0 0;">
+                <p style="margin: 0 0 8px 0; font-size: 13px; font-weight: 600; color: #111111;">What happens next?</p>
+                <p style="margin: 0; font-size: 13px; color: #555555; line-height: 1.7;">
+                    1. Click the button above to visit Sangria<br>
+                    2. Sign in with your email address<br>
+                    3. You'll be automatically added to the organization
+                </p>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div style="margin-top: 24px; padding: 0 4px;">
+            <p style="font-size: 12px; color: #555555; margin: 0 0 8px 0;">
+                This invitation expires in 7 days. If you have questions, contact the person who invited you.
+            </p>
+            <p style="font-size: 12px; color: #999999; margin: 0;">
+                This email contains a unique invitation link. Do not forward it — it grants access to the organization.
             </p>
         </div>
 
-        <div style="margin-top: 40px; padding-top: 30px; border-top: 1px solid #e1e5e9;">
-            <p style="font-size: 14px; color: #666; margin: 0;">
-                This invitation will expire in 7 days. If you have any questions, please contact the person who invited you.
-            </p>
-            <p style="font-size: 13px; color: #999; margin: 10px 0 0 0;">
-                ⚠️ This email contains a unique invitation link. Please do not forward or share it with anyone — it grants access to the organization. Sangria will never ask you to share this link.
-            </p>
-        </div>
-    </div>
-
-    <div style="text-align: center; margin-top: 30px;">
-        <p style="font-size: 12px; color: #999; margin: 0;">
-            Powered by Sangria • Built for teams that ship fast
-        </p>
     </div>
 </body>
 </html>`,
 		html.EscapeString(orgName), html.EscapeString(orgName), html.EscapeString(inviterName), html.EscapeString(orgName),
 		func() string {
 			if customMessage != "" {
-				return fmt.Sprintf(`<div style="background: #e7f3ff; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #2196F3;">
-            <p style="margin: 0; font-style: italic; color: #1565C0;">"%s"</p>
-        </div>`, html.EscapeString(customMessage))
+				return fmt.Sprintf(`<div style="background: #f3f4f1; border-left: 3px solid #a51c30; padding: 16px 20px; border-radius: 4px; margin: 0 0 20px 0;">
+                <p style="margin: 0; font-size: 14px; font-style: italic; color: #333333;">"%s"</p>
+            </div>`, html.EscapeString(customMessage))
 			}
 			return ""
 		}(),
 		html.EscapeString(invitationURL))
 
 	// Create plain text version
-	plainContent := fmt.Sprintf(`You're invited to join %s!
+	plainContent := fmt.Sprintf(`You've been invited to join %s on Sangria.
 
-Hi there!
+%s has invited you to join %s.
 
-%s has invited you to join %s on Sangria.
-
-%s
-
-Accept your invitation by visiting: %s
+%sAccept your invitation: %s
 
 What happens next?
 1. Click the link above to visit Sangria
 2. Sign in with your email address
 3. You'll be automatically added to the organization
 
-This invitation will expire in 7 days.
+This invitation expires in 7 days.
 
----
-Powered by Sangria • Built for teams that ship fast`,
+—
+Sangria · getsangria.com`,
 		orgName, inviterName, orgName,
 		func() string {
 			if customMessage != "" {
-				return fmt.Sprintf("Personal message: \"%s\"\n\n", customMessage)
+				return fmt.Sprintf("\"%s\"\n\n", customMessage)
 			}
 			return ""
 		}(),
@@ -310,7 +312,7 @@ func CreateOrganizationInvitation(pool *pgxpool.Pool) fiber.Handler {
 		// FRONTEND_URL is validated at startup via config.LoadEmailConfig.
 		invitationURL := fmt.Sprintf("%s/accept-invitation?token=%s", config.Email.FrontendURL, invitationToken)
 
-		// Send beautiful invitation email via Resend with timeout
+		// Send invitation email via Resend with timeout
 		emailCtx, cancel := context.WithTimeout(c.Context(), 30*time.Second)
 		defer cancel()
 		err = sendInvitationEmail(emailCtx, req.Email, inviterName, orgName, invitationURL, message)
@@ -326,7 +328,7 @@ func CreateOrganizationInvitation(pool *pgxpool.Pool) fiber.Handler {
 			}
 
 			// Fallback: log the invitation URL for manual sending
-			slog.Info("📧 EMAIL FAILED - Send this invitation URL manually",
+			slog.Info("email send failed — invitation URL available for manual sending",
 				"invitation_id", invitationID,
 				"email", maskEmail(req.Email),
 				"org_name", orgName,
@@ -339,7 +341,7 @@ func CreateOrganizationInvitation(pool *pgxpool.Pool) fiber.Handler {
 			})
 		}
 
-		slog.Info("✅ Beautiful invitation email sent successfully",
+		slog.Info("invitation email sent",
 			"invitation_id", invitationID,
 			"email", maskEmail(req.Email),
 			"org_name", orgName,
@@ -348,7 +350,7 @@ func CreateOrganizationInvitation(pool *pgxpool.Pool) fiber.Handler {
 		)
 
 		return c.Status(201).JSON(fiber.Map{
-			"message":        "Beautiful invitation email sent successfully! 🎉",
+			"message":        "Invitation sent",
 			"invitation_id":  invitationID,
 			"email":          req.Email,
 			"organization":   orgName,
