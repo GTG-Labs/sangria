@@ -13,6 +13,7 @@ from fastapi.responses import JSONResponse
 from starlette.responses import Response
 
 from ..client import SangriaMerchantClient, validate_fixed_price_options
+from ..errors import SangriaHandlerError
 from ..models import (
     FixedPriceOptions,
     PaymentProceeded,
@@ -143,7 +144,10 @@ def require_upto_price(
                 request.state.sangria_payment = PaymentProceeded(paid=False, amount=0)
                 settle_fn, get_result = merchant_client.create_settle_fn(max_price)
                 kwargs["settle"] = settle_fn
-                result = await func(*args, **kwargs)
+                try:
+                    result = await func(*args, **kwargs)
+                except SangriaHandlerError as exc:
+                    return JSONResponse(status_code=exc.status_code, content=exc.body)
                 if not isinstance(result, Settled):
                     raise TypeError("Sangria: handler must return settle(amount, body)")
                 settle_data = get_result()
@@ -180,7 +184,10 @@ def require_upto_price(
             settle_fn, get_result = merchant_client.create_settle_fn(max_price)
             kwargs["settle"] = settle_fn
 
-            result = await func(*args, **kwargs)
+            try:
+                result = await func(*args, **kwargs)
+            except SangriaHandlerError as exc:
+                return JSONResponse(status_code=exc.status_code, content=exc.body)
 
             if not isinstance(result, Settled):
                 raise TypeError("Sangria: handler must return settle(amount, body)")

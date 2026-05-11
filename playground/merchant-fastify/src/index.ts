@@ -36,7 +36,7 @@ fastify.get(
   "/api/search",
   uptoPrice(
     sangria,
-    { maxPrice: 0.10, description: "Search API — pay per result" },
+    { maxPrice: 0.10, maxTimeoutSeconds: 900, description: "Search API — pay per result" },
     async (request, settle) => {
       const q = (request.query as Record<string, string>).q ?? "";
       const results = Array.from(

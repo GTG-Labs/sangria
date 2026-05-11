@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 import httpx
 
 
@@ -71,3 +73,13 @@ class SangriaAPIStatusError(SangriaError):
         super().__init__(message, operation=operation)
         self.response = response
         self.status_code = status_code
+
+
+class SangriaHandlerError(Exception):
+    """Throw from a require_upto_price/require_sangria_payment handler to
+    return a structured HTTP error without settling."""
+
+    def __init__(self, status_code: int, body: Any) -> None:
+        super().__init__("Handler aborted")
+        self.status_code = status_code
+        self.body = body

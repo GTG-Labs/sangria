@@ -1,6 +1,7 @@
 import type { SangriaRequestData, FixedPriceOptions, UptoPriceOptions, Settled, SettleFn } from "../types.js";
 import { toMicrounits } from "../types.js";
 import { Sangria, validateFixedPriceOptions, validateUptoPriceOptions, toBase64 } from "../core.js";
+import { SangriaHandlerError } from "../errors.js";
 
 /**
  * Minimal type stubs for Next.js request/response.
@@ -141,7 +142,17 @@ export function uptoPrice(
     if (shouldBypass) {
       request.sangria = { paid: false, amount: 0 } as SangriaRequestData;
       const { settleFn, getResult } = sangria.createSettleFn(options.maxPrice);
-      await handler(request, settleFn, context);
+      try {
+        await handler(request, settleFn, context);
+      } catch (err) {
+        if (err instanceof SangriaHandlerError) {
+          return new Response(JSON.stringify(err.body), {
+            status: err.statusCode,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+        throw err;
+      }
       const settleData = getResult();
       if (!settleData) {
         throw new Error("Sangria: handler must call settle()");
@@ -190,7 +201,17 @@ export function uptoPrice(
 
     const { settleFn, getResult } = sangria.createSettleFn(options.maxPrice);
 
-    await handler(request, settleFn, context);
+    try {
+      await handler(request, settleFn, context);
+    } catch (err) {
+      if (err instanceof SangriaHandlerError) {
+        return new Response(JSON.stringify(err.body), {
+          status: err.statusCode,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      throw err;
+    }
 
     const settleData = getResult();
     if (!settleData) {

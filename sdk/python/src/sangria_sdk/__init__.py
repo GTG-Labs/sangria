@@ -3,6 +3,7 @@ from .errors import (
     SangriaAPIStatusError,
     SangriaConnectionError,
     SangriaError,
+    SangriaHandlerError,
     SangriaTimeoutError,
 )
 from .models import (
@@ -28,6 +29,7 @@ __all__ = [
     "SangriaAPIStatusError",
     "SangriaConnectionError",
     "SangriaError",
+    "SangriaHandlerError",
     "SangriaMerchantClient",
     "SangriaTimeoutError",
     "Settled",
