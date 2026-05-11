@@ -232,6 +232,9 @@ func VerifyPayment(pool *pgxpool.Pool) fiber.Handler {
 		if err := json.Unmarshal(payloadBytes, &acceptedTimeout); err == nil && acceptedTimeout.Accepted.MaxTimeoutSeconds > 0 {
 			timeout = acceptedTimeout.Accepted.MaxTimeoutSeconds
 		}
+		if timeout > maxAllowedTimeoutSeconds {
+			timeout = maxAllowedTimeoutSeconds
+		}
 
 		canonicalRequirements := x402Handlers.PaymentRequirements{
 			Scheme:            "upto",
@@ -505,6 +508,9 @@ func SettlePayment(pool *pgxpool.Pool) fiber.Handler {
 		var acceptedTimeout acceptedTimeoutEnvelope
 		if err := json.Unmarshal(payloadBytes, &acceptedTimeout); err == nil && acceptedTimeout.Accepted.MaxTimeoutSeconds > 0 {
 			settleTimeout = acceptedTimeout.Accepted.MaxTimeoutSeconds
+		}
+		if settleTimeout > maxAllowedTimeoutSeconds {
+			settleTimeout = maxAllowedTimeoutSeconds
 		}
 
 		switch scheme {
