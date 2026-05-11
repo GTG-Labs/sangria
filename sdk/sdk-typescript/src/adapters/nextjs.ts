@@ -61,7 +61,17 @@ export function fixedPrice(
     }
     if (shouldBypass) {
       request.sangria = { paid: false, amount: 0 } as SangriaRequestData;
-      return handler(request, context);
+      try {
+        return await handler(request, context);
+      } catch (err) {
+        if (err instanceof SangriaHandlerError) {
+          return new Response(JSON.stringify(err.body), {
+            status: err.statusCode,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+        throw err;
+      }
     }
 
     // 2. Extract payment context from the request
@@ -89,7 +99,18 @@ export function fixedPrice(
 
     // 5. Proceed: attach payment data to request, run handler
     request.sangria = result.data;
-    const handlerResponse = await handler(request, context);
+    let handlerResponse: any;
+    try {
+      handlerResponse = await handler(request, context);
+    } catch (err) {
+      if (err instanceof SangriaHandlerError) {
+        return new Response(JSON.stringify(err.body), {
+          status: err.statusCode,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      throw err;
+    }
 
     // Attach x402 PAYMENT-RESPONSE header to the handler's response
     if (result.headers && handlerResponse instanceof Response) {

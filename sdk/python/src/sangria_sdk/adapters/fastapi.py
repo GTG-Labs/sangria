@@ -69,7 +69,10 @@ def require_sangria_payment(
                     )
                     should_bypass = False
             if should_bypass:
-                return await func(*args, **kwargs)
+                try:
+                    return await func(*args, **kwargs)
+                except SangriaHandlerError as exc:
+                    return JSONResponse(status_code=exc.status_code, content=exc.body)
 
             result = await merchant_client.handle_fixed_price(
                 payment_header=request.headers.get("PAYMENT-SIGNATURE"),
@@ -88,7 +91,10 @@ def require_sangria_payment(
                 )
 
             request.state.sangria_payment = result
-            response = await func(*args, **kwargs)
+            try:
+                response = await func(*args, **kwargs)
+            except SangriaHandlerError as exc:
+                return JSONResponse(status_code=exc.status_code, content=exc.body)
 
             # Attach x402 PAYMENT-RESPONSE header to the handler's response
             if result.headers and isinstance(response, Response):
