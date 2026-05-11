@@ -94,7 +94,8 @@ export async function internalFetch(url: string, options: RequestInit = {}): Pro
 
     // For banking apps, immediately redirect to login on any 401
     if (typeof window !== 'undefined') {
-      window.location.href = '/auth/login?reason=session_expired';
+      // Trigger WorkOS sign-in flow by redirecting to a route that calls handleSignIn
+      window.location.href = '/signin?reason=session_expired';
     }
 
     // Throw error to prevent component from trying to process the response
