@@ -93,7 +93,7 @@ uv run python agent-test/export-key.py 0xYOUR_ACCOUNT_ADDRESS
 
 Each merchant server needs a Sangria API key in its own `.env`:
 ```
-SANGRIA_SECRET_KEY=sg_test_xxx
+SANGRIA_API_KEY=sg_test_xxx
 ```
 
 ## Quick start
