@@ -195,18 +195,11 @@ func WorkosAuthMiddleware(c fiber.Ctx) error {
 // APIKeyAuthMiddleware validates API keys and authenticates the caller.
 //
 // Locals written on success:
-//   - "key_type"        (string): "merchant" | "agent" — neutral, set always
-//   - "organization_id" (string UUID): the authenticated principal's org — neutral, set always
-//   - "merchant_api_key"          (*dbengine.Merchant): set when key_type == "merchant"
-//   - "merchant_organization_id"  (string UUID):       set when key_type == "merchant"
-//
-// The "merchant_*" locals are kept unchanged for backward compatibility with existing
-// readers (merchantHandlers/payments.go, ratelimit/rate_limit.go). New code should
-// read the neutral locals.
-//
-// Agent key auth is not yet wired up in V0.1 — AuthenticateAPIKey returns ErrInvalidAPIKey
-// for agent-prefixed keys, and this middleware will return 401 for them until V0.3 adds
-// the agent_api_keys table and the agent_api_key local.
+//   - "key_type"         (string):              "merchant" | "agent" — set always
+//   - "organization_id"  (string UUID):         authenticated principal's org — set always
+//   - "merchant_api_key" (*dbengine.Merchant):  set when key_type == "merchant".
+//     Kept for backward compatibility with existing readers; new code should prefer the
+//     neutral locals.
 func APIKeyAuthMiddleware(pool *pgxpool.Pool) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		// Get API key from Authorization header or X-API-Key header
@@ -243,12 +236,12 @@ func APIKeyAuthMiddleware(pool *pgxpool.Pool) fiber.Handler {
 		switch keyType {
 		case KeyTypeMerchant:
 			c.Locals("merchant_api_key", merchantKey)
-			c.Locals("merchant_organization_id", merchantKey.OrganizationID)
 			c.Locals("organization_id", merchantKey.OrganizationID)
 		case KeyTypeAgent:
-			// Unreachable in V0.1 — AuthenticateAPIKey returns ErrInvalidAPIKey for agent keys.
-			// V0.3 will add the agent_api_keys lookup and populate `agent_api_key` + `organization_id`.
-			slog.Error("agent key reached middleware locals dispatch (should not happen in V0.1)")
+			// Currently unreachable — AuthenticateAPIKey rejects agent keys before this point.
+			// Defensive branch: if an agent key ever reaches here, something upstream is
+			// inconsistent and the safe action is to refuse the request.
+			slog.Error("agent key reached middleware locals dispatch unexpectedly")
 			return c.Status(401).JSON(fiber.Map{"error": "Invalid API key"})
 		}
 

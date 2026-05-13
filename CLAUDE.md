@@ -67,10 +67,12 @@ Use these terms consistently:
 - **Atomic admin checks.** Permission checks and mutations should be in the same SQL query to prevent TOCTOU races.
 - **Email normalization.** Always `strings.TrimSpace(strings.ToLower(email))` before storing or matching.
 - **Sentinel errors.** Use package-level `var Err... = errors.New(...)` for typed error handling.
+- **No planning-doc references in committed code.** Comments, log lines, identifiers, and docstrings must not reference internal planning artifacts: phase numbers (`V0.1`, `V1.5`, `Phase 2`), task numbers (`Task 6`, `V0.3 Task 9`), planning filenames (`AGENT_SDK_PLAN.md`, `H8_PART_A_PLAN.md`), or forward-looking process language (`will be implemented in V0.3`, `V2 hook`, `not yet wired up in V0.1`). These plans are gitignored personal workspace; references rot fast, leak internal process, and are meaningless to future readers. Describe what the code does today and the non-obvious WHY — not the development process that produced it.
 
 ### Security
 - **CSRF Protection is automatic.** Frontend components use standard `internalFetch()` calls — never manual CSRF token handling. The fetch wrapper (`lib/fetch.ts`) automatically injects tokens. Backend validates via `auth.CSRFMiddleware()`.
 - **Use secure fetch wrapper.** Import `{ internalFetch } from "@/lib/fetch"` instead of global `fetch` for automatic CSRF protection on state-changing requests.
+- **Secret material never appears in return values or error messages.** Functions that parse or validate secrets (API keys, JWTs, signing keys, payment authorization signatures, bcrypt-able strings) must not propagate the secret portion outward — only the public lookup portion may escape (e.g., the 8-char `key_id`, the well-known prefix, the key type). Likewise, `fmt.Errorf`/`fmt.Sprintf`/`slog` messages MUST NOT include any byte of the input secret. Audit every return path and every error message on review — a leak requires explicit assignment of secret bytes to a return slot or error string, and explicit assignments are easy to miss in long functions. Reference pattern: `backend/auth/merchantKeys.go::parseAPIKey` accepts the full API key (including its 32-char random secret) and returns only the key type, matched prefix, and 8-char `keyID`. The random portion is held in a local variable for validation, never assigned to a named return, and never echoed in any error.
 
 ### SDK
 - **SDK surface is a product.** Breaking changes to `@sangria-sdk/core` or `sangria-core` need explicit justification.

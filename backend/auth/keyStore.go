@@ -35,10 +35,7 @@ func init() {
 }
 
 // CreateAPIKey creates a new merchant API key for an organization with the specified status.
-// New merchant keys use the "sg_merchants_" prefix. For agent keys, see the V0.3 agent
-// key creation path (not yet implemented in V0.1).
 func CreateAPIKey(ctx context.Context, pool *pgxpool.Pool, organizationID, name string, status dbengine.APIKeyStatus) (*dbengine.Merchant, string, error) {
-	// Generate new merchant API key
 	fullKey, keyID, err := GenerateAPIKey(KeyTypeMerchant)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to generate API key: %w", err)
@@ -68,36 +65,26 @@ func GetAPIKeysByOrganizationID(ctx context.Context, pool *pgxpool.Pool, organiz
 // for O(1) performance.
 //
 // Returns:
-//   - (merchant, KeyTypeMerchant, nil) for valid merchant keys (legacy sg_live_ or new sg_merchants_)
-//   - (nil, KeyTypeAgent, ErrInvalidAPIKey) for agent keys in V0.1 — agent authentication
-//     is not yet wired up because the agent_api_keys table doesn't exist until V0.2/V0.3.
-//     V0.3 will add a parallel agent-auth path that populates this branch.
+//   - (merchant, KeyTypeMerchant, nil) for valid merchant keys
+//   - (nil, KeyTypeAgent, ErrInvalidAPIKey) for agent-prefixed keys — agent authentication
+//     has no backing table yet, so these always reject with the same error as any unknown key
 //   - (nil, "", err) for malformed keys or DB errors
 func AuthenticateAPIKey(ctx context.Context, pool *pgxpool.Pool, providedKey string) (*dbengine.Merchant, KeyType, error) {
-	// Validate format and detect key type
-	keyType, err := ValidateAPIKeyFormat(providedKey)
+	keyType, _, keyID, err := parseAPIKey(providedKey)
 	if err != nil {
 		return nil, "", fmt.Errorf("invalid API key format: %w", err)
 	}
 
-	// Agent keys are not yet authenticatable in V0.1 — agent_api_keys table lands in V0.2/V0.3.
-	// Log and reject with ErrInvalidAPIKey so the middleware returns the same 401 it would
-	// for any unauthenticated key.
+	// Agent keys have no backing table yet — reject with ErrInvalidAPIKey so the middleware
+	// returns the same 401 as any unauthenticated key. Run dummy bcrypt to keep response
+	// time roughly constant.
 	if keyType == KeyTypeAgent {
-		slog.Warn("agent API key authentication attempted before V0.3 implementation",
-			"key_prefix", KeyPrefixAgents)
-		// Run dummy bcrypt to keep response time roughly constant
 		_ = bcrypt.CompareHashAndPassword(dummyHash, []byte(providedKey))
 		return nil, KeyTypeAgent, ErrInvalidAPIKey
 	}
 
-	// Merchant path (covers both legacy sg_live_ and new sg_merchants_)
-	keyID, err := ExtractKeyID(providedKey)
-	if err != nil {
-		return nil, "", fmt.Errorf("failed to extract key ID: %w", err)
-	}
-
-	// Query by key_id instead of scanning all keys (O(1) vs O(N))
+	// Merchant path (covers both legacy sg_live_ and new sg_merchants_).
+	// Query by key_id instead of scanning all keys (O(1) vs O(N)).
 	candidates, err := dbengine.GetActiveMerchantsByKeyID(ctx, pool, keyID)
 	if err != nil {
 		return nil, "", err
