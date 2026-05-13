@@ -243,6 +243,12 @@ func APIKeyAuthMiddleware(pool *pgxpool.Pool) fiber.Handler {
 			// inconsistent and the safe action is to refuse the request.
 			slog.Error("agent key reached middleware locals dispatch unexpectedly")
 			return c.Status(401).JSON(fiber.Map{"error": "Invalid API key"})
+		default:
+			// AuthenticateAPIKey should only return a known KeyType on a nil-error path.
+			// Reaching here means that contract is broken (zero value, unknown type, etc.).
+			// Fail closed rather than calling c.Next() with missing locals.
+			slog.Error("unexpected key type from AuthenticateAPIKey", "key_type", keyType)
+			return c.Status(401).JSON(fiber.Map{"error": "Invalid API key"})
 		}
 
 		return c.Next()

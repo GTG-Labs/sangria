@@ -3,8 +3,22 @@ package auth
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"strings"
+)
+
+// Sentinel errors for typed error handling. Callers can use errors.Is to branch on these.
+var (
+	// ErrUnknownKeyType is returned when GenerateAPIKey is called with a KeyType that
+	// isn't KeyTypeMerchant or KeyTypeAgent. Indicates a programmer error.
+	ErrUnknownKeyType = errors.New("unknown key type")
+
+	// ErrInvalidAPIKeyFormat is returned when an API key string doesn't match the expected
+	// shape — wrong prefix, wrong overall structure, or wrong length/encoding of any
+	// component. Distinct from auth.ErrInvalidAPIKey (defined in keyStore.go), which
+	// indicates a well-formed key that didn't match any active DB row.
+	ErrInvalidAPIKeyFormat = errors.New("invalid API key format")
 )
 
 // KeyType represents the kind of principal a key authenticates.
@@ -65,6 +79,7 @@ func GenerateAPIKey(keyType KeyType) (string, string, error) {
 // prefixForKeyType returns the prefix string for a given KeyType.
 // Note: KeyPrefixLive is intentionally not returned — legacy keys are validated but
 // never freshly generated.
+// Returns an error wrapping ErrUnknownKeyType for any unrecognized KeyType.
 func prefixForKeyType(t KeyType) (string, error) {
 	switch t {
 	case KeyTypeMerchant:
@@ -72,13 +87,13 @@ func prefixForKeyType(t KeyType) (string, error) {
 	case KeyTypeAgent:
 		return KeyPrefixAgents, nil
 	default:
-		return "", fmt.Errorf("unknown key type: %q", t)
+		return "", fmt.Errorf("%w: %q", ErrUnknownKeyType, t)
 	}
 }
 
 // detectPrefix returns the matching known prefix and the corresponding KeyType.
-// Returns an error if the key doesn't start with any known prefix.
-// Legacy sg_live_ keys map to KeyTypeMerchant.
+// Returns an error wrapping ErrInvalidAPIKeyFormat if the key doesn't start with any
+// known prefix. Legacy sg_live_ keys map to KeyTypeMerchant.
 func detectPrefix(key string) (string, KeyType, error) {
 	switch {
 	case strings.HasPrefix(key, KeyPrefixAgents):
@@ -88,48 +103,59 @@ func detectPrefix(key string) (string, KeyType, error) {
 	case strings.HasPrefix(key, KeyPrefixLive):
 		return KeyPrefixLive, KeyTypeMerchant, nil
 	default:
-		return "", "", fmt.Errorf("API key must start with %s, %s, or %s",
-			KeyPrefixMerchants, KeyPrefixAgents, KeyPrefixLive)
+		return "", "", fmt.Errorf("%w: must start with %s, %s, or %s",
+			ErrInvalidAPIKeyFormat, KeyPrefixMerchants, KeyPrefixAgents, KeyPrefixLive)
 	}
 }
 
 // parseAPIKey validates an API key's format and returns its type, matched prefix, and keyID.
 // Named returns let early-exit error paths use bare `return` instead of the noisy
-// `return "", "", "", err` pattern.
+// `return "", "", "", err` pattern. On any error, all non-err returns are forced to
+// their zero values so callers can rely on the Go convention that `err != nil` implies
+// the other returns are unset.
 func parseAPIKey(key string) (keyType KeyType, prefix string, keyID string, err error) {
+	defer func() {
+		if err != nil {
+			keyType = ""
+			prefix = ""
+			keyID = ""
+		}
+	}()
+
 	if key == "" {
-		err = fmt.Errorf("API key cannot be empty")
+		err = fmt.Errorf("%w: key is empty", ErrInvalidAPIKeyFormat)
 		return
 	}
 
 	prefix, keyType, err = detectPrefix(key)
 	if err != nil {
+		// detectPrefix already wraps ErrInvalidAPIKeyFormat; propagate as-is.
 		return
 	}
 
 	// Body after prefix: keyID_randomPart
 	parts := strings.Split(strings.TrimPrefix(key, prefix), "_")
 	if len(parts) != 2 {
-		err = fmt.Errorf("API key must have format: prefix_keyID_randomPart")
+		err = fmt.Errorf("%w: must have form prefix_keyID_randomPart", ErrInvalidAPIKeyFormat)
 		return
 	}
 	keyIDPart, randomPart := parts[0], parts[1]
 
 	if len(keyIDPart) != KeyIDLength {
-		err = fmt.Errorf("API key ID must be %d characters", KeyIDLength)
+		err = fmt.Errorf("%w: key ID must be %d characters", ErrInvalidAPIKeyFormat, KeyIDLength)
 		return
 	}
 	if _, decodeErr := hex.DecodeString(keyIDPart); decodeErr != nil {
-		err = fmt.Errorf("API key ID must be valid hexadecimal")
+		err = fmt.Errorf("%w: key ID must be valid hexadecimal", ErrInvalidAPIKeyFormat)
 		return
 	}
 
 	if len(randomPart) != KeyRandomLength {
-		err = fmt.Errorf("API key random part must be %d characters", KeyRandomLength)
+		err = fmt.Errorf("%w: random part must be %d characters", ErrInvalidAPIKeyFormat, KeyRandomLength)
 		return
 	}
 	if _, decodeErr := hex.DecodeString(randomPart); decodeErr != nil {
-		err = fmt.Errorf("API key random part must be valid hexadecimal")
+		err = fmt.Errorf("%w: random part must be valid hexadecimal", ErrInvalidAPIKeyFormat)
 		return
 	}
 
@@ -146,10 +172,8 @@ func ValidateAPIKeyFormat(key string) (KeyType, error) {
 
 // ExtractKeyID extracts the key_id from a full API key for database lookup.
 // Works for all three accepted prefixes. Thin wrapper over parseAPIKey.
+// Error returns wrap ErrInvalidAPIKeyFormat (via parseAPIKey).
 func ExtractKeyID(fullKey string) (string, error) {
 	_, _, keyID, err := parseAPIKey(fullKey)
-	if err != nil {
-		return "", fmt.Errorf("invalid API key format: %w", err)
-	}
-	return keyID, nil
+	return keyID, err
 }

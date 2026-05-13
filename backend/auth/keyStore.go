@@ -72,7 +72,8 @@ func GetAPIKeysByOrganizationID(ctx context.Context, pool *pgxpool.Pool, organiz
 func AuthenticateAPIKey(ctx context.Context, pool *pgxpool.Pool, providedKey string) (*dbengine.Merchant, KeyType, error) {
 	keyType, _, keyID, err := parseAPIKey(providedKey)
 	if err != nil {
-		return nil, "", fmt.Errorf("invalid API key format: %w", err)
+		// parseAPIKey already wraps ErrInvalidAPIKeyFormat with a descriptive message.
+		return nil, "", err
 	}
 
 	// Agent keys have no backing table yet — reject with ErrInvalidAPIKey so the middleware
