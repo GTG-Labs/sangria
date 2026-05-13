@@ -29,7 +29,7 @@ App-managed env vars (those whose `Validated` column is `Yes`) are checked at bu
 | `BACKEND_URL` | Yes | Server | Yes | Go backend base URL (e.g. `https://api.getsangria.com`). Must be a valid URL. |
 | `NEXT_PUBLIC_WORKOS_REDIRECT_URI` | Yes | Client | Yes | WorkOS redirect URI, inlined at build time. Must be a valid URL. |
 | `MYTHOS_BASE_URL` | No | Server | Yes | Override for the public origin used in demo resource URLs (`app/api/x402-pay/route.ts`). When unset, the route derives it from the incoming request. |
-| `SANGRIA_SECRET_KEY` | Yes | Server | Yes | Merchant API key used by the x402-pay demo route to authenticate against the backend's `/v1/*` endpoints. |
+| `SANGRIA_API_KEY` | Yes | Server | Yes | Merchant API key used by the x402-pay demo route to authenticate against the backend's `/v1/*` endpoints. |
 | `BUYER_ADDRESS` | Yes | Server | Yes | Buyer EOA address for the x402-pay demo route. Validated as an Ethereum address (`viem.isAddress`) at the call site. |
 | `CDP_API_KEY_NAME` | Yes | Server | Yes | Buyer-side Coinbase Developer Platform API key name for signing demo payments. **Not the backend's CDP credentials** — these are buyer/agent-side. |
 | `CDP_API_KEY_PRIVATE_KEY` | Yes | Server | Yes | Buyer-side CDP API private key. |

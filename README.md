@@ -35,7 +35,7 @@ import { Sangria } from "@sangria-sdk/core";
 import { fixedPrice } from "@sangria-sdk/core/express";
 
 const app = express();
-const sangria = new Sangria({ apiKey: process.env.SANGRIA_SECRET_KEY! });
+const sangria = new Sangria({ apiKey: process.env.SANGRIA_API_KEY! });
 
 app.get(
   "/premium",
@@ -60,7 +60,7 @@ from sangria_sdk import SangriaMerchantClient
 from sangria_sdk.adapters.fastapi import require_sangria_payment
 
 app = FastAPI()
-client = SangriaMerchantClient(api_key=os.environ["SANGRIA_SECRET_KEY"])
+client = SangriaMerchantClient(api_key=os.environ["SANGRIA_API_KEY"])
 
 @app.get("/premium")
 @require_sangria_payment(client, amount=0.01, description="Premium content")

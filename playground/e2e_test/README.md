@@ -54,19 +54,19 @@ Pick one of the merchant server implementations:
 ```bash
 # FastAPI (Python)
 cd playground/merchant-fastapi
-SANGRIA_URL=http://localhost:8080 SANGRIA_SECRET_KEY="sg_test_xxx" uv run python src/main.py
+SANGRIA_URL=http://localhost:8080 SANGRIA_API_KEY="sg_test_xxx" uv run python src/main.py
 
 # Express (Node.js)
-cd playground/merchant-express && SANGRIA_SECRET_KEY="sg_test_xxx" bun dev
+cd playground/merchant-express && SANGRIA_API_KEY="sg_test_xxx" bun dev
 
 # Fastify (Node.js)
-cd playground/merchant-fastify && SANGRIA_SECRET_KEY="sg_test_xxx" bun dev
+cd playground/merchant-fastify && SANGRIA_API_KEY="sg_test_xxx" bun dev
 
 # Hono (Node.js)
-cd playground/merchant-hono && SANGRIA_SECRET_KEY="sg_test_xxx" bun dev
+cd playground/merchant-hono && SANGRIA_API_KEY="sg_test_xxx" bun dev
 
 # Next.js
-cd playground/merchant-nextjs && SANGRIA_SECRET_KEY="sg_test_xxx" pnpm dev
+cd playground/merchant-nextjs && SANGRIA_API_KEY="sg_test_xxx" pnpm dev
 ```
 
 ### 2. Run the test client

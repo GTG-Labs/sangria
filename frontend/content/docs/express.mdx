@@ -40,7 +40,7 @@ Install the Sangria SDK in your Express project.
 import { Sangria } from "@sangria-sdk/core";
 
 const sangria = new Sangria({
-  apiKey: process.env.SANGRIA_SECRET_KEY,
+  apiKey: process.env.SANGRIA_API_KEY,
 });
 ```
 
@@ -56,7 +56,7 @@ import { fixedPrice } from "@sangria-sdk/core/express";
 const app = express();
 
 const sangria = new Sangria({
-  apiKey: process.env.SANGRIA_SECRET_KEY,
+  apiKey: process.env.SANGRIA_API_KEY,
 });
 
 // This endpoint is free

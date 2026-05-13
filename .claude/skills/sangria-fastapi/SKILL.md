@@ -43,9 +43,9 @@ Before making any edits, you MUST collect the following from the user. If any ar
 
    **b. Client init** — insert immediately after the `app = FastAPI(...)` line. Skip this step if a `client = SangriaMerchantClient(...)` block already exists in the file. If the file doesn't already import `os`, also add `import os` at the top.
    ```python
-   sangria_key = os.getenv("SANGRIA_SECRET_KEY")
+   sangria_key = os.getenv("SANGRIA_API_KEY")
    if not sangria_key:
-       raise RuntimeError("SANGRIA_SECRET_KEY environment variable is required")
+       raise RuntimeError("SANGRIA_API_KEY environment variable is required")
 
    client = SangriaMerchantClient(
        base_url=os.getenv("SANGRIA_URL", "http://localhost:8080"),
