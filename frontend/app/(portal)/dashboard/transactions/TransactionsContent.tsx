@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ExternalLink, AlertCircle } from "lucide-react";
+import { useOrganization } from "@/contexts/OrganizationContext";
 import { internalFetch } from "@/lib/fetch";
 
 interface Transaction {
@@ -25,6 +26,7 @@ interface PaginatedResponse {
 }
 
 export default function TransactionsContent() {
+  const { selectedOrgId } = useOrganization();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -33,9 +35,8 @@ export default function TransactionsContent() {
   const [hasMore, setHasMore] = useState(false);
   const [total, setTotal] = useState<number | null>(null);
   const [balance, setBalance] = useState<number | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
-  // Clear list + pagination metadata after an initial-load failure so a stale
-  // Load More button can't render below an empty state.
   const resetForInitialLoadFailure = () => {
     setTransactions([]);
     setHasMore(false);
@@ -44,9 +45,12 @@ export default function TransactionsContent() {
   };
 
   const fetchTransactions = async (cursor?: string) => {
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const signal = controller.signal;
+
     const isInitialLoad = !cursor;
-    // Symmetric set: clear the opposite flag so a superseding fetch can't
-    // leave the other flag stuck.
     if (isInitialLoad) {
       setLoading(true);
       setLoadingMore(false);
@@ -56,14 +60,18 @@ export default function TransactionsContent() {
     }
 
     try {
-      const url = cursor
-        ? `/api/backend/transactions?limit=20&cursor=${encodeURIComponent(cursor)}`
-        : `/api/backend/transactions?limit=20`;
+      const params = new URLSearchParams();
+      params.set("limit", "20");
+      if (selectedOrgId) params.set("org_id", selectedOrgId);
+      if (cursor) params.set("cursor", cursor);
 
-      const response = await internalFetch(url);
+      const response = await internalFetch(`/api/backend/transactions?${params}`, { signal });
+
+      if (signal.aborted) return;
 
       if (response.ok) {
         const data = await response.json();
+        if (signal.aborted) return;
 
         if (Array.isArray(data)) {
           setTransactions(data);
@@ -83,35 +91,56 @@ export default function TransactionsContent() {
         const errorData = await response
           .json()
           .catch(() => ({ error: "Unknown error" }));
+        if (signal.aborted) return;
         setError(errorData.error || "Failed to load transactions");
         if (isInitialLoad) resetForInitialLoadFailure();
       }
     } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") return;
       console.error("Failed to load transactions:", err);
       setError("Failed to load transactions");
       if (isInitialLoad) resetForInitialLoadFailure();
     } finally {
-      setLoading(false);
-      setLoadingMore(false);
+      if (!signal.aborted) {
+        setLoading(false);
+        setLoadingMore(false);
+      }
     }
   };
 
-  const fetchBalance = async () => {
+  const fetchBalance = async (signal?: AbortSignal) => {
     try {
-      const response = await internalFetch("/api/backend/balance");
+      const params = new URLSearchParams();
+      if (selectedOrgId) params.set("org_id", selectedOrgId);
+      const response = await internalFetch(`/api/backend/balance?${params}`, { signal });
+      if (signal?.aborted) return;
       if (response.ok) {
         const data = await response.json();
+        if (signal?.aborted) return;
         setBalance(data.balance);
       }
     } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") return;
       console.error("Failed to load balance:", err);
     }
   };
 
   useEffect(() => {
-    fetchBalance();
+    if (!selectedOrgId) return;
+
+    const controller = new AbortController();
+
+    setError(null);
+    setBalance(null);
+
+    fetchBalance(controller.signal);
     fetchTransactions();
-  }, []);
+
+    return () => {
+      controller.abort();
+      abortRef.current?.abort();
+    };
+  }, [selectedOrgId]);
 
   const formatBalance = (microunits: number) => {
     const whole = Math.floor(microunits / 1_000_000);
@@ -255,7 +284,7 @@ export default function TransactionsContent() {
       {hasMore && (
         <div className="mt-6 flex justify-center">
           <button
-            onClick={() => nextCursor && fetchTransactions(nextCursor)}
+            onClick={() => { if (nextCursor) fetchTransactions(nextCursor); }}
             disabled={loadingMore || !nextCursor}
             className="px-5 py-2 text-sm border border-zinc-200 rounded-lg text-gray-600 hover:bg-zinc-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
