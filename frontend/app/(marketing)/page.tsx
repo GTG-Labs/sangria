@@ -12,7 +12,7 @@ export default async function Home() {
         <div className="relative max-w-7xl mx-auto px-6">
           <div>
             <div className="text-left fade-in relative z-10">
-              <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold text-gray-900 dark:text-white leading-[1.1] tracking-tight mb-10 whitespace-nowrap">
+              <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold text-gray-900 dark:text-white leading-[1.1] tracking-tight mb-10 whitespace-normal md:whitespace-nowrap">
                 Bank accounts <span className="text-sangria-500">for your agent.</span>
               </h1>
 

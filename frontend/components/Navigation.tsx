@@ -34,7 +34,8 @@ export default async function Navigation() {
           />
           <Image
             src="/sangria_wordmark_dark_background.png"
-            alt="Sangria"
+            alt=""
+            aria-hidden="true"
             width={400}
             height={100}
             className="h-6 w-auto hidden dark:block"

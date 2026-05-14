@@ -65,14 +65,16 @@ export default function Footer() {
           />
           <Image
             src="/sangria_wordmark_light_background.png"
-            alt="Sangria"
+            alt=""
+            aria-hidden="true"
             width={800}
             height={200}
             className="w-full h-auto opacity-[0.08] dark:hidden"
           />
           <Image
             src="/sangria_wordmark_dark_background.png"
-            alt="Sangria"
+            alt=""
+            aria-hidden="true"
             width={800}
             height={200}
             className="w-full h-auto opacity-[0.08] hidden dark:block"
