@@ -110,8 +110,9 @@ export default function TransactionsContent() {
 
   const fetchBalance = async (signal?: AbortSignal) => {
     try {
-      const orgParam = selectedOrgId ? `?org_id=${selectedOrgId}` : "";
-      const response = await internalFetch(`/api/backend/balance${orgParam}`, { signal });
+      const params = new URLSearchParams();
+      if (selectedOrgId) params.set("org_id", selectedOrgId);
+      const response = await internalFetch(`/api/backend/balance?${params}`, { signal });
       if (signal?.aborted) return;
       if (response.ok) {
         const data = await response.json();
