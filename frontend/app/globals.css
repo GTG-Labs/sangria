@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Stack+Sans+Text:wght@200..700&display=swap');
 @import "tailwindcss";
 @import "fumadocs-ui/css/neutral.css";
 @import "fumadocs-ui/css/preset.css";
@@ -21,7 +22,7 @@
   --color-sangria-800: #5a0e1a;
   --color-sangria-900: #420a13;
 
-  --font-sans: "IBM Plex Sans", system-ui, sans-serif;
+  --font-sans: "Stack Sans Text", system-ui, sans-serif;
   --font-serif: "PT Serif", "georgia", serif;
   --font-mono: "JetBrains Mono", monospace;
 }
@@ -119,6 +120,11 @@ body {
   background: var(--bg-primary);
   color: var(--text-secondary);
   font-family: var(--font-sans);
+}
+
+::selection {
+  background: rgba(165, 28, 48, 0.88);
+  color: white;
 }
 
 h1,

@@ -423,11 +423,8 @@ export default function APIKeysContent() {
       <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
         {!apiKeys || apiKeys.length === 0 ? (
           <div className="p-12 text-center">
-            <p className="text-gray-500 mb-2">
+            <p className="text-gray-500 mb-6">
               No API keys found. Create your first API key to get started.
-            </p>
-            <p className="text-xs text-gray-400 mb-4">
-              API keys are shown in full only once during creation for security.
             </p>
             <ArcadeButton onClick={() => setShowCreateForm(true)} size="sm">
               Create API Key

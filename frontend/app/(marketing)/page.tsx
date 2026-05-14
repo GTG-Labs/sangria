@@ -1,4 +1,3 @@
-import Image from "next/image";
 import ArcadeButton from "@/components/ArcadeButton";
 import SignInForm from "@/components/SignInForm";
 import { getCachedAuth } from "@/lib/auth";
@@ -11,20 +10,11 @@ export default async function Home() {
       {/* Hero */}
       <section className="relative h-full flex items-center overflow-hidden">
         <div className="relative max-w-7xl mx-auto px-6">
-          <div className="grid md:grid-cols-2 gap-12 items-center">
-            {/* Left: text */}
+          <div>
             <div className="text-left fade-in relative z-10">
-              <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold text-gray-900 dark:text-white leading-[1.1] tracking-tight mb-6">
-                Let agents pay
-                <br />
-                <span className="text-sangria-500">for your API.</span>
+              <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold text-gray-900 dark:text-white leading-[1.1] tracking-tight mb-10 whitespace-normal md:whitespace-nowrap">
+                Bank accounts <span className="text-sangria-500">for your agent.</span>
               </h1>
-
-              <p className="text-base md:text-lg text-zinc-600 dark:text-zinc-400 mb-10 leading-relaxed">
-                Sangria is a drop-in SDK that integrates with your backend and
-                allows you to monetize your endpoints so agents can call and pay
-                for them.
-              </p>
 
               <div className="flex flex-col sm:flex-row items-stretch sm:items-start gap-4">
                 {user ? (
@@ -50,18 +40,6 @@ export default async function Home() {
                   View on GitHub →
                 </ArcadeButton>
               </div>
-            </div>
-
-            {/* Right: illustration */}
-            <div className="flex items-center justify-center">
-              <Image
-                src="/computey2.png"
-                alt="Pixel art computer holding a sangria"
-                width={500}
-                height={500}
-                className="w-full max-w-[220px] sm:max-w-xs md:max-w-md"
-                priority
-              />
             </div>
           </div>
         </div>

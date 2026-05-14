@@ -36,7 +36,7 @@ export default function PortalSidebarNav() {
   };
 
   return (
-    <div className="mt-3">
+    <div className="mt-1.5">
       <nav className="space-y-1">
         {getNavItems().map((item) => {
           const Icon = item.icon;

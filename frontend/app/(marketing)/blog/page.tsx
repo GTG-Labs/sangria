@@ -11,7 +11,7 @@ export default function BlogPage() {
   const posts = getAllPosts();
 
   return (
-    <div className="min-h-screen pt-12">
+    <div className="pt-12">
       {/* Header with ballpit */}
       <BlogHeader />
 

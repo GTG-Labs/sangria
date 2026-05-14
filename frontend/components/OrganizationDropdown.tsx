@@ -129,7 +129,7 @@ export default function OrganizationDropdown() {
       </button>
 
       {isOpen && (
-        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-50">
+        <div className="absolute top-full left-0 mt-1 min-w-72 bg-white border border-gray-200 rounded-xl shadow-lg z-50">
           <div className="py-2">
             {/* Organization List */}
             {userInfo.organizations.map((org) => (
