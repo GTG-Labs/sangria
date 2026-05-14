@@ -122,6 +122,11 @@ body {
   font-family: var(--font-sans);
 }
 
+::selection {
+  background: rgba(165, 28, 48, 0.88);
+  color: white;
+}
+
 h1,
 h2,
 h3,

@@ -50,7 +50,7 @@ export default function ResizableSidebar({ children }: { children: React.ReactNo
       className="relative border-b border-zinc-200 bg-[#FAFAF8] lg:min-h-screen lg:border-b-0 lg:border-r"
       style={{ width }}
     >
-      <div className="flex h-full flex-col px-3 pt-3 pb-0">
+      <div className="flex h-full flex-col px-1.5 pt-3 pb-0">
         {children}
       </div>
 

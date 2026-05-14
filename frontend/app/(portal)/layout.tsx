@@ -20,11 +20,11 @@ export default async function PortalLayout({
           <ResizableSidebar>
             <OrganizationDropdown />
 
-            <div className="-mx-3 border-b border-zinc-200 mt-3" />
+            <div className="-mx-1.5 border-b border-zinc-200 mt-1.5" />
 
             <PortalSidebarNav />
 
-            <div className="mt-auto -mx-3 border-t border-zinc-200 px-3 py-3">
+            <div className="mt-auto -mx-1.5 border-t border-zinc-200 px-1.5 py-3">
               <ProfilePopover
                 firstName={user.firstName}
                 lastName={user.lastName}
