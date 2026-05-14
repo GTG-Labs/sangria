@@ -6,18 +6,28 @@ export default function Footer() {
     <footer className="border-t border-zinc-200 dark:border-white/10 bg-zinc-50 dark:bg-zinc-950 font-sans">
       <div className="max-w-7xl mx-auto px-6 py-8 flex flex-col gap-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <Link href="/" className="flex items-center gap-2">
+          <Link href="/" className="flex items-center gap-0.5">
             <Image
               src="/sangrialogo.png"
               alt="Sangria Logo"
               width={20}
               height={20}
-              className="w-5 h-5"
-              style={{ mixBlendMode: "multiply" }}
+              className="h-6 w-6"
             />
-            <span className="text-zinc-400 dark:text-zinc-500 text-sm font-medium">
-              Sangria
-            </span>
+            <Image
+              src="/sangria_wordmark_light_background.png"
+              alt="Sangria"
+              width={400}
+              height={100}
+              className="h-4 w-auto dark:hidden"
+            />
+            <Image
+              src="/sangria_wordmark_dark_background.png"
+              alt="Sangria"
+              width={400}
+              height={100}
+              className="h-4 w-auto hidden dark:block"
+            />
           </Link>
 
           <div className="flex items-center gap-6">

@@ -15,17 +15,31 @@ export default async function Navigation() {
     <ScrollNav>
       <div className="relative w-full h-12 flex items-stretch px-4">
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-1.5 shrink-0">
+        <Link href="/" className="flex items-center gap-0.5 shrink-0">
           <Image
             src="/sangrialogo.png"
             alt="Sangria Logo"
             width={32}
             height={32}
-            className="w-8 h-8 dark:mix-blend-normal mix-blend-multiply"
+            className="h-9 w-9"
+            priority
           />
-          <span className="text-gray-900 dark:text-white text-lg font-bold">
-            Sangria
-          </span>
+          <Image
+            src="/sangria_wordmark_light_background.png"
+            alt="Sangria"
+            width={400}
+            height={100}
+            className="h-6 w-auto dark:hidden"
+            priority
+          />
+          <Image
+            src="/sangria_wordmark_dark_background.png"
+            alt="Sangria"
+            width={400}
+            height={100}
+            className="h-6 w-auto hidden dark:block"
+            priority
+          />
         </Link>
 
         {/* Spacer */}

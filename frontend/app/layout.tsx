@@ -1,15 +1,8 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Sans, PT_Serif, JetBrains_Mono } from "next/font/google";
+import { PT_Serif, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
 import { RootProvider } from "fumadocs-ui/provider/next";
-
-const ibmPlexSans = IBM_Plex_Sans({
-  variable: "--font-ibm-plex-sans",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-  style: ["normal", "italic"],
-});
 
 const ptSerif = PT_Serif({
   variable: "--font-pt-serif",
@@ -40,7 +33,7 @@ export default function RootLayout({
         {/* Banking application - no third-party tracking for compliance and security */}
       </head>
       <body
-        className={`${ibmPlexSans.variable} ${ptSerif.variable} ${jetbrainsMono.variable} antialiased`}
+        className={`${ptSerif.variable} ${jetbrainsMono.variable} antialiased`}
       >
         <RootProvider theme={{ enabled: false }} search={{ enabled: false }}>
             {children}
