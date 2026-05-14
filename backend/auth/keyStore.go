@@ -84,8 +84,7 @@ func AuthenticateAPIKey(ctx context.Context, pool *pgxpool.Pool, providedKey str
 		return nil, KeyTypeAgent, ErrInvalidAPIKey
 	}
 
-	// Merchant path (covers both legacy sg_live_ and new sg_merchants_).
-	// Query by key_id instead of scanning all keys (O(1) vs O(N)).
+	// Merchant path. Query by key_id instead of scanning all keys (O(1) vs O(N)).
 	candidates, err := dbengine.GetActiveMerchantsByKeyID(ctx, pool, keyID)
 	if err != nil {
 		return nil, "", err
