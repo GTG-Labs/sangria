@@ -134,7 +134,14 @@ Requires WorkOS JWT and the user must exist in the `admins` table.
 
 ### API key format
 
-Merchant API keys follow the format `sg_live_<key_id>_<random>` or `sg_test_<key_id>_<random>`. Pass via `Authorization: Bearer <key>` header.
+API keys follow the format `<prefix><key_id>_<random>` where `key_id` is 8 hex chars and `random` is 32 hex chars. Pass via `Authorization: Bearer <key>` header (or `X-API-Key` header).
+
+Two prefixes exist:
+
+- `sg_merchants_` — merchant API keys
+- `sg_agents_` — agent SDK API keys
+
+Test mode is not currently implemented. When it's added, the convention will be `sg_merchants_test_<id>_<rand>` and `sg_agents_test_<id>_<rand>` (absence of `_test_` implies live).
 
 ### Admin authentication
 

@@ -20,7 +20,7 @@ from sangria_sdk.adapters.fastapi import require_sangria_payment
 app = FastAPI()
 client = SangriaMerchantClient(
     base_url="https://api.sangria.net",
-    api_key="sg_live_...",
+    api_key="sg_merchants_...",
 )
 
 @app.get("/premium")

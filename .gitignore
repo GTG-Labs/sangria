@@ -13,3 +13,4 @@ guides-and-knowledge/
 .next/
 next-env.d.ts
 .worktrees/
+agent-sdk-planning/

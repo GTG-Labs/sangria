@@ -32,7 +32,12 @@ All database queries live in `dbEngine/`. Handlers call dbEngine functions, neve
 
 - Startup sequence in `main.go`: load env → load logging → load every other config module → setup WorkOS → connect DB → ensure system accounts → register routes → listen. Logging must load first so subsequent loaders log through the configured `slog` handler.
 - All env var reads live in `backend/config/`. Add a new var by extending the appropriate `Config` struct + `LoadXConfig` function; do not add `os.Getenv` calls in handlers, middleware, or utility packages. The grep `os\.Getenv` outside `config/` should always return zero matches.
-- API key format lives in `auth/merchantKeys.go` — use the helpers there, don't hand-roll parsing
+- API key format and validation live in `auth/merchantKeys.go` — use the helpers (`GenerateAPIKey(keyType)`, `ValidateAPIKeyFormat`, `ExtractKeyID`, `parseAPIKey`), don't hand-roll parsing. **Exactly two prefixes are accepted:** `sg_merchants_` (merchant API keys) and `sg_agents_` (agent SDK API keys). **Do NOT add a third prefix** without explicit cross-cutting discussion — every new prefix multiplies the validator surface, breaks log-grep assumptions, and forces every downstream key-handling code path to grow a new branch. If you find yourself wanting to add one, propose the change at the architectural level first. The `KeyType` returned by `ValidateAPIKeyFormat` distinguishes merchant vs agent for callers that need to branch.
+- `APIKeyAuthMiddleware` sets these Fiber locals on success:
+  - `key_type` (`string`: `"merchant"` | `"agent"`) — neutral, set always; read this when a handler should support both types
+  - `organization_id` (`string` UUID) — neutral, set always
+  - `merchant_api_key` (`*dbengine.Merchant`) — set when `key_type == "merchant"`; kept for backward compatibility with existing readers (`merchantHandlers/payments.go`, `ratelimit/rate_limit.go`). New code should prefer the neutral locals.
+  Agent keys currently reject at the auth layer (no backing table yet) — the `KeyTypeAgent` switch branch in the middleware is defensive only.
 - All handler functions return `fiber.Handler` (closure over `*pgxpool.Pool`)
 - Organization context resolved via `ResolveOrganizationContext()` helper — checks `?org_id=` param, falls back to single membership or personal org
 - Facilitator helpers split by idempotency: `doFacilitatorRequestIdempotent` retries on transient failures (use for `Verify`), `doFacilitatorRequestOnce` makes a single attempt (use for `Settle`). Do not retry `Settle` at the HTTP layer — see root CLAUDE.md § Non-Negotiable Principles for why.
@@ -47,3 +52,4 @@ All database queries live in `dbEngine/`. Handlers call dbEngine functions, neve
 - **Security**: Timing-safe comparison via `crypto/subtle.ConstantTimeCompare` prevents timing attacks
 - **CORS**: Configured in `utils/cors.go` with credentials support for cross-origin CSRF token cookies
 - **Error Handling**: Structured responses with action hints for frontend token refresh on validation failures
+- **API key parsing avoids leaks**: `auth/merchantKeys.go::parseAPIKey` is the canonical pattern for any function that takes a secret and validates it — full key in, only the public parts (type, prefix, 8-char `keyID`) out. The 32-char random secret stays in a local variable and is never assigned to a named return or included in any error message. Any new code that handles API keys, signing keys, or similar secrets must follow this discipline. See root `CLAUDE.md` § Non-Negotiable Principles § Security for the full rule.

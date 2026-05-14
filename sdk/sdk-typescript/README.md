@@ -99,7 +99,7 @@ If your `bypassPaymentIf` callback throws, the SDK logs the error (prefixed `[sa
 
 ```typescript
 const sangria = new Sangria({
-  apiKey: "sg_live_...", // Required. Your Sangria merchant API key.
+  apiKey: "sg_merchants_...", // Required. Your Sangria merchant API key.
   baseUrl: "https://...", // Optional. Defaults to http://localhost:8080.
 });
 ```

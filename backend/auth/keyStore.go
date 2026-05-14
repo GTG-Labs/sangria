@@ -34,10 +34,9 @@ func init() {
 	dummyHash = h
 }
 
-// CreateAPIKey creates a new API key for an organization with the specified status.
+// CreateAPIKey creates a new merchant API key for an organization with the specified status.
 func CreateAPIKey(ctx context.Context, pool *pgxpool.Pool, organizationID, name string, status dbengine.APIKeyStatus) (*dbengine.Merchant, string, error) {
-	// Generate new API key first
-	fullKey, keyID, err := GenerateAPIKey()
+	fullKey, keyID, err := GenerateAPIKey(KeyTypeMerchant)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to generate API key: %w", err)
 	}
@@ -61,24 +60,34 @@ func GetAPIKeysByOrganizationID(ctx context.Context, pool *pgxpool.Pool, organiz
 	return dbengine.ListAPIKeysByOrganization(ctx, pool, organizationID)
 }
 
-// AuthenticateAPIKey validates an API key and returns the associated merchant.
-// Uses GitHub-style indexed lookup by key_id for O(1) performance.
-func AuthenticateAPIKey(ctx context.Context, pool *pgxpool.Pool, providedKey string) (*dbengine.Merchant, error) {
-	// Validate format first
-	if err := ValidateAPIKeyFormat(providedKey); err != nil {
-		return nil, fmt.Errorf("invalid API key format: %w", err)
-	}
-
-	// Extract key_id for indexed lookup
-	keyID, err := ExtractKeyID(providedKey)
+// AuthenticateAPIKey validates an API key and returns the associated merchant
+// along with the detected key type. Uses GitHub-style indexed lookup by key_id
+// for O(1) performance.
+//
+// Returns:
+//   - (merchant, KeyTypeMerchant, nil) for valid merchant keys
+//   - (nil, KeyTypeAgent, ErrInvalidAPIKey) for agent-prefixed keys — agent authentication
+//     has no backing table yet, so these always reject with the same error as any unknown key
+//   - (nil, "", err) for malformed keys or DB errors
+func AuthenticateAPIKey(ctx context.Context, pool *pgxpool.Pool, providedKey string) (*dbengine.Merchant, KeyType, error) {
+	keyType, _, keyID, err := parseAPIKey(providedKey)
 	if err != nil {
-		return nil, fmt.Errorf("failed to extract key ID: %w", err)
+		// parseAPIKey already wraps ErrInvalidAPIKeyFormat with a descriptive message.
+		return nil, "", err
 	}
 
-	// Query by key_id instead of scanning all keys (O(1) vs O(N))
+	// Agent keys have no backing table yet — reject with ErrInvalidAPIKey so the middleware
+	// returns the same 401 as any unauthenticated key. Run dummy bcrypt to keep response
+	// time roughly constant.
+	if keyType == KeyTypeAgent {
+		_ = bcrypt.CompareHashAndPassword(dummyHash, []byte(providedKey))
+		return nil, KeyTypeAgent, ErrInvalidAPIKey
+	}
+
+	// Merchant path. Query by key_id instead of scanning all keys (O(1) vs O(N)).
 	candidates, err := dbengine.GetActiveMerchantsByKeyID(ctx, pool, keyID)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	for _, merchant := range candidates {
@@ -89,7 +98,7 @@ func AuthenticateAPIKey(ctx context.Context, pool *pgxpool.Pool, providedKey str
 				slog.Warn("failed to update last_used_at", "merchant_id", merchant.ID, "error", err)
 			}
 
-			return &merchant, nil
+			return &merchant, KeyTypeMerchant, nil
 		}
 	}
 
@@ -98,7 +107,7 @@ func AuthenticateAPIKey(ctx context.Context, pool *pgxpool.Pool, providedKey str
 		_ = bcrypt.CompareHashAndPassword(dummyHash, []byte(providedKey))
 	}
 
-	return nil, ErrInvalidAPIKey
+	return nil, KeyTypeMerchant, ErrInvalidAPIKey
 }
 
 // RevokeAPIKey atomically deactivates an API key, but only if the requesting
