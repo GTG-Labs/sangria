@@ -163,8 +163,8 @@ func ValidateAPIKeyFormat(key string) (KeyType, error) {
 }
 
 // ExtractKeyID extracts the key_id from a full API key for database lookup.
-// Works for all three accepted prefixes. Thin wrapper over parseAPIKey.
-// Error returns wrap ErrInvalidAPIKeyFormat (via parseAPIKey).
+// Accepts the two valid prefixes — KeyPrefixMerchants and KeyPrefixAgents.
+// Thin wrapper over parseAPIKey; errors wrap ErrInvalidAPIKeyFormat.
 func ExtractKeyID(fullKey string) (string, error) {
 	_, _, keyID, err := parseAPIKey(fullKey)
 	return keyID, err

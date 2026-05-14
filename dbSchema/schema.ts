@@ -12,6 +12,7 @@ import {
   uniqueIndex,
   text,
   primaryKey,
+  jsonb,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
@@ -19,6 +20,9 @@ export const transactionStatusEnum = pgEnum("transaction_status", [
   "pending",
   "confirmed",
   "failed",
+  // HTTP returned ambiguous (timeout / 5xx) but on-chain state is unknown;
+  // requires reconciliation against the chain to determine final state.
+  "unresolved",
 ]);
 export const paymentSchemeEnum = pgEnum("payment_scheme", ["exact", "upto"]);
 export const directionEnum = pgEnum("direction", ["DEBIT", "CREDIT"]);
@@ -380,5 +384,313 @@ export const organizationInvitations = pgTable(
     uniqueIndex("uq_org_invitations_pending")
       .on(table.organizationId, sql`lower(${table.inviteeEmail})`)
       .where(sql`status = 'pending'`),
+  ],
+);
+
+// ---------------------------------------------------------------------------
+// Agent SDK
+// ---------------------------------------------------------------------------
+
+export const agentKycStatusEnum = pgEnum("agent_kyc_status", [
+  "unverified",
+  "pending",
+  "verified",
+  "failed",
+]);
+
+export const agentTopupSourceEnum = pgEnum("agent_topup_source", [
+  "trial",
+  "stripe_card",
+  "stripe_ach",
+  "wire",
+  "direct_usdc",
+]);
+
+export const agentTopupStatusEnum = pgEnum("agent_topup_status", [
+  "pending",
+  "completed",
+  "failed",
+  "refunded",
+]);
+
+export const agentPaymentStatusEnum = pgEnum("agent_payment_status", [
+  "pending",
+  "confirmed",
+  "failed",
+  "unresolved",
+]);
+
+// ---------------------------------------------------------------------------
+// agentOperators — one row per organization that pays via the agent SDK
+// ---------------------------------------------------------------------------
+
+export const agentOperators = pgTable(
+  "agent_operators",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id),
+
+    // Operator-wide default policy. Application code must set these on insert.
+    defaultMaxPerCallMicrounits: bigint("default_max_per_call_microunits", {
+      mode: "bigint",
+    }).notNull(),
+    defaultDailyCapMicrounits: bigint("default_daily_cap_microunits", {
+      mode: "bigint",
+    }).notNull(),
+    defaultMonthlyCapMicrounits: bigint("default_monthly_cap_microunits", {
+      mode: "bigint",
+    }).notNull(),
+    defaultRequireConfirmAboveMicrounits: bigint(
+      "default_require_confirm_above_microunits",
+      { mode: "bigint" },
+    ).notNull(),
+
+    // Per-partner trial credit override. Null means use the env-var default
+    // applied by CreateAgentOperator at signup.
+    trialCreditMicrounits: bigint("trial_credit_microunits", { mode: "bigint" }),
+
+    // Set after first successful card top-up.
+    stripeCustomerId: varchar("stripe_customer_id", { length: 255 }),
+
+    kycStatus: agentKycStatusEnum("kyc_status").notNull().default("unverified"),
+    walletStrategy: varchar("wallet_strategy", { length: 32 })
+      .notNull()
+      .default("pooled"),
+
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    unique("uq_agent_operators_organization_id").on(table.organizationId),
+  ],
+);
+
+// ---------------------------------------------------------------------------
+// agents — per-operator named agents
+// ---------------------------------------------------------------------------
+
+export const agents = pgTable(
+  "agents",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id),
+    name: varchar({ length: 255 }).notNull(),
+
+    // jsonb array of host strings; null = allow-all.
+    merchantAllowlist: jsonb("merchant_allowlist"),
+
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("idx_agents_organization_id").on(table.organizationId),
+    uniqueIndex("uq_agents_org_name").on(table.organizationId, table.name),
+  ],
+);
+
+// ---------------------------------------------------------------------------
+// agentApiKeys — hashed API keys for agent operator authentication
+// ---------------------------------------------------------------------------
+
+export const agentApiKeys = pgTable(
+  "agent_api_keys",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id),
+    keyHash: text("key_hash").notNull(),
+    keyId: varchar("key_id", { length: 8 }).notNull(),
+    name: varchar({ length: 255 }).notNull(),
+
+    // Per-key policy: when false, only the host of the merchant URL is logged
+    // on agent_payments rows (path + query are dropped).
+    logFullUrl: boolean("log_full_url").notNull().default(true),
+
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    unique("uq_agent_api_keys_key_hash").on(table.keyHash),
+    index("idx_agent_api_keys_organization_id").on(table.organizationId),
+    index("idx_agent_api_keys_key_id").on(table.keyId),
+    // One active key per (org, name); revoke before re-using a name.
+    uniqueIndex("uq_agent_api_keys_active_name")
+      .on(table.organizationId, table.name)
+      .where(sql`revoked_at IS NULL`),
+  ],
+);
+
+// ---------------------------------------------------------------------------
+// agentPayments — full lifecycle of every agent payment attempt
+// ---------------------------------------------------------------------------
+
+export const agentPayments = pgTable(
+  "agent_payments",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+
+    // Client-supplied UUID v4 from the SDK; SDK reuses the same value across retries
+    // of the same logical call within its retry-policy window.
+    idempotencyKey: varchar("idempotency_key", { length: 255 }).notNull(),
+
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id),
+    agentId: uuid("agent_id").references(() => agents.id),
+    apiKeyId: uuid("api_key_id")
+      .notNull()
+      .references(() => agentApiKeys.id),
+
+    // What the agent is paying for. merchantUrlOrHost stores the full URL when
+    // the api key has logFullUrl=true; just the host otherwise.
+    merchantUrlOrHost: text("merchant_url_or_host").notNull(),
+    merchantPayToAddress: varchar("merchant_pay_to_address", {
+      length: 64,
+    }).notNull(),
+    network: varchar({ length: 32 }).notNull(), // CAIP-2, e.g. "eip155:8453"
+    scheme: paymentSchemeEnum().notNull(),
+
+    // Amounts. settlement and fee are populated on /confirm.
+    maxAmountMicrounits: bigint("max_amount_microunits", {
+      mode: "bigint",
+    }).notNull(),
+    settlementAmountMicrounits: bigint("settlement_amount_microunits", {
+      mode: "bigint",
+    }),
+    platformFeeMicrounits: bigint("platform_fee_microunits", {
+      mode: "bigint",
+    }),
+
+    // ERC-3009 authorization expiry — needed to determine whether to mark a
+    // pending intent as conclusively failed during reconciliation.
+    validBefore: timestamp("valid_before", { withTimezone: true }).notNull(),
+
+    // Signed PAYMENT-SIGNATURE bytes. Kept so retries can reuse the same
+    // signature without minting a new ERC-3009 nonce.
+    paymentSignatureB64: text("payment_signature_b64").notNull(),
+
+    status: agentPaymentStatusEnum().notNull().default("pending"),
+    txHash: varchar("tx_hash", { length: 80 }),
+
+    // Set on /confirm; analogous to withdrawals.debitTransactionId.
+    ledgerTransactionId: uuid("ledger_transaction_id").references(
+      () => transactions.id,
+    ),
+
+    failureCode: varchar("failure_code", { length: 100 }),
+    failureMessage: text("failure_message"),
+
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+    failedAt: timestamp("failed_at", { withTimezone: true }),
+    unresolvedAt: timestamp("unresolved_at", { withTimezone: true }),
+  },
+  (table) => [
+    unique("uq_agent_payments_idempotency_key").on(table.idempotencyKey),
+    index("idx_agent_payments_organization_id").on(table.organizationId),
+    index("idx_agent_payments_agent_id").on(table.agentId),
+    index("idx_agent_payments_status").on(table.status),
+    index("idx_agent_payments_created_at").on(table.createdAt.desc()),
+    // Mirrors the transactions-table partial unique on confirmed tx_hash.
+    uniqueIndex("uq_agent_payments_tx_hash_confirmed")
+      .on(table.txHash)
+      .where(sql`status = 'confirmed' AND tx_hash IS NOT NULL`),
+    check(
+      "chk_agent_payments_max_amount_positive",
+      sql`${table.maxAmountMicrounits} > 0`,
+    ),
+  ],
+);
+
+// ---------------------------------------------------------------------------
+// agentTopups — every credit grant: trial, Stripe, ACH, wire, direct USDC
+// ---------------------------------------------------------------------------
+
+export const agentTopups = pgTable(
+  "agent_topups",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id),
+
+    source: agentTopupSourceEnum().notNull(),
+    amountCreditsMicrounits: bigint("amount_credits_microunits", {
+      mode: "bigint",
+    }).notNull(),
+
+    // Stripe linkage — required for stripe_card / stripe_ach sources to support
+    // refunds via the Stripe API.
+    stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 255 }),
+
+    // Bridge.xyz (or successor) USD→USDC conversion record.
+    bridgeTransactionId: varchar("bridge_transaction_id", { length: 255 }),
+
+    // Ledger linkage — the credit-side ledger transaction.
+    ledgerTransactionId: uuid("ledger_transaction_id").references(
+      () => transactions.id,
+    ),
+
+    status: agentTopupStatusEnum().notNull().default("pending"),
+    failureCode: varchar("failure_code", { length: 100 }),
+    failureMessage: text("failure_message"),
+
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    refundedAt: timestamp("refunded_at", { withTimezone: true }),
+  },
+  (table) => [
+    index("idx_agent_topups_organization_id").on(table.organizationId),
+    index("idx_agent_topups_source").on(table.source),
+    index("idx_agent_topups_stripe_payment_intent_id").on(
+      table.stripePaymentIntentId,
+    ),
+    check(
+      "chk_agent_topups_amount_positive",
+      sql`${table.amountCreditsMicrounits} > 0`,
+    ),
+  ],
+);
+
+// ---------------------------------------------------------------------------
+// waitlistEntries — invite-only beta gating for the agent operator dashboard
+// ---------------------------------------------------------------------------
+
+export const waitlistEntries = pgTable(
+  "waitlist_entries",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    email: varchar({ length: 320 }).notNull(), // RFC 5321 max
+    referrer: varchar({ length: 255 }),
+    company: varchar({ length: 255 }),
+    intendedUse: text("intended_use"),
+    approved: boolean().notNull().default(false),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    approvedBy: text("approved_by").references(() => users.workosId),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    // Case-insensitive uniqueness on email.
+    uniqueIndex("uq_waitlist_entries_email_lower").on(
+      sql`lower(${table.email})`,
+    ),
+    index("idx_waitlist_entries_approved").on(table.approved),
   ],
 );

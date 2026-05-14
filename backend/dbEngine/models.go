@@ -96,9 +96,13 @@ type OrganizationInvitation struct {
 type TransactionStatus string
 
 const (
-	TransactionStatusPending   TransactionStatus = "pending"
-	TransactionStatusConfirmed TransactionStatus = "confirmed"
-	TransactionStatusFailed    TransactionStatus = "failed"
+	TransactionStatusPending    TransactionStatus = "pending"
+	TransactionStatusConfirmed  TransactionStatus = "confirmed"
+	TransactionStatusFailed     TransactionStatus = "failed"
+	// TransactionStatusUnresolved means the HTTP layer returned ambiguously
+	// (timeout / 5xx) but the on-chain settlement state is unknown. The row
+	// must be reconciled against the chain to determine final state.
+	TransactionStatusUnresolved TransactionStatus = "unresolved"
 )
 
 type PaymentScheme string
@@ -311,4 +315,154 @@ const (
 	RequestStatusCanceled RequestStatus = "canceled"
 )
 
+// ---------------------------------------------------------------------------
+// Agent SDK
+// ---------------------------------------------------------------------------
 
+type AgentKYCStatus string
+
+const (
+	AgentKYCStatusUnverified AgentKYCStatus = "unverified"
+	AgentKYCStatusPending    AgentKYCStatus = "pending"
+	AgentKYCStatusVerified   AgentKYCStatus = "verified"
+	AgentKYCStatusFailed     AgentKYCStatus = "failed"
+)
+
+type AgentTopupSource string
+
+const (
+	AgentTopupSourceTrial      AgentTopupSource = "trial"
+	AgentTopupSourceStripeCard AgentTopupSource = "stripe_card"
+	AgentTopupSourceStripeACH  AgentTopupSource = "stripe_ach"
+	AgentTopupSourceWire       AgentTopupSource = "wire"
+	AgentTopupSourceDirectUSDC AgentTopupSource = "direct_usdc"
+)
+
+type AgentTopupStatus string
+
+const (
+	AgentTopupStatusPending   AgentTopupStatus = "pending"
+	AgentTopupStatusCompleted AgentTopupStatus = "completed"
+	AgentTopupStatusFailed    AgentTopupStatus = "failed"
+	AgentTopupStatusRefunded  AgentTopupStatus = "refunded"
+)
+
+type AgentPaymentStatus string
+
+const (
+	AgentPaymentStatusPending    AgentPaymentStatus = "pending"
+	AgentPaymentStatusConfirmed  AgentPaymentStatus = "confirmed"
+	AgentPaymentStatusFailed     AgentPaymentStatus = "failed"
+	AgentPaymentStatusUnresolved AgentPaymentStatus = "unresolved"
+)
+
+// Per-operator agent credit account names. One pair (Trial + Paid) is created
+// per operator on first top-up; the names embed the orgID so balance lookups
+// are queryable by name pattern. Use the helper functions below — never
+// hand-concatenate the em-dash separator at call sites.
+const (
+	AgentCreditsTrialNamePrefix = "Agent Credits Trial — "
+	AgentCreditsPaidNamePrefix  = "Agent Credits Paid — "
+)
+
+func AgentCreditsTrialAccountName(orgID string) string {
+	return AgentCreditsTrialNamePrefix + orgID
+}
+
+func AgentCreditsPaidAccountName(orgID string) string {
+	return AgentCreditsPaidNamePrefix + orgID
+}
+
+type AgentOperator struct {
+	ID                                   string         `json:"id"`
+	OrganizationID                       string         `json:"organization_id"`
+	DefaultMaxPerCallMicrounits          int64          `json:"default_max_per_call_microunits"`
+	DefaultDailyCapMicrounits            int64          `json:"default_daily_cap_microunits"`
+	DefaultMonthlyCapMicrounits          int64          `json:"default_monthly_cap_microunits"`
+	DefaultRequireConfirmAboveMicrounits int64          `json:"default_require_confirm_above_microunits"`
+	TrialCreditMicrounits                *int64         `json:"trial_credit_microunits"`
+	StripeCustomerID                     *string        `json:"stripe_customer_id"`
+	KYCStatus                            AgentKYCStatus `json:"kyc_status"`
+	WalletStrategy                       string         `json:"wallet_strategy"`
+	CreatedAt                            time.Time      `json:"created_at"`
+}
+
+type Agent struct {
+	ID                string    `json:"id"`
+	OrganizationID    string    `json:"organization_id"`
+	Name              string    `json:"name"`
+	MerchantAllowlist *[]string `json:"merchant_allowlist"` // null = allow-all
+	CreatedAt         time.Time `json:"created_at"`
+}
+
+type AgentAPIKey struct {
+	ID             string     `json:"id"`
+	OrganizationID string     `json:"organization_id"`
+	// KeyHash is the bcrypt hash of the full API key. NEVER serialized to clients.
+	KeyHash    string     `json:"-"`
+	KeyID      string     `json:"key_id"`
+	Name       string     `json:"name"`
+	LogFullURL bool       `json:"log_full_url"`
+	ExpiresAt  *time.Time `json:"expires_at"`
+	LastUsedAt *time.Time `json:"last_used_at"`
+	RevokedAt  *time.Time `json:"revoked_at"`
+	CreatedAt  time.Time  `json:"created_at"`
+}
+
+type AgentPayment struct {
+	ID string `json:"id"`
+	// IdempotencyKey is internal dedup data; clients reference rows by ID.
+	// Hidden from JSON to mirror the withdrawals.IdempotencyKey pattern.
+	IdempotencyKey             string             `json:"-"`
+	OrganizationID             string             `json:"organization_id"`
+	AgentID                    *string            `json:"agent_id"`
+	APIKeyID                   string             `json:"api_key_id"`
+	MerchantURLOrHost          string             `json:"merchant_url_or_host"`
+	MerchantPayToAddress       string             `json:"merchant_pay_to_address"`
+	Network                    string             `json:"network"`
+	Scheme                     PaymentScheme      `json:"scheme"`
+	MaxAmountMicrounits        int64              `json:"max_amount_microunits"`
+	SettlementAmountMicrounits *int64             `json:"settlement_amount_microunits"`
+	PlatformFeeMicrounits      *int64             `json:"platform_fee_microunits"`
+	ValidBefore                time.Time          `json:"valid_before"`
+	// PaymentSignatureB64 is the signed PAYMENT-SIGNATURE payload. Sensitive
+	// authorization material; NEVER serialized to clients.
+	PaymentSignatureB64 string             `json:"-"`
+	Status              AgentPaymentStatus `json:"status"`
+	TxHash              *string            `json:"tx_hash"`
+	LedgerTransactionID *string            `json:"ledger_transaction_id"`
+	FailureCode         *string            `json:"failure_code"`
+	FailureMessage      *string            `json:"failure_message"`
+	CreatedAt           time.Time          `json:"created_at"`
+	ConfirmedAt         *time.Time         `json:"confirmed_at"`
+	FailedAt            *time.Time         `json:"failed_at"`
+	UnresolvedAt        *time.Time         `json:"unresolved_at"`
+}
+
+type AgentTopup struct {
+	ID                      string           `json:"id"`
+	OrganizationID          string           `json:"organization_id"`
+	Source                  AgentTopupSource `json:"source"`
+	AmountCreditsMicrounits int64            `json:"amount_credits_microunits"`
+	StripePaymentIntentID   *string          `json:"stripe_payment_intent_id"`
+	BridgeTransactionID     *string          `json:"bridge_transaction_id"`
+	LedgerTransactionID     *string          `json:"ledger_transaction_id"`
+	Status                  AgentTopupStatus `json:"status"`
+	FailureCode             *string          `json:"failure_code"`
+	FailureMessage          *string          `json:"failure_message"`
+	CreatedAt               time.Time        `json:"created_at"`
+	CompletedAt             *time.Time       `json:"completed_at"`
+	RefundedAt              *time.Time       `json:"refunded_at"`
+}
+
+type WaitlistEntry struct {
+	ID          string     `json:"id"`
+	Email       string     `json:"email"`
+	Referrer    *string    `json:"referrer"`
+	Company     *string    `json:"company"`
+	IntendedUse *string    `json:"intended_use"`
+	Approved    bool       `json:"approved"`
+	ApprovedAt  *time.Time `json:"approved_at"`
+	ApprovedBy  *string    `json:"approved_by"`
+	CreatedAt   time.Time  `json:"created_at"`
+}
