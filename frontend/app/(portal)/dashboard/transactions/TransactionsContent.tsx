@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { ExternalLink, AlertCircle } from "lucide-react";
+import { useOrganization } from "@/contexts/OrganizationContext";
 import { internalFetch } from "@/lib/fetch";
 
 interface Transaction {
@@ -25,6 +26,7 @@ interface PaginatedResponse {
 }
 
 export default function TransactionsContent() {
+  const { selectedOrgId } = useOrganization();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -43,10 +45,8 @@ export default function TransactionsContent() {
     setTotal(null);
   };
 
-  const fetchTransactions = async (cursor?: string) => {
+  const fetchTransactions = async (cursor?: string, signal?: AbortSignal) => {
     const isInitialLoad = !cursor;
-    // Symmetric set: clear the opposite flag so a superseding fetch can't
-    // leave the other flag stuck.
     if (isInitialLoad) {
       setLoading(true);
       setLoadingMore(false);
@@ -56,11 +56,14 @@ export default function TransactionsContent() {
     }
 
     try {
-      const url = cursor
-        ? `/api/backend/transactions?limit=20&cursor=${encodeURIComponent(cursor)}`
-        : `/api/backend/transactions?limit=20`;
+      const params = new URLSearchParams();
+      params.set("limit", "20");
+      if (selectedOrgId) params.set("org_id", selectedOrgId);
+      if (cursor) params.set("cursor", cursor);
 
-      const response = await internalFetch(url);
+      const response = await internalFetch(`/api/backend/transactions?${params}`, { signal });
+
+      if (signal?.aborted) return;
 
       if (response.ok) {
         const data = await response.json();
@@ -87,31 +90,46 @@ export default function TransactionsContent() {
         if (isInitialLoad) resetForInitialLoadFailure();
       }
     } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") return;
       console.error("Failed to load transactions:", err);
       setError("Failed to load transactions");
       if (isInitialLoad) resetForInitialLoadFailure();
     } finally {
-      setLoading(false);
-      setLoadingMore(false);
+      if (!signal?.aborted) {
+        setLoading(false);
+        setLoadingMore(false);
+      }
     }
   };
 
-  const fetchBalance = async () => {
+  const fetchBalance = async (signal?: AbortSignal) => {
     try {
-      const response = await internalFetch("/api/backend/balance");
+      const orgParam = selectedOrgId ? `?org_id=${selectedOrgId}` : "";
+      const response = await internalFetch(`/api/backend/balance${orgParam}`, { signal });
+      if (signal?.aborted) return;
       if (response.ok) {
         const data = await response.json();
         setBalance(data.balance);
       }
     } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") return;
       console.error("Failed to load balance:", err);
     }
   };
 
   useEffect(() => {
-    fetchBalance();
-    fetchTransactions();
-  }, []);
+    if (!selectedOrgId) return;
+
+    const controller = new AbortController();
+
+    setError(null);
+    setBalance(null);
+
+    fetchBalance(controller.signal);
+    fetchTransactions(undefined, controller.signal);
+
+    return () => controller.abort();
+  }, [selectedOrgId]);
 
   const formatBalance = (microunits: number) => {
     const whole = Math.floor(microunits / 1_000_000);
