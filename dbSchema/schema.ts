@@ -443,9 +443,6 @@ export const agentOperators = pgTable(
     stripeCustomerId: varchar("stripe_customer_id", { length: 255 }),
 
     kycStatus: agentKycStatusEnum("kyc_status").notNull().default("unverified"),
-    walletStrategy: varchar("wallet_strategy", { length: 32 })
-      .notNull()
-      .default("pooled"),
 
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -453,6 +450,13 @@ export const agentOperators = pgTable(
   },
   (table) => [
     unique("uq_agent_operators_organization_id").on(table.organizationId),
+    // Partial unique on stripe_customer_id — doubles as the lookup index for
+    // Stripe webhook resolution AND enforces the 1:1 operator↔Stripe-customer
+    // mapping. Partial WHERE excludes NULL rows (the column stays NULL until
+    // the operator's first card top-up), keeping the index small.
+    uniqueIndex("uq_agent_operators_stripe_customer_id")
+      .on(table.stripeCustomerId)
+      .where(sql`stripe_customer_id IS NOT NULL`),
   ],
 );
 
@@ -552,7 +556,7 @@ export const agentPayments = pgTable(
     merchantPayToAddress: varchar("merchant_pay_to_address", {
       length: 64,
     }).notNull(),
-    network: varchar({ length: 32 }).notNull(), // CAIP-2, e.g. "eip155:8453"
+    network: varchar({ length: 64 }).notNull(), // CAIP-2, e.g. "eip155:8453"; sized for max CAIP-2 (~41 chars) plus headroom — Solana CAIP-2 is 39
     scheme: paymentSchemeEnum().notNull(),
 
     // Amounts. settlement and fee are populated on /confirm.
@@ -575,7 +579,7 @@ export const agentPayments = pgTable(
     paymentSignatureB64: text("payment_signature_b64").notNull(),
 
     status: agentPaymentStatusEnum().notNull().default("pending"),
-    txHash: varchar("tx_hash", { length: 80 }),
+    txHash: varchar("tx_hash", { length: 255 }),
 
     // Set on /confirm; analogous to withdrawals.debitTransactionId.
     ledgerTransactionId: uuid("ledger_transaction_id").references(
@@ -634,7 +638,9 @@ export const agentTopups = pgTable(
     idempotencyKey: varchar("idempotency_key", { length: 255 }).notNull(),
 
     // Stripe linkage — required for stripe_card / stripe_ach sources to support
-    // refunds via the Stripe API.
+    // refunds via the Stripe API. Enforced by chk_agent_topups_stripe_pi_required
+    // below; always known at insert time because Stripe Checkout in mode='payment'
+    // creates the PaymentIntent immediately for both card and ACH.
     stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 255 }),
 
     // Bridge.xyz (or successor) USD→USDC conversion record.
@@ -671,6 +677,15 @@ export const agentTopups = pgTable(
     check(
       "chk_agent_topups_amount_positive",
       sql`${table.amountCreditsMicrounits} > 0`,
+    ),
+    // Stripe topups must always carry the PaymentIntent ID so we can refund via
+    // Stripe's API later. Verified against Stripe docs: mode='payment' Checkout
+    // Sessions (which Sangria uses for topups) create the PI immediately for
+    // both card and us_bank_account flows, so the PI is known at every insertion
+    // path. trial / wire / direct_usdc sources legitimately have no PI.
+    check(
+      "chk_agent_topups_stripe_pi_required",
+      sql`${table.source} NOT IN ('stripe_card', 'stripe_ach') OR ${table.stripePaymentIntentId} IS NOT NULL`,
     ),
   ],
 );

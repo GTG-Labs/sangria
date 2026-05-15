@@ -375,7 +375,6 @@ type AgentOperator struct {
 	TrialCreditMicrounits *int64         `json:"trial_credit_microunits"`
 	StripeCustomerID      *string        `json:"stripe_customer_id"`
 	KYCStatus             AgentKYCStatus `json:"kyc_status"`
-	WalletStrategy        string         `json:"wallet_strategy"`
 	CreatedAt             time.Time      `json:"created_at"`
 }
 
