@@ -16,7 +16,7 @@ deployment/
 ## 🚀 Quick Start
 
 1. **Update versions** in `deployment/SDK_VERSIONS.md`
-2. **Make changes** to SDK code in `sdk/`
+2. **Make changes** to SDK code in `sdk/merchants/`
 3. **Push to main** → Automatic deployment!
 
 ## 📝 How to Deploy
@@ -37,8 +37,8 @@ DESCRIPTION: Fixed timeout issue in payment processing
 
 #### Step 2: Make SDK Changes
 Edit your SDK code in:
-- `sdk/sdk-typescript/` for TypeScript changes
-- `sdk/python/` for Python changes
+- `sdk/merchants/sdk-typescript/` for TypeScript changes
+- `sdk/merchants/python/` for Python changes
 
 #### Step 3: Push Both
 ```bash
@@ -51,8 +51,8 @@ git push origin main
 
 #### Step 1: Just Make SDK Changes
 Edit your SDK code in:
-- `sdk/sdk-typescript/` for TypeScript changes
-- `sdk/python/` for Python changes
+- `sdk/merchants/sdk-typescript/` for TypeScript changes
+- `sdk/merchants/python/` for Python changes
 
 #### Step 2: Push (Without Version Update)
 ```bash
@@ -79,7 +79,7 @@ git push origin main
 ## 🔄 Workflow Types
 
 ### 🤖 Automatic Deployment (`deploy-sdks.yml`)
-**Triggers:** Push to main with changes in `sdk/` or `deployment/SDK_VERSIONS.md`
+**Triggers:** Push to main with changes in `sdk/merchants/` or `deployment/SDK_VERSIONS.md`
 **Process:**
 1. Detects which SDKs have code changes
 2. Auto-bumps patch versions if SDK changed but versions didn't
@@ -148,7 +148,7 @@ Both individual workflows support:
 ## 🤖 Auto-Version Bump Details
 
 **When it happens:**
-- SDK code changes detected (`sdk/sdk-typescript/` or `sdk/python/`)
+- SDK code changes detected (`sdk/merchants/sdk-typescript/` or `sdk/merchants/python/`)
 - No version changes in `deployment/SDK_VERSIONS.md`
 
 **What it does:**

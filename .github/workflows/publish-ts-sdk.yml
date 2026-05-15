@@ -39,16 +39,16 @@ jobs:
         with:
           node-version: '20'
           cache: 'pnpm'
-          cache-dependency-path: sdk/sdk-typescript/pnpm-lock.yaml
+          cache-dependency-path: sdk/merchants/sdk-typescript/pnpm-lock.yaml
           registry-url: 'https://registry.npmjs.org'
 
       - name: Install dependencies
-        working-directory: sdk/sdk-typescript
+        working-directory: sdk/merchants/sdk-typescript
         run: pnpm install
 
       - name: Get version from SDK_VERSIONS.md
         id: version
-        working-directory: sdk/sdk-typescript
+        working-directory: sdk/merchants/sdk-typescript
         run: |
           # Extract TypeScript SDK section from deployment/SDK_VERSIONS.md in a section-aware way
           VERSION=$(awk '
@@ -59,13 +59,13 @@ jobs:
               print;
               exit
             }
-          ' ../../deployment/SDK_VERSIONS.md)
+          ' ../../../deployment/SDK_VERSIONS.md)
 
           echo "📖 Version from SDK_VERSIONS.md: $VERSION"
 
           # Validate VERSION is non-empty
           if [ -z "$VERSION" ]; then
-            echo "❌ ERROR: Failed to extract VERSION from ../../deployment/SDK_VERSIONS.md"
+            echo "❌ ERROR: Failed to extract VERSION from ../../../deployment/SDK_VERSIONS.md"
             echo "Expected: '## TypeScript SDK' section with 'VERSION: X.Y.Z' line"
             echo "Current SDK_VERSIONS.md content:"
             cat ../../deployment/SDK_VERSIONS.md
@@ -92,17 +92,17 @@ jobs:
           echo "📦 Publishing @sangria-sdk/core@$VERSION"
 
       - name: Build
-        working-directory: sdk/sdk-typescript
+        working-directory: sdk/merchants/sdk-typescript
         run: pnpm build
 
       - name: Publish (dry run)
         if: ${{ inputs.test_mode }}
-        working-directory: sdk/sdk-typescript
+        working-directory: sdk/merchants/sdk-typescript
         run: pnpm publish --dry-run --no-git-checks
 
       - name: Publish to npm
         if: ${{ !inputs.test_mode }}
-        working-directory: sdk/sdk-typescript
+        working-directory: sdk/merchants/sdk-typescript
         run: pnpm publish --access public --no-git-checks --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -112,7 +112,7 @@ jobs:
         run: |
           git config user.email "action@github.com"
           git config user.name "GitHub Action"
-          git add sdk/sdk-typescript/package.json
+          git add sdk/merchants/sdk-typescript/package.json
           git commit -m "chore: release @sangria-sdk/core@${{ steps.version.outputs.version }}"
           git tag "ts-sdk@${{ steps.version.outputs.version }}"
           git push && git push --tags

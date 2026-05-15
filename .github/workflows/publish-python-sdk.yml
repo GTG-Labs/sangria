@@ -40,12 +40,12 @@ jobs:
           pip install build twine
 
       - name: Install package dependencies
-        working-directory: sdk/python
+        working-directory: sdk/merchants/python
         run: pip install -e .
 
       - name: Get version from SDK_VERSIONS.md
         id: version
-        working-directory: sdk/python
+        working-directory: sdk/merchants/python
         run: |
           # Extract Python SDK section from deployment/SDK_VERSIONS.md in a section-aware way
           VERSION=$(awk '
@@ -56,12 +56,12 @@ jobs:
               print;
               exit
             }
-          ' ../../deployment/SDK_VERSIONS.md)
+          ' ../../../deployment/SDK_VERSIONS.md)
           echo "📖 Version from SDK_VERSIONS.md: $VERSION"
 
           # Verify VERSION is non-empty
           if [ -z "$VERSION" ]; then
-            echo "❌ ERROR: Failed to extract VERSION from ../../deployment/SDK_VERSIONS.md"
+            echo "❌ ERROR: Failed to extract VERSION from ../../../deployment/SDK_VERSIONS.md"
             echo "Expected pattern: '## Python SDK' section with 'VERSION: X.Y.Z' line"
             exit 1
           fi
@@ -115,19 +115,19 @@ jobs:
           echo "📦 Publishing sangria-core@$VERSION"
 
       - name: Build package
-        working-directory: sdk/python
+        working-directory: sdk/merchants/python
         run: python -m build
 
       - name: Publish (dry run)
         if: ${{ inputs.test_mode }}
-        working-directory: sdk/python
+        working-directory: sdk/merchants/python
         run: |
           echo "Dry run - would publish:"
           ls -la dist/
 
       - name: Publish to PyPI
         if: ${{ !inputs.test_mode }}
-        working-directory: sdk/python
+        working-directory: sdk/merchants/python
         run: python -m twine upload dist/*
         env:
           TWINE_USERNAME: __token__
@@ -138,14 +138,14 @@ jobs:
         run: |
           git config user.email "action@github.com"
           git config user.name "GitHub Action"
-          git add sdk/python/pyproject.toml
+          git add sdk/merchants/python/pyproject.toml
 
           # Only commit if there are changes to avoid no-op failures
-          if ! git diff --quiet --cached sdk/python/pyproject.toml; then
+          if ! git diff --quiet --cached sdk/merchants/python/pyproject.toml; then
             git commit -m "chore: release sangria-core@${{ steps.version.outputs.version }}"
-            echo "✅ Committed version bump for sdk/python/pyproject.toml"
+            echo "✅ Committed version bump for sdk/merchants/python/pyproject.toml"
           else
-            echo "ℹ️ No changes to sdk/python/pyproject.toml, skipping commit"
+            echo "ℹ️ No changes to sdk/merchants/python/pyproject.toml, skipping commit"
           fi
 
           # Create tag (will fail if tag already exists, but that's OK)

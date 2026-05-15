@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - 'sdk/**'
+      - 'sdk/merchants/**'
       - 'deployment/SDK_VERSIONS.md'
 
 permissions:
@@ -29,9 +29,9 @@ jobs:
         with:
           filters: |
             typescript:
-              - 'sdk/sdk-typescript/**'
+              - 'sdk/merchants/sdk-typescript/**'
             python:
-              - 'sdk/python/**'
+              - 'sdk/merchants/python/**'
             versions:
               - 'deployment/SDK_VERSIONS.md'
 

@@ -77,7 +77,7 @@ A TypeScript (and Python) **merchant-side** SDK for protecting API endpoints wit
 - Supports both `exact` (fixed price) and `upto` (variable price) schemes.
 - Credit verification and client-side ERC-3009 signing are planned future capabilities, not part of the current SDK.
 
-**Key files:** `sdk/sdk-typescript/src/core.ts`, `sdk/sdk-typescript/src/adapters/`
+**Key files:** `sdk/merchants/sdk-typescript/src/core.ts`, `sdk/merchants/sdk-typescript/src/adapters/`
 
 #### Sangria Backend (Orchestration Layer)
 

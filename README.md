@@ -125,16 +125,16 @@ sequenceDiagram
 | [`backend/`](backend/)                       | Orchestration API — accounts, payments, settlement | Go, Fiber, pgx                  |
 | [`dbSchema/`](dbSchema/)                     | Database schema (single source of truth)           | Drizzle ORM                     |
 | [`frontend/`](frontend/)                     | Documentation site                                 | Next.js, Tailwind               |
-| [`sdk/sdk-typescript/`](sdk/sdk-typescript/) | TypeScript merchant SDK (`@sangria-sdk/core`)      | TypeScript                      |
-| [`sdk/python/`](sdk/python/)                 | Python merchant SDK (`sangria-merchant-sdk`)       | Python, httpx                   |
+| [`sdk/merchants/sdk-typescript/`](sdk/merchants/sdk-typescript/) | TypeScript merchant SDK (`@sangria-sdk/core`)      | TypeScript                      |
+| [`sdk/merchants/python/`](sdk/merchants/python/)                 | Python merchant SDK (`sangria-merchant-sdk`)       | Python, httpx                   |
 | [`playground/`](playground/)                 | Example merchants + buyer client                   | Express, Fastify, Hono, FastAPI |
 
 ---
 
 ## Documentation
 
-- [TypeScript SDK](sdk/sdk-typescript/README.md) — full API, all framework adapters, bypass config
-- [Python SDK](sdk/python/README.md) — FastAPI adapter, API contract
+- [TypeScript SDK](sdk/merchants/sdk-typescript/README.md) — full API, all framework adapters, bypass config
+- [Python SDK](sdk/merchants/python/README.md) — FastAPI adapter, API contract
 - [Playground](playground/README.md) — run example merchants and test payments locally
 - [Backend API](backend/README.md) — API reference, self-hosting guide
 - [Architecture](Sangria-Architecture.md) — layered architecture deep-dive
