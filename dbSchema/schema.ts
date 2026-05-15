@@ -120,8 +120,12 @@ export const accounts = pgTable(
   (table) => [
     index("idx_accounts_organization_id").on(table.organizationId),
     index("idx_accounts_type").on(table.type),
-    uniqueIndex("uq_accounts_org_liability_usd")
-      .on(table.organizationId)
+    // Multiple LIABILITY/USD accounts per org are allowed (e.g. an org that's both
+    // a merchant and an agent operator has the merchant "USD Liability" plus
+    // "Agent Credits Trial — <orgID>" and "Agent Credits Paid — <orgID>"). The
+    // unique constraint scopes by name so each named account is unique within an org.
+    uniqueIndex("uq_accounts_org_name_liability_usd")
+      .on(table.organizationId, table.name)
       .where(sql`type = 'LIABILITY' AND currency = 'USD'`),
   ],
 );
@@ -421,7 +425,10 @@ export const agentPaymentStatusEnum = pgEnum("agent_payment_status", [
 ]);
 
 // ---------------------------------------------------------------------------
-// agentOperators — one row per organization that pays via the agent SDK
+// agentOperators — org-level enrollment in the agent SDK side of the network.
+// Mandatory 1:1 with organizations: every org has exactly one agent_operators
+// row, created atomically with the org during signup. Holds billing/identity
+// metadata only — spend caps and merchant allowlists live on agent_api_keys.
 // ---------------------------------------------------------------------------
 
 export const agentOperators = pgTable(
@@ -432,23 +439,8 @@ export const agentOperators = pgTable(
       .notNull()
       .references(() => organizations.id),
 
-    // Operator-wide default policy. Application code must set these on insert.
-    defaultMaxPerCallMicrounits: bigint("default_max_per_call_microunits", {
-      mode: "bigint",
-    }).notNull(),
-    defaultDailyCapMicrounits: bigint("default_daily_cap_microunits", {
-      mode: "bigint",
-    }).notNull(),
-    defaultMonthlyCapMicrounits: bigint("default_monthly_cap_microunits", {
-      mode: "bigint",
-    }).notNull(),
-    defaultRequireConfirmAboveMicrounits: bigint(
-      "default_require_confirm_above_microunits",
-      { mode: "bigint" },
-    ).notNull(),
-
     // Per-partner trial credit override. Null means use the env-var default
-    // applied by CreateAgentOperator at signup.
+    // applied at signup.
     trialCreditMicrounits: bigint("trial_credit_microunits", { mode: "bigint" }),
 
     // Set after first successful card top-up.
@@ -469,45 +461,40 @@ export const agentOperators = pgTable(
 );
 
 // ---------------------------------------------------------------------------
-// agents — per-operator named agents
-// ---------------------------------------------------------------------------
-
-export const agents = pgTable(
-  "agents",
-  {
-    id: uuid().primaryKey().defaultRandom(),
-    organizationId: uuid("organization_id")
-      .notNull()
-      .references(() => organizations.id),
-    name: varchar({ length: 255 }).notNull(),
-
-    // jsonb array of host strings; null = allow-all.
-    merchantAllowlist: jsonb("merchant_allowlist"),
-
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-  },
-  (table) => [
-    index("idx_agents_organization_id").on(table.organizationId),
-    uniqueIndex("uq_agents_org_name").on(table.organizationId, table.name),
-  ],
-);
-
-// ---------------------------------------------------------------------------
-// agentApiKeys — hashed API keys for agent operator authentication
+// agentApiKeys — hashed API keys for agent SDK authentication. The key IS the
+// agent identity: every payment is authenticated by exactly one key, so all
+// per-call policy (spend caps, merchant allowlist, URL-logging granularity)
+// lives here rather than on a separate "agent" entity.
 // ---------------------------------------------------------------------------
 
 export const agentApiKeys = pgTable(
   "agent_api_keys",
   {
     id: uuid().primaryKey().defaultRandom(),
-    organizationId: uuid("organization_id")
+    agentOperatorId: uuid("agent_operator_id")
       .notNull()
-      .references(() => organizations.id),
+      .references(() => agentOperators.id),
     keyHash: text("key_hash").notNull(),
     keyId: varchar("key_id", { length: 8 }).notNull(),
     name: varchar({ length: 255 }).notNull(),
+
+    // Per-key spend caps. Application code must set these on insert.
+    maxPerCallMicrounits: bigint("max_per_call_microunits", {
+      mode: "bigint",
+    }).notNull(),
+    dailyCapMicrounits: bigint("daily_cap_microunits", {
+      mode: "bigint",
+    }).notNull(),
+    monthlyCapMicrounits: bigint("monthly_cap_microunits", {
+      mode: "bigint",
+    }).notNull(),
+    requireConfirmAboveMicrounits: bigint(
+      "require_confirm_above_microunits",
+      { mode: "bigint" },
+    ).notNull(),
+
+    // jsonb array of host strings the key is permitted to pay; null = allow-all.
+    merchantAllowlist: jsonb("merchant_allowlist"),
 
     // Per-key policy: when false, only the host of the merchant URL is logged
     // on agent_payments rows (path + query are dropped).
@@ -522,12 +509,28 @@ export const agentApiKeys = pgTable(
   },
   (table) => [
     unique("uq_agent_api_keys_key_hash").on(table.keyHash),
-    index("idx_agent_api_keys_organization_id").on(table.organizationId),
+    index("idx_agent_api_keys_agent_operator_id").on(table.agentOperatorId),
     index("idx_agent_api_keys_key_id").on(table.keyId),
-    // One active key per (org, name); revoke before re-using a name.
+    // One active key per (operator, name); revoke before re-using a name.
     uniqueIndex("uq_agent_api_keys_active_name")
-      .on(table.organizationId, table.name)
+      .on(table.agentOperatorId, table.name)
       .where(sql`revoked_at IS NULL`),
+    check(
+      "chk_agent_api_keys_max_per_call_positive",
+      sql`${table.maxPerCallMicrounits} > 0`,
+    ),
+    check(
+      "chk_agent_api_keys_daily_cap_positive",
+      sql`${table.dailyCapMicrounits} > 0`,
+    ),
+    check(
+      "chk_agent_api_keys_monthly_cap_positive",
+      sql`${table.monthlyCapMicrounits} > 0`,
+    ),
+    check(
+      "chk_agent_api_keys_require_confirm_above_nonneg",
+      sql`${table.requireConfirmAboveMicrounits} >= 0`,
+    ),
   ],
 );
 
@@ -544,10 +547,8 @@ export const agentPayments = pgTable(
     // of the same logical call within its retry-policy window.
     idempotencyKey: varchar("idempotency_key", { length: 255 }).notNull(),
 
-    organizationId: uuid("organization_id")
-      .notNull()
-      .references(() => organizations.id),
-    agentId: uuid("agent_id").references(() => agents.id),
+    // Single owning key. Org/operator are reachable via api_key → agent_operator →
+    // organization; we don't denormalize to keep deletion/transfer semantics clean.
     apiKeyId: uuid("api_key_id")
       .notNull()
       .references(() => agentApiKeys.id),
@@ -600,8 +601,7 @@ export const agentPayments = pgTable(
   },
   (table) => [
     unique("uq_agent_payments_idempotency_key").on(table.idempotencyKey),
-    index("idx_agent_payments_organization_id").on(table.organizationId),
-    index("idx_agent_payments_agent_id").on(table.agentId),
+    index("idx_agent_payments_api_key_id").on(table.apiKeyId),
     index("idx_agent_payments_status").on(table.status),
     index("idx_agent_payments_created_at").on(table.createdAt.desc()),
     // Mirrors the transactions-table partial unique on confirmed tx_hash.
@@ -623,14 +623,22 @@ export const agentTopups = pgTable(
   "agent_topups",
   {
     id: uuid().primaryKey().defaultRandom(),
-    organizationId: uuid("organization_id")
+    agentOperatorId: uuid("agent_operator_id")
       .notNull()
-      .references(() => organizations.id),
+      .references(() => agentOperators.id),
 
     source: agentTopupSourceEnum().notNull(),
     amountCreditsMicrounits: bigint("amount_credits_microunits", {
       mode: "bigint",
     }).notNull(),
+
+    // Idempotency key — prevents duplicate topups from at-least-once webhook
+    // delivery (Stripe, Bridge.xyz) or accidental signup retries.
+    // Conventions per source:
+    //   - trial:        deterministic "trial-grant-<agent_operator_id>"
+    //   - stripe_*:     the Stripe payment_intent_id (e.g. "pi_3M...")
+    //   - wire / direct_usdc: caller-supplied UUID
+    idempotencyKey: varchar("idempotency_key", { length: 255 }).notNull(),
 
     // Stripe linkage — required for stripe_card / stripe_ach sources to support
     // refunds via the Stripe API.
@@ -655,10 +663,17 @@ export const agentTopups = pgTable(
     refundedAt: timestamp("refunded_at", { withTimezone: true }),
   },
   (table) => [
-    index("idx_agent_topups_organization_id").on(table.organizationId),
+    index("idx_agent_topups_agent_operator_id").on(table.agentOperatorId),
     index("idx_agent_topups_source").on(table.source),
     index("idx_agent_topups_stripe_payment_intent_id").on(
       table.stripePaymentIntentId,
+    ),
+    // Per-operator dedup. Same key value across different operators is allowed
+    // (extremely unlikely in practice since trial keys embed the operator ID and
+    // Stripe PIIDs are global, but keeps the constraint scoped correctly).
+    unique("uq_agent_topups_operator_idempotency_key").on(
+      table.agentOperatorId,
+      table.idempotencyKey,
     ),
     check(
       "chk_agent_topups_amount_positive",
@@ -667,30 +682,3 @@ export const agentTopups = pgTable(
   ],
 );
 
-// ---------------------------------------------------------------------------
-// waitlistEntries — invite-only beta gating for the agent operator dashboard
-// ---------------------------------------------------------------------------
-
-export const waitlistEntries = pgTable(
-  "waitlist_entries",
-  {
-    id: uuid().primaryKey().defaultRandom(),
-    email: varchar({ length: 320 }).notNull(), // RFC 5321 max
-    referrer: varchar({ length: 255 }),
-    company: varchar({ length: 255 }),
-    intendedUse: text("intended_use"),
-    approved: boolean().notNull().default(false),
-    approvedAt: timestamp("approved_at", { withTimezone: true }),
-    approvedBy: text("approved_by").references(() => users.workosId),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-  },
-  (table) => [
-    // Case-insensitive uniqueness on email.
-    uniqueIndex("uq_waitlist_entries_email_lower").on(
-      sql`lower(${table.email})`,
-    ),
-    index("idx_waitlist_entries_approved").on(table.approved),
-  ],
-);

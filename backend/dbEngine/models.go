@@ -374,57 +374,48 @@ func AgentCreditsPaidAccountName(orgID string) string {
 }
 
 type AgentOperator struct {
-	ID                                   string         `json:"id"`
-	OrganizationID                       string         `json:"organization_id"`
-	DefaultMaxPerCallMicrounits          int64          `json:"default_max_per_call_microunits"`
-	DefaultDailyCapMicrounits            int64          `json:"default_daily_cap_microunits"`
-	DefaultMonthlyCapMicrounits          int64          `json:"default_monthly_cap_microunits"`
-	DefaultRequireConfirmAboveMicrounits int64          `json:"default_require_confirm_above_microunits"`
-	TrialCreditMicrounits                *int64         `json:"trial_credit_microunits"`
-	StripeCustomerID                     *string        `json:"stripe_customer_id"`
-	KYCStatus                            AgentKYCStatus `json:"kyc_status"`
-	WalletStrategy                       string         `json:"wallet_strategy"`
-	CreatedAt                            time.Time      `json:"created_at"`
-}
-
-type Agent struct {
-	ID                string    `json:"id"`
-	OrganizationID    string    `json:"organization_id"`
-	Name              string    `json:"name"`
-	MerchantAllowlist *[]string `json:"merchant_allowlist"` // null = allow-all
-	CreatedAt         time.Time `json:"created_at"`
+	ID                    string         `json:"id"`
+	OrganizationID        string         `json:"organization_id"`
+	TrialCreditMicrounits *int64         `json:"trial_credit_microunits"`
+	StripeCustomerID      *string        `json:"stripe_customer_id"`
+	KYCStatus             AgentKYCStatus `json:"kyc_status"`
+	WalletStrategy        string         `json:"wallet_strategy"`
+	CreatedAt             time.Time      `json:"created_at"`
 }
 
 type AgentAPIKey struct {
-	ID             string     `json:"id"`
-	OrganizationID string     `json:"organization_id"`
+	ID              string `json:"id"`
+	AgentOperatorID string `json:"agent_operator_id"`
 	// KeyHash is the bcrypt hash of the full API key. NEVER serialized to clients.
-	KeyHash    string     `json:"-"`
-	KeyID      string     `json:"key_id"`
-	Name       string     `json:"name"`
-	LogFullURL bool       `json:"log_full_url"`
-	ExpiresAt  *time.Time `json:"expires_at"`
-	LastUsedAt *time.Time `json:"last_used_at"`
-	RevokedAt  *time.Time `json:"revoked_at"`
-	CreatedAt  time.Time  `json:"created_at"`
+	KeyHash                       string     `json:"-"`
+	KeyID                         string     `json:"key_id"`
+	Name                          string     `json:"name"`
+	MaxPerCallMicrounits          int64      `json:"max_per_call_microunits"`
+	DailyCapMicrounits            int64      `json:"daily_cap_microunits"`
+	MonthlyCapMicrounits          int64      `json:"monthly_cap_microunits"`
+	RequireConfirmAboveMicrounits int64      `json:"require_confirm_above_microunits"`
+	MerchantAllowlist             *[]string  `json:"merchant_allowlist"` // null = allow-all
+	LogFullURL                    bool       `json:"log_full_url"`
+	ExpiresAt                     *time.Time `json:"expires_at"`
+	LastUsedAt                    *time.Time `json:"last_used_at"`
+	RevokedAt                     *time.Time `json:"revoked_at"`
+	CreatedAt                     time.Time  `json:"created_at"`
 }
 
 type AgentPayment struct {
 	ID string `json:"id"`
 	// IdempotencyKey is internal dedup data; clients reference rows by ID.
 	// Hidden from JSON to mirror the withdrawals.IdempotencyKey pattern.
-	IdempotencyKey             string             `json:"-"`
-	OrganizationID             string             `json:"organization_id"`
-	AgentID                    *string            `json:"agent_id"`
-	APIKeyID                   string             `json:"api_key_id"`
-	MerchantURLOrHost          string             `json:"merchant_url_or_host"`
-	MerchantPayToAddress       string             `json:"merchant_pay_to_address"`
-	Network                    string             `json:"network"`
-	Scheme                     PaymentScheme      `json:"scheme"`
-	MaxAmountMicrounits        int64              `json:"max_amount_microunits"`
-	SettlementAmountMicrounits *int64             `json:"settlement_amount_microunits"`
-	PlatformFeeMicrounits      *int64             `json:"platform_fee_microunits"`
-	ValidBefore                time.Time          `json:"valid_before"`
+	IdempotencyKey             string        `json:"-"`
+	APIKeyID                   string        `json:"api_key_id"`
+	MerchantURLOrHost          string        `json:"merchant_url_or_host"`
+	MerchantPayToAddress       string        `json:"merchant_pay_to_address"`
+	Network                    string        `json:"network"`
+	Scheme                     PaymentScheme `json:"scheme"`
+	MaxAmountMicrounits        int64         `json:"max_amount_microunits"`
+	SettlementAmountMicrounits *int64        `json:"settlement_amount_microunits"`
+	PlatformFeeMicrounits      *int64        `json:"platform_fee_microunits"`
+	ValidBefore                time.Time     `json:"valid_before"`
 	// PaymentSignatureB64 is the signed PAYMENT-SIGNATURE payload. Sensitive
 	// authorization material; NEVER serialized to clients.
 	PaymentSignatureB64 string             `json:"-"`
@@ -441,28 +432,19 @@ type AgentPayment struct {
 
 type AgentTopup struct {
 	ID                      string           `json:"id"`
-	OrganizationID          string           `json:"organization_id"`
+	AgentOperatorID         string           `json:"agent_operator_id"`
 	Source                  AgentTopupSource `json:"source"`
 	AmountCreditsMicrounits int64            `json:"amount_credits_microunits"`
-	StripePaymentIntentID   *string          `json:"stripe_payment_intent_id"`
-	BridgeTransactionID     *string          `json:"bridge_transaction_id"`
-	LedgerTransactionID     *string          `json:"ledger_transaction_id"`
-	Status                  AgentTopupStatus `json:"status"`
-	FailureCode             *string          `json:"failure_code"`
-	FailureMessage          *string          `json:"failure_message"`
-	CreatedAt               time.Time        `json:"created_at"`
-	CompletedAt             *time.Time       `json:"completed_at"`
-	RefundedAt              *time.Time       `json:"refunded_at"`
-}
-
-type WaitlistEntry struct {
-	ID          string     `json:"id"`
-	Email       string     `json:"email"`
-	Referrer    *string    `json:"referrer"`
-	Company     *string    `json:"company"`
-	IntendedUse *string    `json:"intended_use"`
-	Approved    bool       `json:"approved"`
-	ApprovedAt  *time.Time `json:"approved_at"`
-	ApprovedBy  *string    `json:"approved_by"`
-	CreatedAt   time.Time  `json:"created_at"`
+	// IdempotencyKey dedupes against at-least-once webhook delivery and signup
+	// retries. Hidden from JSON to mirror the Withdrawal.IdempotencyKey pattern.
+	IdempotencyKey        string           `json:"-"`
+	StripePaymentIntentID *string          `json:"stripe_payment_intent_id"`
+	BridgeTransactionID   *string          `json:"bridge_transaction_id"`
+	LedgerTransactionID   *string          `json:"ledger_transaction_id"`
+	Status                AgentTopupStatus `json:"status"`
+	FailureCode           *string          `json:"failure_code"`
+	FailureMessage        *string          `json:"failure_message"`
+	CreatedAt             time.Time        `json:"created_at"`
+	CompletedAt           *time.Time       `json:"completed_at"`
+	RefundedAt            *time.Time       `json:"refunded_at"`
 }
