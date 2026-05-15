@@ -12,7 +12,6 @@ import {
   uniqueIndex,
   text,
   primaryKey,
-  jsonb,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
@@ -20,9 +19,6 @@ export const transactionStatusEnum = pgEnum("transaction_status", [
   "pending",
   "confirmed",
   "failed",
-  // HTTP returned ambiguous (timeout / 5xx) but on-chain state is unknown;
-  // requires reconciliation against the chain to determine final state.
-  "unresolved",
 ]);
 export const paymentSchemeEnum = pgEnum("payment_scheme", ["exact", "upto"]);
 export const directionEnum = pgEnum("direction", ["DEBIT", "CREDIT"]);
@@ -428,7 +424,7 @@ export const agentPaymentStatusEnum = pgEnum("agent_payment_status", [
 // agentOperators — org-level enrollment in the agent SDK side of the network.
 // Mandatory 1:1 with organizations: every org has exactly one agent_operators
 // row, created atomically with the org during signup. Holds billing/identity
-// metadata only — spend caps and merchant allowlists live on agent_api_keys.
+// metadata only — spend caps live on agent_api_keys.
 // ---------------------------------------------------------------------------
 
 export const agentOperators = pgTable(
@@ -463,8 +459,8 @@ export const agentOperators = pgTable(
 // ---------------------------------------------------------------------------
 // agentApiKeys — hashed API keys for agent SDK authentication. The key IS the
 // agent identity: every payment is authenticated by exactly one key, so all
-// per-call policy (spend caps, merchant allowlist, URL-logging granularity)
-// lives here rather than on a separate "agent" entity.
+// per-call policy (spend caps, URL-logging granularity) lives here rather than
+// on a separate "agent" entity.
 // ---------------------------------------------------------------------------
 
 export const agentApiKeys = pgTable(
@@ -492,9 +488,6 @@ export const agentApiKeys = pgTable(
       "require_confirm_above_microunits",
       { mode: "bigint" },
     ).notNull(),
-
-    // jsonb array of host strings the key is permitted to pay; null = allow-all.
-    merchantAllowlist: jsonb("merchant_allowlist"),
 
     // Per-key policy: when false, only the host of the merchant URL is logged
     // on agent_payments rows (path + query are dropped).

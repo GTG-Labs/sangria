@@ -96,13 +96,9 @@ type OrganizationInvitation struct {
 type TransactionStatus string
 
 const (
-	TransactionStatusPending    TransactionStatus = "pending"
-	TransactionStatusConfirmed  TransactionStatus = "confirmed"
-	TransactionStatusFailed     TransactionStatus = "failed"
-	// TransactionStatusUnresolved means the HTTP layer returned ambiguously
-	// (timeout / 5xx) but the on-chain settlement state is unknown. The row
-	// must be reconciled against the chain to determine final state.
-	TransactionStatusUnresolved TransactionStatus = "unresolved"
+	TransactionStatusPending   TransactionStatus = "pending"
+	TransactionStatusConfirmed TransactionStatus = "confirmed"
+	TransactionStatusFailed    TransactionStatus = "failed"
 )
 
 type PaymentScheme string
@@ -394,7 +390,6 @@ type AgentAPIKey struct {
 	DailyCapMicrounits            int64      `json:"daily_cap_microunits"`
 	MonthlyCapMicrounits          int64      `json:"monthly_cap_microunits"`
 	RequireConfirmAboveMicrounits int64      `json:"require_confirm_above_microunits"`
-	MerchantAllowlist             *[]string  `json:"merchant_allowlist"` // null = allow-all
 	LogFullURL                    bool       `json:"log_full_url"`
 	ExpiresAt                     *time.Time `json:"expires_at"`
 	LastUsedAt                    *time.Time `json:"last_used_at"`
