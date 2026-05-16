@@ -267,7 +267,18 @@ export function computedPrice(
       amount: result.data.amount,
     };
 
-    let handlerResponse = await handler(request, transaction);
+    let handlerResponse;
+    try {
+      handlerResponse = await handler(request, transaction);
+    } catch (err) {
+      if (err instanceof SangriaHandlerError) {
+        return new Response(JSON.stringify(err.body), {
+          status: err.statusCode,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      throw err;
+    }
 
     if (result.headers && handlerResponse instanceof Response) {
       const merged = new Headers(handlerResponse.headers);

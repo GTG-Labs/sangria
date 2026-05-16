@@ -218,7 +218,14 @@ export function computedPrice(
         amount: result.data.amount,
       };
 
-      return await handler(req, res, transaction);
+      try {
+        return await handler(req, res, transaction);
+      } catch (err) {
+        if (err instanceof SangriaHandlerError) {
+          return res.status(err.statusCode).json(err.body);
+        }
+        throw err;
+      }
     } catch (err) {
       return next(err);
     }

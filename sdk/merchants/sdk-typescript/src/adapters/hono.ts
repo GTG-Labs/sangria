@@ -246,6 +246,13 @@ export function computedPrice(
       amount: result.data.amount,
     };
 
-    return handler(c, transaction);
+    try {
+      return await handler(c, transaction);
+    } catch (err) {
+      if (err instanceof SangriaHandlerError) {
+        return c.json(err.body as Record<string, unknown>, err.statusCode as ContentfulStatusCode);
+      }
+      throw err;
+    }
   };
 }

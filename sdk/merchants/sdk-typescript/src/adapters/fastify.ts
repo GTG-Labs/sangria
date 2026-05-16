@@ -240,6 +240,13 @@ export function computedPrice<T = unknown>(
       amount: result.data.amount,
     };
 
-    return handler(request, reply, transaction);
+    try {
+      return await handler(request, reply, transaction);
+    } catch (err) {
+      if (err instanceof SangriaHandlerError) {
+        return reply.status(err.statusCode).send(err.body);
+      }
+      throw err;
+    }
   };
 }
