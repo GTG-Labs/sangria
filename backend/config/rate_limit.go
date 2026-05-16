@@ -13,7 +13,6 @@ var RateLimit RateLimitConfig
 // RateLimitConfig defines per-bucket request-per-minute limits.
 // Each limit is keyed to a different identity (API key, user, org, IP)
 // chosen to match the attack surface of the corresponding routes.
-// See CRITICAL_SECURITY_ISSUES.md § H1 for the threat model.
 type RateLimitConfig struct {
 	// V1PerMin caps settlement/generate-payment requests per merchant API key.
 	// Protects the facilitator from being flooded with outbound calls.

@@ -21,7 +21,7 @@ Payment settlement (cross-currency):
   USD net:   0                                   OK
 ```
 
-Amounts are positive integers in microunits (1 USD = 1,000,000). Direction (`DEBIT`/`CREDIT`) determines sign. No signed amounts, no ambiguity.
+Amounts are positive integers in microunits with direction encoding sign — see root `CLAUDE.md` § Non-Negotiable Principles § Money & Ledger for the canonical rule.
 
 ## Files
 

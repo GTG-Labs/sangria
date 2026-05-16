@@ -141,7 +141,7 @@ Two prefixes exist:
 - `sg_merchants_` — merchant API keys
 - `sg_agents_` — agent SDK API keys
 
-Test mode is not currently implemented. When it's added, the convention will be `sg_merchants_test_<id>_<rand>` and `sg_agents_test_<id>_<rand>` (absence of `_test_` implies live).
+Test mode is not currently implemented.
 
 ### Admin authentication
 
