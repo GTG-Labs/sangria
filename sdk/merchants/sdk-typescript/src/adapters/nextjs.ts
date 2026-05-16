@@ -1,5 +1,5 @@
-import type { SangriaRequestData, FixedPriceOptions, UptoPriceOptions, Settled, SettleFn } from "../types.js";
-import { toMicrounits } from "../types.js";
+import type { SangriaRequestData, SangriaTransaction, FixedPriceOptions, UptoPriceOptions, Settled, SettleFn } from "../types.js";
+import { toMicrounits, fromMicrounits } from "../types.js";
 import { Sangria, validateFixedPriceOptions, validateUptoPriceOptions, toBase64 } from "../core.js";
 import { SangriaHandlerError } from "../errors.js";
 
@@ -288,4 +288,73 @@ export function getSangria(
   request: any
 ): SangriaRequestData | undefined {
   return request.sangria;
+}
+
+// ── Computed price: dynamic exact pricing based on request ──
+//
+//   // app/api/buy/route.ts
+//   export const POST = computedPrice(sangria, calcPrice, async (request, transaction) => {
+//     return Response.json({ success: true, transactionId: transaction.hash });
+//   });
+//
+export function computedPrice(
+  sangria: Sangria,
+  calcPrice: (request: any) => number | Promise<number>,
+  handler: (request: any, transaction: SangriaTransaction) => Promise<any> | any
+): NextRouteHandler {
+  return async (request: any, context?: any) => {
+    const price = await calcPrice(request);
+
+    const paymentHeader =
+      request.headers.get("payment-signature") ?? undefined;
+    const resourceUrl = request.url;
+
+    const result = await sangria.handleFixedPrice(
+      { paymentHeader, resourceUrl },
+      { price }
+    );
+
+    if (result.action === "respond") {
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        ...result.headers,
+      };
+      return new Response(JSON.stringify(result.body), {
+        status: result.status,
+        headers,
+      });
+    }
+
+    if (toMicrounits(result.data.amount) !== toMicrounits(price)) {
+      return new Response(
+        JSON.stringify({ error: "Price mismatch: settled amount differs from computed price" }),
+        { status: 409, headers: { "Content-Type": "application/json" } }
+      );
+    }
+
+    request.sangria = result.data;
+
+    const transaction: SangriaTransaction = {
+      hash: result.data.transaction!,
+      network: result.data.network!,
+      payer: result.data.payer!,
+      amount: result.data.amount,
+    };
+
+    let handlerResponse = await handler(request, transaction);
+
+    if (result.headers && handlerResponse instanceof Response) {
+      const merged = new Headers(handlerResponse.headers);
+      for (const [k, v] of Object.entries(result.headers)) {
+        merged.set(k, v);
+      }
+      return new Response(handlerResponse.body, {
+        status: handlerResponse.status,
+        statusText: handlerResponse.statusText,
+        headers: merged,
+      });
+    }
+
+    return handlerResponse;
+  };
 }

@@ -64,9 +64,14 @@ export class Sangria {
   ): Promise<PaymentResult> {
     if (!ctx.paymentHeader) {
       return this.generatePayment(ctx, options);
-    } else {
-      return this.settlePayment(ctx.paymentHeader, options);
     }
+
+    const signedAmount = this.extractSignedAmountMicrounits(ctx.paymentHeader);
+    if (signedAmount != null && signedAmount !== toMicrounits(options.price)) {
+      return this.generatePayment(ctx, options);
+    }
+
+    return this.settlePayment(ctx.paymentHeader, options);
   }
 
   private async generatePayment(
@@ -130,7 +135,9 @@ export class Sangria {
       action: "proceed",
       data: {
         paid: true,
-        amount: options.price,
+        amount: result.amount != null
+          ? fromMicrounits(result.amount)
+          : (() => { throw new Error("Sangria: backend did not return settled amount"); })(),
         transaction: result.transaction,
         network: result.network,
         payer: result.payer,
@@ -228,6 +235,21 @@ export class Sangria {
     };
 
     return { settleFn, getResult: () => result };
+  }
+
+  // ── Payment header inspection ────────────────────────────────────
+
+  private extractSignedAmountMicrounits(paymentHeader: string): number | null {
+    try {
+      const json = typeof Buffer !== "undefined"
+        ? Buffer.from(paymentHeader, "base64").toString("utf-8")
+        : atob(paymentHeader);
+      const decoded = JSON.parse(json);
+      const value = Number(decoded?.payload?.authorization?.value);
+      return Number.isFinite(value) && value > 0 ? value : null;
+    } catch {
+      return null;
+    }
   }
 
   // ── HTTP transport ───────────────────────────────────────────────

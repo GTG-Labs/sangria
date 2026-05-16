@@ -18,6 +18,7 @@ from ..models import (
     FixedPriceOptions,
     PaymentProceeded,
     PaymentResponse,
+    SangriaTransaction,
     Settled,
     UptoPriceOptions,
     to_microunits,
@@ -243,6 +244,87 @@ def require_upto_price(
         sig = inspect.signature(func)
         wrapper.__signature__ = sig.replace(  # type: ignore[attr-defined]
             parameters=[p for p in sig.parameters.values() if p.name != "settle"]
+        )
+        return wrapper
+
+    return decorator
+
+
+# ── Computed price: dynamic exact pricing based on request ──
+#
+#   async def calc_price(request: Request) -> float:
+#       body = await request.json()
+#       product = await db.products.get(body["sku"])
+#       return product.price + calculate_shipping(body["address"])
+#
+#   @app.post("/buy")
+#   @computed_price(sangria, calc_price)
+#   async def buy(request: Request, transaction: SangriaTransaction):
+#       return {"success": True, "transaction_id": transaction.hash}
+#
+def computed_price(
+    merchant_client: SangriaMerchantClient,
+    calc_price: Callable[..., Any],
+) -> Callable[[Callable[..., Awaitable[Any]]], Callable[..., Awaitable[Any]]]:
+    def decorator(func: Callable[..., Awaitable[Any]]) -> Callable[..., Awaitable[Any]]:
+        @wraps(func)
+        async def wrapper(*args: Any, **kwargs: Any) -> Any:
+            request: Request | None = kwargs.get("request")
+            if request is None:
+                for arg in args:
+                    if isinstance(arg, Request):
+                        request = arg
+                        break
+
+            if request is None:
+                raise HTTPException(status_code=500, detail="FastAPI request not available")
+
+            if inspect.iscoroutinefunction(calc_price):
+                price = await calc_price(request)
+            else:
+                price = calc_price(request)
+
+            result = await merchant_client.handle_fixed_price(
+                payment_header=request.headers.get("PAYMENT-SIGNATURE"),
+                options=FixedPriceOptions(
+                    price=price,
+                    resource=str(request.url),
+                ),
+            )
+
+            if isinstance(result, PaymentResponse):
+                return JSONResponse(
+                    status_code=result.status_code,
+                    content=result.body,
+                    headers=result.headers,
+                )
+
+            if to_microunits(result.amount) != to_microunits(price):
+                return JSONResponse(
+                    status_code=409,
+                    content={"error": "Price mismatch: settled amount differs from computed price"},
+                )
+
+            transaction = SangriaTransaction(
+                hash=result.transaction or "",
+                network=result.network or "",
+                payer=result.payer or "",
+                amount=result.amount,
+            )
+
+            request.state.sangria_payment = result
+            kwargs["transaction"] = transaction
+            response = await func(*args, **kwargs)
+
+            if result.headers and isinstance(response, Response):
+                for k, v in result.headers.items():
+                    response.headers[k] = v
+
+            return response
+
+        sig = inspect.signature(func)
+        wrapper.__signature__ = sig.replace(  # type: ignore[attr-defined]
+            parameters=[p for p in sig.parameters.values() if p.name != "transaction"]
         )
         return wrapper
 

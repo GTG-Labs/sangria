@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
-import type { SangriaRequestData, FixedPriceOptions, UptoPriceOptions, Settled, SettleFn } from "../types.js";
-import { toMicrounits } from "../types.js";
+import type { SangriaRequestData, SangriaTransaction, FixedPriceOptions, UptoPriceOptions, Settled, SettleFn } from "../types.js";
+import { toMicrounits, fromMicrounits } from "../types.js";
 import { Sangria, validateFixedPriceOptions, validateUptoPriceOptions, toBase64 } from "../core.js";
 import { SangriaHandlerError } from "../errors.js";
 
@@ -210,6 +210,67 @@ export function uptoPrice(
       };
 
       return res.json(settleData.body);
+    } catch (err) {
+      return next(err);
+    }
+  };
+}
+
+// ── Computed price: dynamic exact pricing based on request ──
+//
+//   app.post("/buy", computedPrice(sangria, calcPrice, async (req, res, transaction) => {
+//     res.json({ transactionId: transaction.hash });
+//   }));
+//
+export function computedPrice(
+  sangria: Sangria,
+  calcPrice: (req: Request) => number | Promise<number>,
+  handler: (req: Request, res: Response, transaction: SangriaTransaction) => void | Promise<void>
+) {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const price = await calcPrice(req);
+
+      const result = await sangria.handleFixedPrice(
+        {
+          paymentHeader: Array.isArray(req.headers["payment-signature"])
+            ? req.headers["payment-signature"][0]
+            : req.headers["payment-signature"],
+          resourceUrl: `${req.protocol}://${req.hostname}${req.originalUrl}`,
+        },
+        { price }
+      );
+
+      if (result.action === "respond") {
+        if (result.headers) {
+          for (const [key, value] of Object.entries(result.headers)) {
+            res.setHeader(key, value);
+          }
+        }
+        return res.status(result.status).json(result.body);
+      }
+
+      if (toMicrounits(result.data.amount) !== toMicrounits(price)) {
+        return res.status(409).json({
+          error: "Price mismatch: settled amount differs from computed price",
+        });
+      }
+
+      if (result.headers) {
+        for (const [key, value] of Object.entries(result.headers)) {
+          res.setHeader(key, value);
+        }
+      }
+      req.sangria = result.data;
+
+      const transaction: SangriaTransaction = {
+        hash: result.data.transaction!,
+        network: result.data.network!,
+        payer: result.data.payer!,
+        amount: result.data.amount,
+      };
+
+      return await handler(req, res, transaction);
     } catch (err) {
       return next(err);
     }

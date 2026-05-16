@@ -4,8 +4,8 @@ import type {
   FastifyReply,
 } from "fastify";
 import fp from "fastify-plugin";
-import type { SangriaRequestData, FixedPriceOptions, UptoPriceOptions, Settled, SettleFn } from "../types.js";
-import { toMicrounits } from "../types.js";
+import type { SangriaRequestData, SangriaTransaction, FixedPriceOptions, UptoPriceOptions, Settled, SettleFn } from "../types.js";
+import { toMicrounits, fromMicrounits } from "../types.js";
 import { Sangria, validateFixedPriceOptions, validateUptoPriceOptions, toBase64 } from "../core.js";
 import { SangriaHandlerError } from "../errors.js";
 
@@ -13,9 +13,16 @@ export interface FastifyConfig {
   bypassPaymentIf?: (request: FastifyRequest) => boolean | Promise<boolean>;
 }
 
+export interface SangriaPluginOptions {
+  sangria?: Sangria;
+}
+
 declare module "fastify" {
   interface FastifyRequest {
     sangria?: SangriaRequestData;
+  }
+  interface FastifyInstance {
+    sangriaClient?: Sangria;
   }
 }
 
@@ -220,10 +227,81 @@ export function uptoPrice(
   };
 }
 
-/** Register this plugin before using fixedPrice() or uptoPrice() */
+/** Register this plugin before using fixedPrice(), uptoPrice(), or computedPrice(). */
 export const sangriaPlugin = fp(
-  async (fastify: FastifyInstance) => {
+  async (fastify: FastifyInstance, opts: SangriaPluginOptions) => {
     fastify.decorateRequest("sangria", undefined);
+    if (opts.sangria) {
+      fastify.decorate("sangriaClient", opts.sangria);
+    }
   },
   { name: "sangria" }
 );
+
+// ── Computed price: dynamic exact pricing based on request ──
+//
+//   const calcPrice = async (request) => {
+//     const product = await db.get(request.body.sku);
+//     return product.price + getShipping(request.body.address);
+//   };
+//
+//   fastify.post("/buy",
+//     computedPrice(calcPrice, async (request, reply, transaction) => {
+//       return { success: true, transactionId: transaction.hash };
+//     })
+//   );
+//
+//   Note: register sangriaPlugin with { sangria } before using computedPrice().
+//
+export function computedPrice<T = unknown>(
+  calcPrice: (request: FastifyRequest) => number | Promise<number>,
+  handler: (request: FastifyRequest, reply: FastifyReply, transaction: SangriaTransaction) => Promise<T>
+) {
+  return async (request: FastifyRequest, reply: FastifyReply) => {
+    const sangria = request.server.sangriaClient;
+    if (!sangria) {
+      throw new Error(
+        "Sangria: register sangriaPlugin with { sangria } option before using computedPrice()"
+      );
+    }
+
+    const price = await calcPrice(request);
+
+    const result = await sangria.handleFixedPrice(
+      {
+        paymentHeader: Array.isArray(request.headers["payment-signature"])
+          ? request.headers["payment-signature"][0]
+          : request.headers["payment-signature"],
+        resourceUrl: `${request.protocol}://${request.hostname}${request.url}`,
+      },
+      { price }
+    );
+
+    if (result.action === "respond") {
+      if (result.headers) {
+        reply.headers(result.headers);
+      }
+      return reply.status(result.status).send(result.body);
+    }
+
+    if (toMicrounits(result.data.amount) !== toMicrounits(price)) {
+      return reply.status(409).send({
+        error: "Price mismatch: settled amount differs from computed price",
+      });
+    }
+
+    if (result.headers) {
+      reply.headers(result.headers);
+    }
+    request.sangria = result.data;
+
+    const transaction: SangriaTransaction = {
+      hash: result.data.transaction!,
+      network: result.data.network!,
+      payer: result.data.payer!,
+      amount: result.data.amount,
+    };
+
+    return handler(request, reply, transaction);
+  };
+}

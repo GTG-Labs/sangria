@@ -1,13 +1,13 @@
 ## TypeScript SDK (@sangria-sdk/core)
 
 ```text
-VERSION: 0.3.3
-DESCRIPTION: Add Next.js adapter support
+VERSION: 0.4.0
+DESCRIPTION: Add computedPrice for dynamic pricing; pre-settlement signed-amount check
 ```
 
 ## Python SDK (sangria-core)
 
 ```text
-VERSION: 0.3.3
-DESCRIPTION: Maintenance release
+VERSION: 0.4.0
+DESCRIPTION: Add computed_price for dynamic pricing; pre-settlement signed-amount check
 ```
