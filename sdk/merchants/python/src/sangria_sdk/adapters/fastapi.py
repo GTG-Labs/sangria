@@ -252,15 +252,19 @@ def require_upto_price(
 
 # ── Computed price: dynamic exact pricing based on request ──
 #
-#   async def calc_price(request: Request) -> float:
-#       body = await request.json()
-#       product = await db.products.get(body["sku"])
-#       return product.price + calculate_shipping(body["address"])
-#
 #   @app.post("/buy")
 #   @computed_price(sangria, calc_price)
 #   async def buy(request: Request, transaction: SangriaTransaction):
 #       return {"success": True, "transaction_id": transaction.hash}
+#
+#   calc_price is called on every request (both the initial 402 and the paid
+#   retry). The second call is what detects body tampering — if an attacker
+#   replays a signature with a modified body, the recomputed price won't match
+#   the signed amount and the request is rejected before settlement.
+#
+#   bypass_if is intentionally not supported here. The existing bypass
+#   implementation in fixed_price/upto_price is being reworked; adding a known-
+#   faulty variant to a new API surface would just create more migration work.
 #
 def computed_price(
     merchant_client: SangriaMerchantClient,

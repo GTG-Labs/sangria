@@ -242,6 +242,15 @@ export function sangriaMiddleware(sangria: Sangria): MiddlewareHandler<SangriaEn
 //     })
 //   );
 //
+//   calcPrice is called on every request (both the initial 402 and the paid
+//   retry). The second call is what detects body tampering — if an attacker
+//   replays a signature with a modified body, the recomputed price won't match
+//   the signed amount and the request is rejected before settlement.
+//
+//   bypassPaymentIf is intentionally not supported here. The existing bypass
+//   implementation in fixedPrice/uptoPrice is being reworked; adding a known-
+//   faulty variant to a new API surface would just create more migration work.
+//
 export function computedPrice(
   calcPrice: (c: SangriaContext) => number | Promise<number>,
   handler: (c: SangriaContext, transaction: SangriaTransaction) => Promise<Response>

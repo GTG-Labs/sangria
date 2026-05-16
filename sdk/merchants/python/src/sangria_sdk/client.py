@@ -60,12 +60,18 @@ class SangriaMerchantClient:
         self.settle_endpoint = settle_endpoint
         self.verify_endpoint = verify_endpoint
 
+    # Returns None for unrecognized formats (e.g. Permit2, future x402 versions)
+    # so the backend — which understands all formats — remains the final authority.
     def _extract_signed_amount_microunits(self, payment_header: str) -> int | None:
         try:
             decoded = json.loads(base64.b64decode(payment_header))
             value = int(decoded["payload"]["authorization"]["value"])
-            return value if value > 0 else None
+            if value > 0:
+                return value
+            logger.warning("could not extract signed amount from payment header — deferring validation to backend")
+            return None
         except (json.JSONDecodeError, KeyError, ValueError, TypeError):
+            logger.warning("could not parse payment header — deferring validation to backend")
             return None
 
     async def handle_fixed_price(
@@ -76,6 +82,14 @@ class SangriaMerchantClient:
         if not payment_header:
             return await self._generate_payment(options)
 
+        # Pre-settlement tamper check: decode the cryptographically-signed amount
+        # from the payment header and compare it against the expected price.
+        #   - Mismatch → fresh 402 with the correct price. No money moves.
+        #   - Match → proceed to settle.
+        #   - None (unrecognized header format) → proceed to settle and let the
+        #     backend validate. The backend is the authoritative validator and
+        #     understands all payment formats; the SDK only parses EIP-3009
+        #     (exact scheme). Upto uses a separate code path entirely.
         signed_amount = self._extract_signed_amount_microunits(payment_header)
         if signed_amount is not None and signed_amount != to_microunits(options.price):
             return await self._generate_payment(options)

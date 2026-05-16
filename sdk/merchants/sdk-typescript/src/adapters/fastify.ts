@@ -240,11 +240,6 @@ export const sangriaPlugin = fp(
 
 // ── Computed price: dynamic exact pricing based on request ──
 //
-//   const calcPrice = async (request) => {
-//     const product = await db.get(request.body.sku);
-//     return product.price + getShipping(request.body.address);
-//   };
-//
 //   fastify.post("/buy",
 //     computedPrice(calcPrice, async (request, reply, transaction) => {
 //       return { success: true, transactionId: transaction.hash };
@@ -252,6 +247,15 @@ export const sangriaPlugin = fp(
 //   );
 //
 //   Note: register sangriaPlugin with { sangria } before using computedPrice().
+//
+//   calcPrice is called on every request (both the initial 402 and the paid
+//   retry). The second call is what detects body tampering — if an attacker
+//   replays a signature with a modified body, the recomputed price won't match
+//   the signed amount and the request is rejected before settlement.
+//
+//   bypassPaymentIf is intentionally not supported here. The existing bypass
+//   implementation in fixedPrice/uptoPrice is being reworked; adding a known-
+//   faulty variant to a new API surface would just create more migration work.
 //
 export function computedPrice<T = unknown>(
   calcPrice: (request: FastifyRequest) => number | Promise<number>,

@@ -371,7 +371,7 @@ func confirmAndRespond(c fiber.Ctx, pool *pgxpool.Pool, txn dbengine.Transaction
 		"transaction": settleResp.Transaction,
 		"network":     networkCAIP2,
 		"payer":       settleResp.Payer,
-		"amount":      chargeAmount,
+		"amount":      chargeAmount, // SDK relies on this field — do not remove
 	})
 }
 
@@ -591,7 +591,7 @@ func SettlePayment(pool *pgxpool.Pool) fiber.Handler {
 				"transaction": storedTxHash,
 				"network":     netConfig.CAIP2,
 				"payer":       "",
-				"amount":      chargeAmount,
+				"amount":      chargeAmount, // SDK relies on this field — do not remove
 			})
 		}
 		if errors.Is(err, dbengine.ErrPreviouslyFailed) {
