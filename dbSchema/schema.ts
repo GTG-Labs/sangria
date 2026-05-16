@@ -462,6 +462,11 @@ export const agentOperators = pgTable(
     uniqueIndex("uq_agent_operators_stripe_customer_id")
       .on(table.stripeCustomerId)
       .where(sql`stripe_customer_id IS NOT NULL`),
+    // Allow 0 (operator explicitly granted no trial) — distinct from NULL (use env default).
+    check(
+      "chk_agent_operators_trial_credit_nonneg",
+      sql`${table.trialCreditMicrounits} IS NULL OR ${table.trialCreditMicrounits} >= 0`,
+    ),
   ],
 );
 
@@ -620,6 +625,20 @@ export const agentPayments = pgTable(
     check(
       "chk_agent_payments_max_amount_positive",
       sql`${table.maxAmountMicrounits} > 0`,
+    ),
+    // Confirmed rows must carry all the fields that the confirm step fills in.
+    // Prevents a half-written confirm transaction from leaving the DB in a state
+    // where status says success but the proof (tx_hash, ledger entry, fee, amount)
+    // isn't there.
+    check(
+      "chk_agent_payments_confirmed_fields_required",
+      sql`${table.status} <> 'confirmed' OR (
+        ${table.settlementAmountMicrounits} IS NOT NULL
+        AND ${table.platformFeeMicrounits} IS NOT NULL
+        AND ${table.txHash} IS NOT NULL
+        AND ${table.ledgerTransactionId} IS NOT NULL
+        AND ${table.confirmedAt} IS NOT NULL
+      )`,
     ),
   ],
 );

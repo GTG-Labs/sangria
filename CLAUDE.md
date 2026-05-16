@@ -59,6 +59,7 @@ Use these terms consistently:
 
 ### Money & Ledger
 - **Double-entry bookkeeping for all USDC->USD flows.** Every movement debits and credits named accounts. The ledger is the source of truth for balances.
+- **Amounts are always non-negative; direction carries the sign.** Every monetary column in the schema is a positive bigint with a CHECK ≥ 0 (or > 0 where zero is meaningless); the sign of a balance change is encoded by a separate `direction` column drawing from `directionEnum` (`DEBIT` / `CREDIT`). Balances are derived at query time via `SUM(CASE WHEN direction='CREDIT' THEN amount ELSE -amount END)`. **Never introduce a signed amount column, and never model a reversal/refund/correction as a status-mutation of the original row** — make it a new row in the appropriate event-log table with `direction='DEBIT'` and a refund-flavored source value. This is the textbook event-sourced ledger pattern and matches Stripe's own `balance_transactions` model. Applies repo-wide: schema, Go structs, SDK surfaces.
 - **x402 settle is NOT HTTP-idempotent.** Persist intent before calling. Treat ambiguous HTTP responses as UNRESOLVED (not failed) and reconcile against on-chain state. Never release a fiat payout on HTTP 200 alone.
 - **EIP-3009 nonces give on-chain idempotency but do not solve HTTP-layer ambiguity.** Don't conflate the two.
 - Amount representation is defined in § Product Vocabulary (microunits).
