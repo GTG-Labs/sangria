@@ -7,7 +7,7 @@ import { LayoutDashboard, ArrowLeftRight, SlidersHorizontal } from "lucide-react
 const NAV_ITEMS = [
   { href: "/client/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/client/transactions", label: "Transactions", icon: ArrowLeftRight },
-  { href: "/client/settings", label: "Balance", icon: SlidersHorizontal },
+  { href: "/client/settings", label: "Settings", icon: SlidersHorizontal },
 ];
 
 export default function ClientSidebarNav() {

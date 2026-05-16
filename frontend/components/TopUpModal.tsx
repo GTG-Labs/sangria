@@ -48,6 +48,9 @@ function TopUpContent({ onClose, savedCard }: { onClose: () => void; savedCard: 
   return (
     <div
       ref={overlayRef}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="topup-modal-title"
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
       onClick={(e) => { if (e.target === overlayRef.current) onClose(); }}
     >
@@ -63,7 +66,7 @@ function TopUpContent({ onClose, savedCard }: { onClose: () => void; savedCard: 
         {success ? (
           <div className="flex flex-col items-center gap-3 py-6 text-center">
             <CheckCircle className="h-10 w-10 text-green-500" />
-            <p className="text-lg font-semibold text-gray-900">Top-up initiated</p>
+            <p id="topup-modal-title" className="text-lg font-semibold text-gray-900">Top-up initiated</p>
             <p className="text-sm text-gray-500">
               ${effectiveAmount.toFixed(2)} will arrive as USDC on Base in ~1 minute.
             </p>
@@ -73,7 +76,7 @@ function TopUpContent({ onClose, savedCard }: { onClose: () => void; savedCard: 
           </div>
         ) : (
           <>
-            <h2 className="text-base font-semibold text-gray-900">Top Up Agent</h2>
+            <h2 id="topup-modal-title" className="text-base font-semibold text-gray-900">Top Up Agent</h2>
             <p className="mt-1 text-sm text-gray-500">
               Choose an amount to add to your agent&apos;s USDC balance.
             </p>

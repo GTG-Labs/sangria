@@ -24,7 +24,7 @@ interface ClientTransaction {
   amount: number;
   currency: string;
   status: "confirmed" | "pending" | "failed";
-  created_at: string;
+  createdAt: string;
 }
 
 const STATUS_STYLES: Record<string, string> = {
@@ -184,7 +184,7 @@ export default function ClientDashboardContent() {
                       -{formatAmount(tx.amount)}&nbsp;{tx.currency}
                     </td>
                     <td className="py-3.5 pl-6 pr-4 text-right text-xs text-gray-400">
-                      {timeAgo(tx.created_at)}
+                      {timeAgo(tx.createdAt)}
                     </td>
                   </tr>
                 ))}

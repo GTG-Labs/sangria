@@ -15,7 +15,7 @@ export async function GET() {
       amount: 500_000,
       currency: "USDC",
       status: "confirmed",
-      created_at: new Date(now - 2 * 60 * 1000).toISOString(),
+      createdAt: new Date(now - 2 * 60 * 1000).toISOString(),
     },
     {
       id: "2",
@@ -23,7 +23,7 @@ export async function GET() {
       amount: 250_000,
       currency: "USDC",
       status: "confirmed",
-      created_at: new Date(now - 35 * 60 * 1000).toISOString(),
+      createdAt: new Date(now - 35 * 60 * 1000).toISOString(),
     },
     {
       id: "3",
@@ -31,7 +31,7 @@ export async function GET() {
       amount: 1_000_000,
       currency: "USDC",
       status: "confirmed",
-      created_at: new Date(now - 3 * 60 * 60 * 1000).toISOString(),
+      createdAt: new Date(now - 3 * 60 * 60 * 1000).toISOString(),
     },
     {
       id: "4",
@@ -39,7 +39,7 @@ export async function GET() {
       amount: 100_000,
       currency: "USDC",
       status: "confirmed",
-      created_at: new Date(now - 26 * 60 * 60 * 1000).toISOString(),
+      createdAt: new Date(now - 26 * 60 * 60 * 1000).toISOString(),
     },
     {
       id: "5",
@@ -47,15 +47,15 @@ export async function GET() {
       amount: 750_000,
       currency: "USDC",
       status: "failed",
-      created_at: new Date(now - 50 * 60 * 60 * 1000).toISOString(),
+      createdAt: new Date(now - 50 * 60 * 60 * 1000).toISOString(),
     },
   ];
 
   return Response.json({
     data: stub,
     pagination: {
-      next_cursor: null,
-      has_more: false,
+      nextCursor: null,
+      hasMore: false,
       count: stub.length,
       limit: 20,
       total: stub.length,

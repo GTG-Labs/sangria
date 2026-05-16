@@ -10,14 +10,14 @@ interface ClientTransaction {
   amount: number;
   currency: string;
   status: "confirmed" | "pending" | "failed";
-  created_at: string;
+  createdAt: string;
 }
 
 interface PaginatedResponse {
   data: ClientTransaction[];
   pagination: {
-    next_cursor: string | null;
-    has_more: boolean;
+    nextCursor: string | null;
+    hasMore: boolean;
     count: number;
     limit: number;
     total: number;
@@ -96,8 +96,8 @@ export default function ClientTransactionsContent() {
         if (signal.aborted) return;
 
         setTransactions((prev) => (cursor ? [...prev, ...data.data] : data.data));
-        setNextCursor(data.pagination.next_cursor);
-        setHasMore(data.pagination.has_more);
+        setNextCursor(data.pagination.nextCursor);
+        setHasMore(data.pagination.hasMore);
         setTotal(data.pagination.total);
         setError(null);
       } else {
@@ -186,7 +186,7 @@ export default function ClientTransactionsContent() {
                     -{formatAmount(tx.amount, tx.currency)}
                   </td>
                   <td className="py-4 pl-6 pr-4 text-right text-sm text-gray-400">
-                    {timeAgo(tx.created_at)}
+                    {timeAgo(tx.createdAt)}
                   </td>
                 </tr>
               ))}
