@@ -376,7 +376,7 @@ func AgentCreditsPaidAccountName(orgID string) string {
 type AgentOperator struct {
 	ID                    string         `json:"id"`
 	OrganizationID        string         `json:"organization_id"`
-	TrialCreditMicrounits *int64         `json:"trial_credit_microunits"`
+	TrialCreditMicrounits int64          `json:"trial_credit_microunits"`
 	StripeCustomerID      *string        `json:"stripe_customer_id"`
 	KYCStatus             AgentKYCStatus `json:"kyc_status"`
 	Address   json.RawMessage `json:"address,omitempty"`
