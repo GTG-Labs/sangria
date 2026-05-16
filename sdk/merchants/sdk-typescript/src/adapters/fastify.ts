@@ -5,13 +5,9 @@ import type {
 } from "fastify";
 import fp from "fastify-plugin";
 import type { SangriaRequestData, SangriaTransaction, FixedPriceOptions, UptoPriceOptions, Settled, SettleFn } from "../types.js";
-import { toMicrounits, fromMicrounits } from "../types.js";
+import { toMicrounits } from "../types.js";
 import { Sangria, validateFixedPriceOptions, validateUptoPriceOptions, toBase64 } from "../core.js";
 import { SangriaHandlerError } from "../errors.js";
-
-export interface FastifyConfig {
-  bypassPaymentIf?: (request: FastifyRequest) => boolean | Promise<boolean>;
-}
 
 export interface SangriaPluginOptions {
   sangria?: Sangria;
@@ -36,36 +32,10 @@ export function fixedPrice(
   sangria: Sangria,
   options: FixedPriceOptions,
   handler: (request: FastifyRequest, reply: FastifyReply) => Promise<unknown>,
-  config?: FastifyConfig
 ) {
   validateFixedPriceOptions(options);
 
   return async (request: FastifyRequest, reply: FastifyReply) => {
-    let shouldBypass = false;
-    if (config?.bypassPaymentIf) {
-      try {
-        const result = await config.bypassPaymentIf(request);
-        shouldBypass = result === true;
-      } catch (err) {
-        console.error(
-          "[sangria-sdk] bypassPaymentIf threw; falling through to payment required",
-          err,
-        );
-        shouldBypass = false;
-      }
-    }
-    if (shouldBypass) {
-      request.sangria = { paid: false, amount: 0 };
-      try {
-        return await handler(request, reply);
-      } catch (err) {
-        if (err instanceof SangriaHandlerError) {
-          return reply.status(err.statusCode).send(err.body);
-        }
-        throw err;
-      }
-    }
-
     const result = await sangria.handleFixedPrice(
       {
         paymentHeader: Array.isArray(request.headers["payment-signature"])
@@ -111,42 +81,10 @@ export function uptoPrice(
   sangria: Sangria,
   options: UptoPriceOptions,
   handler: (request: FastifyRequest, settle: SettleFn) => Promise<Settled>,
-  config?: FastifyConfig
 ) {
   validateUptoPriceOptions(options);
 
   return async (request: FastifyRequest, reply: FastifyReply) => {
-    let shouldBypass = false;
-    if (config?.bypassPaymentIf) {
-      try {
-        const result = await config.bypassPaymentIf(request);
-        shouldBypass = result === true;
-      } catch (err) {
-        console.error(
-          "[sangria-sdk] bypassPaymentIf threw; falling through to payment required",
-          err,
-        );
-        shouldBypass = false;
-      }
-    }
-    if (shouldBypass) {
-      request.sangria = { paid: false, amount: 0 };
-      const { settleFn, getResult } = sangria.createSettleFn(options.maxPrice);
-      try {
-        await handler(request, settleFn);
-      } catch (err) {
-        if (err instanceof SangriaHandlerError) {
-          return reply.status(err.statusCode).send(err.body);
-        }
-        throw err;
-      }
-      const settleData = getResult();
-      if (!settleData) {
-        throw new Error("Sangria: handler must call settle()");
-      }
-      return reply.send(settleData.body);
-    }
-
     const paymentHeader = Array.isArray(request.headers["payment-signature"])
       ? request.headers["payment-signature"][0]
       : request.headers["payment-signature"];
@@ -252,10 +190,6 @@ export const sangriaPlugin = fp(
 //   retry). The second call is what detects body tampering — if an attacker
 //   replays a signature with a modified body, the recomputed price won't match
 //   the signed amount and the request is rejected before settlement.
-//
-//   bypassPaymentIf is intentionally not supported here. The existing bypass
-//   implementation in fixedPrice/uptoPrice is being reworked; adding a known-
-//   faulty variant to a new API surface would just create more migration work.
 //
 export function computedPrice<T = unknown>(
   calcPrice: (request: FastifyRequest) => number | Promise<number>,

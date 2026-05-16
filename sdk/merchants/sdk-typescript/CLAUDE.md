@@ -20,7 +20,6 @@ No test suite or linter is configured.
 ## Conventions
 
 - Adapters must match host framework idioms: Express uses `(req, res, next)` middleware, Fastify uses `preHandler` hooks, Hono uses `c.set()`
-- `bypassPaymentIf(req) => boolean` is wired in at adapter construction and checked per-request before any facilitator call. See root CLAUDE.md § Product Vocabulary for semantics.
 - Scheme selection goes through a dedicated helper per scheme, not a union type with a discriminator. `fixedPrice` exposes the `exact` scheme. See root CLAUDE.md § Product Vocabulary for scheme semantics.
 - Default base URL points to production (`https://api.getsangria.com`). Override via `baseUrl` constructor option.
 - Playground merchants (`playground/merchant-express/`, etc.) are the integration test bed for this SDK — update the relevant example when changing adapter behavior. See root CLAUDE.md § Non-Negotiable Principles for the repo-wide rule.

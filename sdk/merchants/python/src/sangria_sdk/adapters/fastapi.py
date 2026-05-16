@@ -3,7 +3,6 @@ from __future__ import annotations
 import base64
 import inspect
 import json
-import logging
 from collections.abc import Awaitable, Callable
 from functools import wraps
 from typing import Any
@@ -24,9 +23,6 @@ from ..models import (
     to_microunits,
 )
 
-logger = logging.getLogger("sangria_sdk")
-
-
 # ── Entry point: decorate a FastAPI route to require payment ──
 #
 #   @require_sangria_payment(client, amount=0.01)
@@ -36,10 +32,7 @@ def require_sangria_payment(
     merchant_client: SangriaMerchantClient,
     amount: float,
     description: str | None = None,
-    bypass_if: Callable[[Request], bool] | None = None,
 ) -> Callable[[Callable[..., Awaitable[Any]]], Callable[..., Awaitable[Any]]]:
-    # Validate at decorator construction time so misconfigured prices fail at
-    # app startup instead of on the first paying request.
     validate_fixed_price_options(
         FixedPriceOptions(price=amount, resource="", description=description)
     )
@@ -56,24 +49,6 @@ def require_sangria_payment(
 
             if request is None:
                 raise HTTPException(status_code=500, detail="FastAPI request not available")
-
-            should_bypass = False
-            if bypass_if is not None:
-                try:
-                    should_bypass = bypass_if(request)
-                except Exception:
-                    # Fail closed: if the merchant's bypass_if callback raises,
-                    # enforce payment rather than risk letting the request
-                    # through for free.
-                    logger.exception(
-                        "[sangria-sdk] bypass_if raised; falling through to payment required"
-                    )
-                    should_bypass = False
-            if should_bypass:
-                try:
-                    return await func(*args, **kwargs)
-                except SangriaHandlerException as exc:
-                    return JSONResponse(status_code=exc.status_code, content=exc.body)
 
             result = await merchant_client.handle_fixed_price(
                 payment_header=request.headers.get("PAYMENT-SIGNATURE"),
@@ -120,7 +95,6 @@ def require_upto_price(
     merchant_client: SangriaMerchantClient,
     max_price: float,
     description: str | None = None,
-    bypass_if: Callable[[Request], bool] | None = None,
 ) -> Callable[[Callable[..., Awaitable[Any]]], Callable[..., Awaitable[Any]]]:
     UptoPriceOptions(max_price=max_price, resource="", description=description)
 
@@ -136,29 +110,6 @@ def require_upto_price(
 
             if request is None:
                 raise HTTPException(status_code=500, detail="FastAPI request not available")
-
-            should_bypass = False
-            if bypass_if is not None:
-                try:
-                    should_bypass = bypass_if(request)
-                except Exception:
-                    logger.exception(
-                        "[sangria-sdk] bypass_if raised; falling through to payment required"
-                    )
-                    should_bypass = False
-
-            if should_bypass:
-                request.state.sangria_payment = PaymentProceeded(paid=False, amount=0)
-                settle_fn, get_result = merchant_client.create_settle_fn(max_price)
-                kwargs["settle"] = settle_fn
-                try:
-                    result = await func(*args, **kwargs)
-                except SangriaHandlerException as exc:
-                    return JSONResponse(status_code=exc.status_code, content=exc.body)
-                if not isinstance(result, Settled):
-                    raise TypeError("Sangria: handler must return settle(amount, body)")
-                settle_data = get_result()
-                return JSONResponse(content=settle_data[1] if settle_data else None)
 
             payment_header = request.headers.get("PAYMENT-SIGNATURE")
 
@@ -261,10 +212,6 @@ def require_upto_price(
 #   retry). The second call is what detects body tampering — if an attacker
 #   replays a signature with a modified body, the recomputed price won't match
 #   the signed amount and the request is rejected before settlement.
-#
-#   bypass_if is intentionally not supported here. The existing bypass
-#   implementation in fixed_price/upto_price is being reworked; adding a known-
-#   faulty variant to a new API surface would just create more migration work.
 #
 def computed_price(
     merchant_client: SangriaMerchantClient,

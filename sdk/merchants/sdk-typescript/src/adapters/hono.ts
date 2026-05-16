@@ -1,7 +1,7 @@
 import type { MiddlewareHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { SangriaRequestData, SangriaTransaction, FixedPriceOptions, UptoPriceOptions, Settled, SettleFn } from "../types.js";
-import { toMicrounits, fromMicrounits } from "../types.js";
+import { toMicrounits } from "../types.js";
 import { Sangria, validateFixedPriceOptions, validateUptoPriceOptions, toBase64 } from "../core.js";
 import { SangriaHandlerError } from "../errors.js";
 
@@ -14,10 +14,6 @@ type SangriaEnv = {
 
 type SangriaContext = Parameters<MiddlewareHandler<SangriaEnv>>[0];
 
-export interface HonoConfig {
-  bypassPaymentIf?: (c: SangriaContext) => boolean | Promise<boolean>;
-}
-
 // ── Entry point: add as middleware to gate a route behind payment ──
 //
 //   app.get("/premium", fixedPrice(sangria, { price: 0.01 }), handler)
@@ -25,31 +21,10 @@ export interface HonoConfig {
 export function fixedPrice(
   sangria: Sangria,
   options: FixedPriceOptions,
-  config?: HonoConfig
 ): MiddlewareHandler<SangriaEnv> {
   validateFixedPriceOptions(options);
 
   return async (c, next) => {
-    let shouldBypass = false;
-    if (config?.bypassPaymentIf) {
-      try {
-        // Await handles async callbacks; strict === true rejects Promises/truthy non-booleans.
-        const result = await config.bypassPaymentIf(c);
-        shouldBypass = result === true;
-      } catch (err) {
-        // Fail closed: any throw/reject enforces payment.
-        console.error(
-          "[sangria-sdk] bypassPaymentIf threw; falling through to payment required",
-          err,
-        );
-        shouldBypass = false;
-      }
-    }
-    if (shouldBypass) {
-      c.set("sangria", { paid: false, amount: 0 });
-      return next();
-    }
-
     const url = new URL(c.req.url);
     const result = await sangria.handleFixedPrice(
       {
@@ -95,42 +70,10 @@ export function uptoPrice(
   sangria: Sangria,
   options: UptoPriceOptions,
   handler: (c: SangriaContext, settle: SettleFn) => Promise<Settled>,
-  config?: HonoConfig
 ): MiddlewareHandler<SangriaEnv> {
   validateUptoPriceOptions(options);
 
   return async (c, _next) => {
-    let shouldBypass = false;
-    if (config?.bypassPaymentIf) {
-      try {
-        const result = await config.bypassPaymentIf(c);
-        shouldBypass = result === true;
-      } catch (err) {
-        console.error(
-          "[sangria-sdk] bypassPaymentIf threw; falling through to payment required",
-          err,
-        );
-        shouldBypass = false;
-      }
-    }
-    if (shouldBypass) {
-      c.set("sangria", { paid: false, amount: 0 });
-      const { settleFn, getResult } = sangria.createSettleFn(options.maxPrice);
-      try {
-        await handler(c, settleFn);
-      } catch (err) {
-        if (err instanceof SangriaHandlerError) {
-          return c.json(err.body as Record<string, unknown>, err.statusCode as ContentfulStatusCode);
-        }
-        throw err;
-      }
-      const settleData = getResult();
-      if (!settleData) {
-        throw new Error("Sangria: handler must call settle()");
-      }
-      return c.json(settleData.body as Record<string, unknown>);
-    }
-
     const paymentHeader = c.req.header("payment-signature");
     const url = new URL(c.req.url);
     const resourceUrl = url.origin + url.pathname + url.search;
@@ -246,10 +189,6 @@ export function sangriaMiddleware(sangria: Sangria): MiddlewareHandler<SangriaEn
 //   retry). The second call is what detects body tampering — if an attacker
 //   replays a signature with a modified body, the recomputed price won't match
 //   the signed amount and the request is rejected before settlement.
-//
-//   bypassPaymentIf is intentionally not supported here. The existing bypass
-//   implementation in fixedPrice/uptoPrice is being reworked; adding a known-
-//   faulty variant to a new API surface would just create more migration work.
 //
 export function computedPrice(
   calcPrice: (c: SangriaContext) => number | Promise<number>,
