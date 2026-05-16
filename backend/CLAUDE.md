@@ -36,8 +36,9 @@ All database queries live in `dbEngine/`. Handlers call dbEngine functions, neve
 - `APIKeyAuthMiddleware` sets these Fiber locals on success:
   - `key_type` (`string`: `"merchant"` | `"agent"`) — neutral, set always; read this when a handler should support both types
   - `organization_id` (`string` UUID) — neutral, set always
-  - `merchant_api_key` (`*dbengine.Merchant`) — set when `key_type == "merchant"`; kept for backward compatibility with existing readers (`merchantHandlers/payments.go`, `ratelimit/rate_limit.go`). New code should prefer the neutral locals.
-  Agent keys currently reject at the auth layer (no backing table yet) — the `KeyTypeAgent` switch branch in the middleware is defensive only.
+  - `merchant_api_key` (`*dbengine.Merchant`) — set when `key_type == "merchant"`
+  - `agent_api_key` (`*dbengine.AgentAPIKey`) — set when `key_type == "agent"`; carries the per-key spend caps + agent_name + revoked/expires state
+  - `agent_operator` (`*dbengine.AgentOperator`) — set when `key_type == "agent"`; loaded during auth so handlers can read `OrganizationID`, KYC status, etc. without a second DB call
 - All handler functions return `fiber.Handler` (closure over `*pgxpool.Pool`)
 - Organization context resolved via `ResolveOrganizationContext()` helper — checks `?org_id=` param, falls back to single membership or personal org
 - Facilitator helpers split by idempotency: `doFacilitatorRequestIdempotent` retries on transient failures (use for `Verify`), `doFacilitatorRequestOnce` makes a single attempt (use for `Settle`). Do not retry `Settle` at the HTTP layer — see root CLAUDE.md § Non-Negotiable Principles for why.
