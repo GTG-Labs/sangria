@@ -2,7 +2,10 @@
 // defined in dbSchema/. The TypeScript schema is the source of truth.
 package dbengine
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 type Direction string
 
@@ -327,11 +330,12 @@ const (
 type AgentTopupSource string
 
 const (
-	AgentTopupSourceTrial      AgentTopupSource = "trial"
-	AgentTopupSourceStripeCard AgentTopupSource = "stripe_card"
-	AgentTopupSourceStripeACH  AgentTopupSource = "stripe_ach"
-	AgentTopupSourceWire       AgentTopupSource = "wire"
-	AgentTopupSourceDirectUSDC AgentTopupSource = "direct_usdc"
+	AgentTopupSourceTrial        AgentTopupSource = "trial"
+	AgentTopupSourceStripeCard   AgentTopupSource = "stripe_card"
+	AgentTopupSourceStripeACH    AgentTopupSource = "stripe_ach"
+	AgentTopupSourceWire         AgentTopupSource = "wire"
+	AgentTopupSourceDirectUSDC   AgentTopupSource = "direct_usdc"
+	AgentTopupSourceStripeRefund AgentTopupSource = "stripe_refund"
 )
 
 type AgentTopupStatus string
@@ -340,7 +344,6 @@ const (
 	AgentTopupStatusPending   AgentTopupStatus = "pending"
 	AgentTopupStatusCompleted AgentTopupStatus = "completed"
 	AgentTopupStatusFailed    AgentTopupStatus = "failed"
-	AgentTopupStatusRefunded  AgentTopupStatus = "refunded"
 )
 
 type AgentPaymentStatus string
@@ -354,11 +357,12 @@ const (
 
 // Per-operator agent credit account names. One pair (Trial + Paid) is created
 // per operator on first top-up; the names embed the orgID so balance lookups
-// are queryable by name pattern. Use the helper functions below — never
-// hand-concatenate the em-dash separator at call sites.
+// are queryable by name pattern. ASCII colon separator is intentional — easy
+// to type, paste, and grep across psql / logs / CSV pipelines. Use the helper
+// functions below — never hand-concatenate the separator at call sites.
 const (
-	AgentCreditsTrialNamePrefix = "Agent Credits Trial — "
-	AgentCreditsPaidNamePrefix  = "Agent Credits Paid — "
+	AgentCreditsTrialNamePrefix = "Agent Credits Trial: "
+	AgentCreditsPaidNamePrefix  = "Agent Credits Paid: "
 )
 
 func AgentCreditsTrialAccountName(orgID string) string {
@@ -389,7 +393,6 @@ type AgentAPIKey struct {
 	DailyCapMicrounits            int64      `json:"daily_cap_microunits"`
 	MonthlyCapMicrounits          int64      `json:"monthly_cap_microunits"`
 	RequireConfirmAboveMicrounits int64      `json:"require_confirm_above_microunits"`
-	LogFullURL                    bool       `json:"log_full_url"`
 	ExpiresAt                     *time.Time `json:"expires_at"`
 	LastUsedAt                    *time.Time `json:"last_used_at"`
 	RevokedAt                     *time.Time `json:"revoked_at"`
@@ -418,15 +421,23 @@ type AgentPayment struct {
 	LedgerTransactionID *string            `json:"ledger_transaction_id"`
 	FailureCode         *string            `json:"failure_code"`
 	FailureMessage      *string            `json:"failure_message"`
-	CreatedAt           time.Time          `json:"created_at"`
-	ConfirmedAt         *time.Time         `json:"confirmed_at"`
-	FailedAt            *time.Time         `json:"failed_at"`
-	UnresolvedAt        *time.Time         `json:"unresolved_at"`
+	// Metadata is an operator-supplied passthrough — Sangria never reads or
+	// interprets it. Stored as raw JSON so any shape the operator wants is
+	// preserved verbatim; nullable.
+	Metadata     json.RawMessage `json:"metadata,omitempty"`
+	CreatedAt    time.Time       `json:"created_at"`
+	ConfirmedAt  *time.Time      `json:"confirmed_at"`
+	FailedAt     *time.Time      `json:"failed_at"`
+	UnresolvedAt *time.Time      `json:"unresolved_at"`
 }
 
 type AgentTopup struct {
-	ID                      string           `json:"id"`
-	AgentOperatorID         string           `json:"agent_operator_id"`
+	ID              string `json:"id"`
+	AgentOperatorID string `json:"agent_operator_id"`
+	// Direction is CREDIT for topups (any non-refund source) and DEBIT for
+	// refund rows (currently only stripe_refund). Operator balance derives
+	// from SUM(CREDIT.amount) - SUM(DEBIT.amount) WHERE status='completed'.
+	Direction               Direction        `json:"direction"`
 	Source                  AgentTopupSource `json:"source"`
 	AmountCreditsMicrounits int64            `json:"amount_credits_microunits"`
 	// IdempotencyKey dedupes against at-least-once webhook delivery and signup
@@ -440,5 +451,4 @@ type AgentTopup struct {
 	FailureMessage        *string          `json:"failure_message"`
 	CreatedAt             time.Time        `json:"created_at"`
 	CompletedAt           *time.Time       `json:"completed_at"`
-	RefundedAt            *time.Time       `json:"refunded_at"`
 }

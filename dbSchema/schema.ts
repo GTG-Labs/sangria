@@ -12,6 +12,7 @@ import {
   uniqueIndex,
   text,
   primaryKey,
+  jsonb,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
@@ -118,7 +119,7 @@ export const accounts = pgTable(
     index("idx_accounts_type").on(table.type),
     // Multiple LIABILITY/USD accounts per org are allowed (e.g. an org that's both
     // a merchant and an agent operator has the merchant "USD Liability" plus
-    // "Agent Credits Trial — <orgID>" and "Agent Credits Paid — <orgID>"). The
+    // "Agent Credits Trial: <orgID>" and "Agent Credits Paid: <orgID>"). The
     // unique constraint scopes by name so each named account is unique within an org.
     uniqueIndex("uq_accounts_org_name_liability_usd")
       .on(table.organizationId, table.name)
@@ -404,13 +405,17 @@ export const agentTopupSourceEnum = pgEnum("agent_topup_source", [
   "stripe_ach",
   "wire",
   "direct_usdc",
+  // Refund of a prior stripe_card / stripe_ach topup. Models refunds as their
+  // own balance event (direction='DEBIT') rather than mutating the original
+  // topup row — matches Stripe's own balance_transactions model and supports
+  // partial + multiple refunds against one charge naturally.
+  "stripe_refund",
 ]);
 
 export const agentTopupStatusEnum = pgEnum("agent_topup_status", [
   "pending",
   "completed",
   "failed",
-  "refunded",
 ]);
 
 export const agentPaymentStatusEnum = pgEnum("agent_payment_status", [
@@ -463,8 +468,8 @@ export const agentOperators = pgTable(
 // ---------------------------------------------------------------------------
 // agentApiKeys — hashed API keys for agent SDK authentication. The key IS the
 // agent identity: every payment is authenticated by exactly one key, so all
-// per-call policy (spend caps, URL-logging granularity) lives here rather than
-// on a separate "agent" entity.
+// per-call policy (spend caps) lives here rather than on a separate "agent"
+// entity.
 // ---------------------------------------------------------------------------
 
 export const agentApiKeys = pgTable(
@@ -492,10 +497,6 @@ export const agentApiKeys = pgTable(
       "require_confirm_above_microunits",
       { mode: "bigint" },
     ).notNull(),
-
-    // Per-key policy: when false, only the host of the merchant URL is logged
-    // on agent_payments rows (path + query are dropped).
-    logFullUrl: boolean("log_full_url").notNull().default(true),
 
     expiresAt: timestamp("expires_at", { withTimezone: true }),
     lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
@@ -550,8 +551,9 @@ export const agentPayments = pgTable(
       .notNull()
       .references(() => agentApiKeys.id),
 
-    // What the agent is paying for. merchantUrlOrHost stores the full URL when
-    // the api key has logFullUrl=true; just the host otherwise.
+    // The full URL the agent paid for. Operators rename this to a host-only column
+    // (or add a per-key privacy toggle) when a sensitive-content use case needs it;
+    // V1 records full URLs unconditionally for dashboard / debugging value.
     merchantUrlOrHost: text("merchant_url_or_host").notNull(),
     merchantPayToAddress: varchar("merchant_pay_to_address", {
       length: 64,
@@ -589,6 +591,16 @@ export const agentPayments = pgTable(
     failureCode: varchar("failure_code", { length: 100 }),
     failureMessage: text("failure_message"),
 
+    // Operator-supplied passthrough — Stripe/Plaid/Square-style metadata field.
+    // Sangria never reads or interprets this; it's a free-form key/value bag the
+    // SDK forwards from the operator's call site so they can correlate Sangria
+    // payments back to their internal events (user prompt, LLM model name,
+    // conversation/thread ID, framework run ID, OpenTelemetry trace IDs, a
+    // user-supplied "purpose" string, etc.). Nullable for V1; size enforcement
+    // is intentionally deferred until we see real usage patterns and decide
+    // whether to cap by total bytes, key count, or per-value length.
+    metadata: jsonb("metadata"),
+
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -613,7 +625,13 @@ export const agentPayments = pgTable(
 );
 
 // ---------------------------------------------------------------------------
-// agentTopups — every credit grant: trial, Stripe, ACH, wire, direct USDC
+// agentTopups — append-only event log for every balance change to an agent
+// operator's credit account. Each row is one event: a topup (CREDIT direction)
+// or a refund (DEBIT direction). Refunds are NEVER row-mutations of the
+// original topup — they're their own rows. Matches Stripe's balance_transactions
+// model and the existing merchant-side ledger_entries pattern; supports
+// partial + multiple refunds per charge naturally. Operator balance =
+// SUM(CREDIT.amount) - SUM(DEBIT.amount) WHERE status='completed'.
 // ---------------------------------------------------------------------------
 
 export const agentTopups = pgTable(
@@ -624,29 +642,37 @@ export const agentTopups = pgTable(
       .notNull()
       .references(() => agentOperators.id),
 
+    // CREDIT = adds to operator balance (any non-refund source).
+    // DEBIT  = subtracts from operator balance (currently only stripe_refund).
+    // Reuses the merchant-side directionEnum so both sides of the network use
+    // the same accounting vocabulary. amount_credits_microunits is always
+    // positive; direction tells you the sign.
+    direction: directionEnum().notNull(),
     source: agentTopupSourceEnum().notNull(),
     amountCreditsMicrounits: bigint("amount_credits_microunits", {
       mode: "bigint",
     }).notNull(),
 
-    // Idempotency key — prevents duplicate topups from at-least-once webhook
+    // Idempotency key — prevents duplicate rows from at-least-once webhook
     // delivery (Stripe, Bridge.xyz) or accidental signup retries.
     // Conventions per source:
-    //   - trial:        deterministic "trial-grant-<agent_operator_id>"
-    //   - stripe_*:     the Stripe payment_intent_id (e.g. "pi_3M...")
+    //   - trial:          deterministic "trial-grant-<agent_operator_id>"
+    //   - stripe_card / stripe_ach: the Stripe payment_intent_id (e.g. "pi_3M...")
+    //   - stripe_refund:  the Stripe refund_id (e.g. "re_3M...")
     //   - wire / direct_usdc: caller-supplied UUID
     idempotencyKey: varchar("idempotency_key", { length: 255 }).notNull(),
 
-    // Stripe linkage — required for stripe_card / stripe_ach sources to support
-    // refunds via the Stripe API. Enforced by chk_agent_topups_stripe_pi_required
-    // below; always known at insert time because Stripe Checkout in mode='payment'
-    // creates the PaymentIntent immediately for both card and ACH.
+    // Stripe linkage — required for stripe_card / stripe_ach (the PI for that
+    // charge) and stripe_refund (the PI being refunded). Lets us refund via
+    // Stripe's API and group refunds by their original charge.
     stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 255 }),
 
     // Bridge.xyz (or successor) USD→USDC conversion record.
     bridgeTransactionId: varchar("bridge_transaction_id", { length: 255 }),
 
-    // Ledger linkage — the credit-side ledger transaction.
+    // Ledger linkage — the corresponding internal transaction
+    // (CREDIT topups debit a fiat-source account and credit the operator's
+    // Agent Credits Paid/Trial account; DEBIT refunds reverse that).
     ledgerTransactionId: uuid("ledger_transaction_id").references(
       () => transactions.id,
     ),
@@ -659,7 +685,6 @@ export const agentTopups = pgTable(
       .notNull()
       .defaultNow(),
     completedAt: timestamp("completed_at", { withTimezone: true }),
-    refundedAt: timestamp("refunded_at", { withTimezone: true }),
   },
   (table) => [
     index("idx_agent_topups_agent_operator_id").on(table.agentOperatorId),
@@ -668,8 +693,8 @@ export const agentTopups = pgTable(
       table.stripePaymentIntentId,
     ),
     // Per-operator dedup. Same key value across different operators is allowed
-    // (extremely unlikely in practice since trial keys embed the operator ID and
-    // Stripe PIIDs are global, but keeps the constraint scoped correctly).
+    // (extremely unlikely in practice since trial keys embed the operator ID
+    // and Stripe IDs are global, but keeps the constraint scoped correctly).
     unique("uq_agent_topups_operator_idempotency_key").on(
       table.agentOperatorId,
       table.idempotencyKey,
@@ -678,14 +703,23 @@ export const agentTopups = pgTable(
       "chk_agent_topups_amount_positive",
       sql`${table.amountCreditsMicrounits} > 0`,
     ),
-    // Stripe topups must always carry the PaymentIntent ID so we can refund via
-    // Stripe's API later. Verified against Stripe docs: mode='payment' Checkout
-    // Sessions (which Sangria uses for topups) create the PI immediately for
-    // both card and us_bank_account flows, so the PI is known at every insertion
-    // path. trial / wire / direct_usdc sources legitimately have no PI.
+    // Stripe-related rows must always carry the PaymentIntent ID so we can
+    // refund via Stripe's API and group refund rows by original charge.
+    // Verified against Stripe docs: mode='payment' Checkout Sessions create
+    // the PI immediately for both card and us_bank_account flows; refund
+    // webhooks include the original PI in the payload. trial / wire /
+    // direct_usdc sources legitimately have no PI.
     check(
       "chk_agent_topups_stripe_pi_required",
-      sql`${table.source} NOT IN ('stripe_card', 'stripe_ach') OR ${table.stripePaymentIntentId} IS NOT NULL`,
+      sql`${table.source} NOT IN ('stripe_card', 'stripe_ach', 'stripe_refund') OR ${table.stripePaymentIntentId} IS NOT NULL`,
+    ),
+    // Direction <-> source coherence. V1: stripe_refund is the only DEBIT
+    // source; every other source is a CREDIT. Keeps row semantics impossible
+    // to corrupt (e.g. a "trial CREDIT topup" inserted as DEBIT, or a refund
+    // inserted as CREDIT and silently inflating someone's balance).
+    check(
+      "chk_agent_topups_direction_matches_source",
+      sql`(${table.direction} = 'DEBIT' AND ${table.source} = 'stripe_refund') OR (${table.direction} = 'CREDIT' AND ${table.source} <> 'stripe_refund')`,
     ),
   ],
 );
