@@ -79,6 +79,8 @@ class SangriaMerchantClient:
         payment_header: str | None,
         options: FixedPriceOptions,
     ) -> PaymentResult:
+        validate_fixed_price_options(options)
+
         if not payment_header:
             return await self._generate_payment(options)
 

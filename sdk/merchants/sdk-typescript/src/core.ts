@@ -62,6 +62,8 @@ export class Sangria {
     ctx: PaymentContext,
     options: FixedPriceOptions
   ): Promise<PaymentResult> {
+    validateFixedPriceOptions(options);
+
     if (!ctx.paymentHeader) {
       return this.generatePayment(ctx, options);
     }
