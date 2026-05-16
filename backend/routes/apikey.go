@@ -28,11 +28,8 @@ func RegisterAPIKeyRoutes(app *fiber.App, pool *pgxpool.Pool) {
 	merchant.Post("/settle-payment", merchantHandlers.SettlePayment(pool))
 
 	// Agent SDK routes — gated to reject merchant keys for the mirror reason.
-	// Sign/Confirm/Reconcile are placeholders returning 501 until the CDP
-	// integration + agent-payment ledger design land; Balance is functional.
+	// The /buy purchase flow lands as part of the discovery-model PR; this
+	// group currently exposes only the balance lookup.
 	agent := v1.Group("/agent", auth.RequireAgentKey)
-	agent.Post("/sign", agentHandlers.SignAgentPayment(pool))
-	agent.Post("/confirm", agentHandlers.ConfirmAgentPayment(pool))
-	agent.Post("/reconcile/:intent_id", agentHandlers.ReconcileAgentPayment(pool))
 	agent.Get("/balance", agentHandlers.GetAgentBalance(pool))
 }
