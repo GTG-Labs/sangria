@@ -291,7 +291,9 @@ export const withdrawals = pgTable(
 
     // Money
     amount: bigint({ mode: "bigint" }).notNull(),
-    fee: bigint({ mode: "bigint" }).notNull().default(sql`0`),
+    fee: bigint({ mode: "bigint" })
+      .notNull()
+      .default(sql`0`),
     netAmount: bigint("net_amount", { mode: "bigint" }).notNull(),
 
     // Status lifecycle
@@ -442,10 +444,23 @@ export const agentOperators = pgTable(
 
     // Per-partner trial credit override. Null means use the env-var default
     // applied at signup.
-    trialCreditMicrounits: bigint("trial_credit_microunits", { mode: "bigint" }),
+    trialCreditMicrounits: bigint("trial_credit_microunits", {
+      mode: "bigint",
+    }),
 
     // Set after first successful card top-up.
     stripeCustomerId: varchar("stripe_customer_id", { length: 255 }),
+
+    // Stored physical addresses keyed by purpose. Lets agent-driven purchases
+    // of physical goods ship to the right place and lets us send receipts.
+    // Shape (Stripe-Address-shaped values so we can round-trip with Stripe
+    // Checkout, which collects addresses):
+    //   {
+    //     "billing":  { line1, line2, city, state, postal_code, country },
+    //     "shipping": { line1, line2, city, state, postal_code, country },
+    //     ... (any other operator-defined label)
+    //   }
+    address: jsonb("address"),
 
     kycStatus: agentKycStatusEnum("kyc_status").notNull().default("unverified"),
 
@@ -486,7 +501,8 @@ export const agentApiKeys = pgTable(
       .references(() => agentOperators.id),
     keyHash: text("key_hash").notNull(),
     keyId: varchar("key_id", { length: 8 }).notNull(),
-    name: varchar({ length: 255 }).notNull(),
+    name: varchar({ length: 255 }).notNull(), // user-supplied label
+    agentName: varchar("agent_name", { length: 32 }).notNull(), // auto-generated whimsical handle (e.g. "paddlepop")
 
     // Per-key spend caps. Application code must set these on insert.
     maxPerCallMicrounits: bigint("max_per_call_microunits", {
@@ -498,10 +514,9 @@ export const agentApiKeys = pgTable(
     monthlyCapMicrounits: bigint("monthly_cap_microunits", {
       mode: "bigint",
     }).notNull(),
-    requireConfirmAboveMicrounits: bigint(
-      "require_confirm_above_microunits",
-      { mode: "bigint" },
-    ).notNull(),
+    requireConfirmAboveMicrounits: bigint("require_confirm_above_microunits", {
+      mode: "bigint",
+    }).notNull(),
 
     expiresAt: timestamp("expires_at", { withTimezone: true }),
     lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
@@ -742,4 +757,3 @@ export const agentTopups = pgTable(
     ),
   ],
 );
-

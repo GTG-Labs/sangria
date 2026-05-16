@@ -15,7 +15,6 @@ import (
 // RateLimit helpers build Fiber limiter middleware scoped to different
 // identities. Every limit is a fixed 1-minute window with an in-memory
 // counter (one backend instance assumed; swap the Storage when scaling out).
-// See CRITICAL_SECURITY_ISSUES.md § H1 for the threat model.
 
 // skipIfDisabled returns a Next function that bypasses the limiter entirely
 // when RATE_LIMIT_DISABLED=true. Emergency kill switch.

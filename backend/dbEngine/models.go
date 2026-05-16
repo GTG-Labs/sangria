@@ -379,16 +379,18 @@ type AgentOperator struct {
 	TrialCreditMicrounits *int64         `json:"trial_credit_microunits"`
 	StripeCustomerID      *string        `json:"stripe_customer_id"`
 	KYCStatus             AgentKYCStatus `json:"kyc_status"`
-	CreatedAt             time.Time      `json:"created_at"`
+	Address   json.RawMessage `json:"address,omitempty"`
+	CreatedAt time.Time       `json:"created_at"`
 }
 
 type AgentAPIKey struct {
 	ID              string `json:"id"`
 	AgentOperatorID string `json:"agent_operator_id"`
 	// KeyHash is the bcrypt hash of the full API key. NEVER serialized to clients.
-	KeyHash                       string     `json:"-"`
-	KeyID                         string     `json:"key_id"`
-	Name                          string     `json:"name"`
+	KeyHash string `json:"-"`
+	KeyID   string `json:"key_id"`
+	Name                          string     `json:"name"`       // user-supplied label
+	AgentName                     string     `json:"agent_name"` // auto-generated whimsical handle (e.g. "paddlepop")
 	MaxPerCallMicrounits          int64      `json:"max_per_call_microunits"`
 	DailyCapMicrounits            int64      `json:"daily_cap_microunits"`
 	MonthlyCapMicrounits          int64      `json:"monthly_cap_microunits"`
