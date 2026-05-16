@@ -111,7 +111,9 @@ func CreateAgentOperator(ctx context.Context, pool *pgxpool.Pool, orgID string, 
 // in microunits. Sums confirmed ledger entries against the two per-org
 // LIABILITY/USD accounts; a CREDIT raises the balance (we owe more), a DEBIT
 // lowers it. Returns (0, 0, nil) for an org with no agent operator yet.
-func GetAgentCreditsBalances(ctx context.Context, pool *pgxpool.Pool, orgID string) (trial, paid int64, err error) {
+// Accepts a pool or pgx.Tx via the queryer interface so CreateAgentPayment can
+// recompute the balance inside its FOR-UPDATE lock.
+func GetAgentCreditsBalances(ctx context.Context, q queryer, orgID string) (trial, paid int64, err error) {
 	if strings.TrimSpace(orgID) == "" {
 		return 0, 0, fmt.Errorf("organization ID must not be empty")
 	}
@@ -119,7 +121,7 @@ func GetAgentCreditsBalances(ctx context.Context, pool *pgxpool.Pool, orgID stri
 	trialName := AgentCreditsTrialAccountName(orgID)
 	paidName := AgentCreditsPaidAccountName(orgID)
 
-	err = pool.QueryRow(ctx, `
+	err = q.QueryRow(ctx, `
 		SELECT
 		  COALESCE(SUM(CASE WHEN a.name = $1 AND le.direction = 'CREDIT' THEN le.amount
 		                    WHEN a.name = $1 AND le.direction = 'DEBIT'  THEN -le.amount
