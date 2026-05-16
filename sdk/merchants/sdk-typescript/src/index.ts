@@ -18,6 +18,7 @@ export type {
   FixedPriceOptions,
   UptoPriceOptions,
   SangriaRequestData,
+  SangriaTransaction,
   X402ChallengePayload,
   PaymentContext,
   PaymentResult,

@@ -44,7 +44,6 @@ Sangria runs two strictly separated environments — different Postgres database
 Use these terms consistently:
 
 - **Payment schemes**: `exact` (fixed price) and `upto` (variable, capped)
-- **Bypass**: `bypassPaymentIf` (TS) / `bypass_if` (Python) — skip payment for API-key authenticated callers
 - **Facilitator**: the Coinbase-hosted x402 settle endpoint that sponsors gas
 - **Settle vs verify**: distinct facilitator operations — verify checks signature/balance/nonce, settle executes the on-chain transfer
 - **Ledger**: internal double-entry credit system with idempotent transactions. Source of truth for balances.

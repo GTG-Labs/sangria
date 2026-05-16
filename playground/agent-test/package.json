@@ -6,7 +6,8 @@
   "scripts": {
     "test": "tsx src/index.ts all",
     "test:exact": "tsx src/index.ts exact",
-    "test:upto": "tsx src/index.ts upto"
+    "test:upto": "tsx src/index.ts upto",
+    "test:computed": "tsx src/index.ts computed"
   },
   "dependencies": {
     "@x402/evm": "^2.11.0",

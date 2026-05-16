@@ -62,11 +62,26 @@ export class Sangria {
     ctx: PaymentContext,
     options: FixedPriceOptions
   ): Promise<PaymentResult> {
+    validateFixedPriceOptions(options);
+
     if (!ctx.paymentHeader) {
       return this.generatePayment(ctx, options);
-    } else {
-      return this.settlePayment(ctx.paymentHeader, options);
     }
+
+    // Pre-settlement tamper check: decode the cryptographically-signed amount
+    // from the payment header and compare it against the expected price.
+    //   - Mismatch → fresh 402 with the correct price. No money moves.
+    //   - Match → proceed to settle.
+    //   - null (unrecognized header format) → proceed to settle and let the
+    //     backend validate. The backend is the authoritative validator and
+    //     understands all payment formats; the SDK only parses EIP-3009
+    //     (exact scheme). Upto uses a separate code path entirely.
+    const signedAmount = this.extractSignedAmountMicrounits(ctx.paymentHeader);
+    if (signedAmount != null && signedAmount !== toMicrounits(options.price)) {
+      return this.generatePayment(ctx, options);
+    }
+
+    return this.settlePayment(ctx.paymentHeader, options);
   }
 
   private async generatePayment(
@@ -130,7 +145,9 @@ export class Sangria {
       action: "proceed",
       data: {
         paid: true,
-        amount: options.price,
+        amount: result.amount != null
+          ? fromMicrounits(result.amount)
+          : (() => { throw new Error("Sangria: backend did not return settled amount"); })(),
         transaction: result.transaction,
         network: result.network,
         payer: result.payer,
@@ -228,6 +245,26 @@ export class Sangria {
     };
 
     return { settleFn, getResult: () => result };
+  }
+
+  // ── Payment header inspection ────────────────────────────────────
+
+  // Returns null for unrecognized formats (e.g. Permit2, future x402 versions)
+  // so the backend — which understands all formats — remains the final authority.
+  private extractSignedAmountMicrounits(paymentHeader: string): number | null {
+    try {
+      const json = typeof Buffer !== "undefined"
+        ? Buffer.from(paymentHeader, "base64").toString("utf-8")
+        : atob(paymentHeader);
+      const decoded = JSON.parse(json);
+      const value = Number(decoded?.payload?.authorization?.value);
+      if (Number.isFinite(value) && value > 0) return value;
+      console.warn("[sangria-sdk] could not extract signed amount from payment header — deferring validation to backend");
+      return null;
+    } catch {
+      console.warn("[sangria-sdk] could not parse payment header — deferring validation to backend");
+      return null;
+    }
   }
 
   // ── HTTP transport ───────────────────────────────────────────────

@@ -125,13 +125,27 @@ class VerifyResult:
 
 @dataclass(slots=True)
 class SettleResult:
-    """Result from /v1/settle-payment for upto scheme."""
+    """Result from /v1/settle-payment."""
     success: bool
     transaction: str | None = None
     network: str | None = None
     payer: str | None = None
+    amount: int | None = None
     error_reason: str | None = None
     error_message: str | None = None
+
+
+@dataclass(slots=True, frozen=True)
+class SangriaTransaction:
+    """Transaction receipt passed to computed_price handlers after settlement."""
+    hash: str
+    """On-chain transaction hash."""
+    network: str
+    """CAIP-2 network identifier (e.g. "eip155:8453")."""
+    payer: str
+    """Payer wallet address."""
+    amount: float
+    """Amount charged in dollars."""
 
 
 _SETTLE_GUARD = object()

@@ -1,6 +1,6 @@
 import type { MiddlewareHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import type { SangriaRequestData, FixedPriceOptions, UptoPriceOptions, Settled, SettleFn } from "../types.js";
+import type { SangriaRequestData, SangriaTransaction, FixedPriceOptions, UptoPriceOptions, Settled, SettleFn } from "../types.js";
 import { toMicrounits } from "../types.js";
 import { Sangria, validateFixedPriceOptions, validateUptoPriceOptions, toBase64 } from "../core.js";
 import { SangriaHandlerError } from "../errors.js";
@@ -8,14 +8,11 @@ import { SangriaHandlerError } from "../errors.js";
 type SangriaEnv = {
   Variables: {
     sangria: SangriaRequestData;
+    sangriaClient: Sangria;
   };
 };
 
 type SangriaContext = Parameters<MiddlewareHandler<SangriaEnv>>[0];
-
-export interface HonoConfig {
-  bypassPaymentIf?: (c: SangriaContext) => boolean | Promise<boolean>;
-}
 
 // ── Entry point: add as middleware to gate a route behind payment ──
 //
@@ -24,31 +21,10 @@ export interface HonoConfig {
 export function fixedPrice(
   sangria: Sangria,
   options: FixedPriceOptions,
-  config?: HonoConfig
 ): MiddlewareHandler<SangriaEnv> {
   validateFixedPriceOptions(options);
 
   return async (c, next) => {
-    let shouldBypass = false;
-    if (config?.bypassPaymentIf) {
-      try {
-        // Await handles async callbacks; strict === true rejects Promises/truthy non-booleans.
-        const result = await config.bypassPaymentIf(c);
-        shouldBypass = result === true;
-      } catch (err) {
-        // Fail closed: any throw/reject enforces payment.
-        console.error(
-          "[sangria-sdk] bypassPaymentIf threw; falling through to payment required",
-          err,
-        );
-        shouldBypass = false;
-      }
-    }
-    if (shouldBypass) {
-      c.set("sangria", { paid: false, amount: 0 });
-      return next();
-    }
-
     const url = new URL(c.req.url);
     const result = await sangria.handleFixedPrice(
       {
@@ -94,42 +70,10 @@ export function uptoPrice(
   sangria: Sangria,
   options: UptoPriceOptions,
   handler: (c: SangriaContext, settle: SettleFn) => Promise<Settled>,
-  config?: HonoConfig
 ): MiddlewareHandler<SangriaEnv> {
   validateUptoPriceOptions(options);
 
   return async (c, _next) => {
-    let shouldBypass = false;
-    if (config?.bypassPaymentIf) {
-      try {
-        const result = await config.bypassPaymentIf(c);
-        shouldBypass = result === true;
-      } catch (err) {
-        console.error(
-          "[sangria-sdk] bypassPaymentIf threw; falling through to payment required",
-          err,
-        );
-        shouldBypass = false;
-      }
-    }
-    if (shouldBypass) {
-      c.set("sangria", { paid: false, amount: 0 });
-      const { settleFn, getResult } = sangria.createSettleFn(options.maxPrice);
-      try {
-        await handler(c, settleFn);
-      } catch (err) {
-        if (err instanceof SangriaHandlerError) {
-          return c.json(err.body as Record<string, unknown>, err.statusCode as ContentfulStatusCode);
-        }
-        throw err;
-      }
-      const settleData = getResult();
-      if (!settleData) {
-        throw new Error("Sangria: handler must call settle()");
-      }
-      return c.json(settleData.body as Record<string, unknown>);
-    }
-
     const paymentHeader = c.req.header("payment-signature");
     const url = new URL(c.req.url);
     const resourceUrl = url.origin + url.pathname + url.search;
@@ -220,4 +164,95 @@ export function uptoPrice(
 
 export function getSangria(c: SangriaContext): SangriaRequestData | undefined {
   return c.get("sangria");
+}
+
+// ── Middleware: register Sangria instance on Hono context ──
+//
+//   app.use(sangriaMiddleware(sangria));
+//
+export function sangriaMiddleware(sangria: Sangria): MiddlewareHandler<SangriaEnv> {
+  return async (c, next) => {
+    c.set("sangriaClient", sangria);
+    await next();
+  };
+}
+
+// ── Computed price: dynamic exact pricing based on request ──
+//
+//   app.post("/buy",
+//     computedPrice(calcPrice, async (c, transaction) => {
+//       return c.json({ success: true, transactionId: transaction.hash });
+//     })
+//   );
+//
+//   calcPrice is called on every request (both the initial 402 and the paid
+//   retry). The second call is what detects body tampering — if an attacker
+//   replays a signature with a modified body, the recomputed price won't match
+//   the signed amount and the request is rejected before settlement.
+//
+export function computedPrice(
+  calcPrice: (c: SangriaContext) => number | Promise<number>,
+  handler: (c: SangriaContext, transaction: SangriaTransaction) => Promise<Response>
+): MiddlewareHandler<SangriaEnv> {
+  return async (c, _next) => {
+    const sangria = c.get("sangriaClient");
+    if (!sangria) {
+      throw new Error(
+        "Sangria: register sangriaMiddleware(sangria) before using computedPrice()"
+      );
+    }
+
+    const price = await calcPrice(c);
+
+    const url = new URL(c.req.url);
+    const result = await sangria.handleFixedPrice(
+      {
+        paymentHeader: c.req.header("payment-signature"),
+        resourceUrl: url.origin + url.pathname + url.search,
+      },
+      { price }
+    );
+
+    if (result.action === "respond") {
+      if (result.headers) {
+        for (const [key, value] of Object.entries(result.headers)) {
+          c.header(key, value);
+        }
+      }
+      return c.json(
+        result.body as Record<string, unknown>,
+        result.status as ContentfulStatusCode
+      );
+    }
+
+    if (toMicrounits(result.data.amount) !== toMicrounits(price)) {
+      return c.json(
+        { error: "Price mismatch: settled amount differs from computed price" } as Record<string, unknown>,
+        409 as ContentfulStatusCode
+      );
+    }
+
+    if (result.headers) {
+      for (const [key, value] of Object.entries(result.headers)) {
+        c.header(key, value);
+      }
+    }
+    c.set("sangria", result.data);
+
+    const transaction: SangriaTransaction = {
+      hash: result.data.transaction!,
+      network: result.data.network!,
+      payer: result.data.payer!,
+      amount: result.data.amount,
+    };
+
+    try {
+      return await handler(c, transaction);
+    } catch (err) {
+      if (err instanceof SangriaHandlerError) {
+        return c.json(err.body as Record<string, unknown>, err.statusCode as ContentfulStatusCode);
+      }
+      throw err;
+    }
+  };
 }

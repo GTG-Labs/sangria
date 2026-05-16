@@ -1,12 +1,8 @@
 import type { Request, Response, NextFunction } from "express";
-import type { SangriaRequestData, FixedPriceOptions, UptoPriceOptions, Settled, SettleFn } from "../types.js";
+import type { SangriaRequestData, SangriaTransaction, FixedPriceOptions, UptoPriceOptions, Settled, SettleFn } from "../types.js";
 import { toMicrounits } from "../types.js";
 import { Sangria, validateFixedPriceOptions, validateUptoPriceOptions, toBase64 } from "../core.js";
 import { SangriaHandlerError } from "../errors.js";
-
-export interface ExpressConfig {
-  bypassPaymentIf?: (req: Request) => boolean | Promise<boolean>;
-}
 
 declare global {
   namespace Express {
@@ -23,32 +19,11 @@ declare global {
 export function fixedPrice(
   sangria: Sangria,
   options: FixedPriceOptions,
-  config?: ExpressConfig
 ) {
   validateFixedPriceOptions(options);
 
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
-      let shouldBypass = false;
-      if (config?.bypassPaymentIf) {
-        try {
-          // Await handles async callbacks; strict === true rejects Promises/truthy non-booleans.
-          const result = await config.bypassPaymentIf(req);
-          shouldBypass = result === true;
-        } catch (err) {
-          // Fail closed: any throw/reject enforces payment.
-          console.error(
-            "[sangria-sdk] bypassPaymentIf threw; falling through to payment required",
-            err,
-          );
-          shouldBypass = false;
-        }
-      }
-      if (shouldBypass) {
-        req.sangria = { paid: false, amount: 0 };
-        return next();
-      }
-
       const result = await sangria.handleFixedPrice(
         {
           paymentHeader: Array.isArray(req.headers["payment-signature"])
@@ -96,43 +71,11 @@ export function uptoPrice(
   sangria: Sangria,
   options: UptoPriceOptions,
   handler: (req: Request, settle: SettleFn) => Promise<Settled>,
-  config?: ExpressConfig
 ) {
   validateUptoPriceOptions(options);
 
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
-      let shouldBypass = false;
-      if (config?.bypassPaymentIf) {
-        try {
-          const result = await config.bypassPaymentIf(req);
-          shouldBypass = result === true;
-        } catch (err) {
-          console.error(
-            "[sangria-sdk] bypassPaymentIf threw; falling through to payment required",
-            err,
-          );
-          shouldBypass = false;
-        }
-      }
-      if (shouldBypass) {
-        req.sangria = { paid: false, amount: 0 };
-        const { settleFn, getResult } = sangria.createSettleFn(options.maxPrice);
-        try {
-          await handler(req, settleFn);
-        } catch (err) {
-          if (err instanceof SangriaHandlerError) {
-            return res.status(err.statusCode).json(err.body);
-          }
-          throw err;
-        }
-        const settleData = getResult();
-        if (!settleData) {
-          throw new Error("Sangria: handler must call settle()");
-        }
-        return res.json(settleData.body);
-      }
-
       const paymentHeader = Array.isArray(req.headers["payment-signature"])
         ? req.headers["payment-signature"][0]
         : req.headers["payment-signature"];
@@ -210,6 +153,79 @@ export function uptoPrice(
       };
 
       return res.json(settleData.body);
+    } catch (err) {
+      return next(err);
+    }
+  };
+}
+
+// ── Computed price: dynamic exact pricing based on request ──
+//
+//   app.post("/buy", computedPrice(sangria, calcPrice, async (req, res, transaction) => {
+//     res.json({ transactionId: transaction.hash });
+//   }));
+//
+//   calcPrice is called on every request (both the initial 402 and the paid
+//   retry). The second call is what detects body tampering — if an attacker
+//   replays a signature with a modified body, the recomputed price won't match
+//   the signed amount and the request is rejected before settlement.
+//
+export function computedPrice(
+  sangria: Sangria,
+  calcPrice: (req: Request) => number | Promise<number>,
+  handler: (req: Request, res: Response, transaction: SangriaTransaction) => void | Promise<void>
+) {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const price = await calcPrice(req);
+
+      const result = await sangria.handleFixedPrice(
+        {
+          paymentHeader: Array.isArray(req.headers["payment-signature"])
+            ? req.headers["payment-signature"][0]
+            : req.headers["payment-signature"],
+          resourceUrl: `${req.protocol}://${req.hostname}${req.originalUrl}`,
+        },
+        { price }
+      );
+
+      if (result.action === "respond") {
+        if (result.headers) {
+          for (const [key, value] of Object.entries(result.headers)) {
+            res.setHeader(key, value);
+          }
+        }
+        return res.status(result.status).json(result.body);
+      }
+
+      if (toMicrounits(result.data.amount) !== toMicrounits(price)) {
+        return res.status(409).json({
+          error: "Price mismatch: settled amount differs from computed price",
+        });
+      }
+
+      if (result.headers) {
+        for (const [key, value] of Object.entries(result.headers)) {
+          res.setHeader(key, value);
+        }
+      }
+      req.sangria = result.data;
+
+      const transaction: SangriaTransaction = {
+        hash: result.data.transaction!,
+        network: result.data.network!,
+        payer: result.data.payer!,
+        amount: result.data.amount,
+      };
+
+      try {
+        return await handler(req, res, transaction);
+      } catch (err) {
+        if (err instanceof SangriaHandlerError) {
+          return res.status(err.statusCode).json(err.body);
+        }
+        throw err;
+      }
     } catch (err) {
       return next(err);
     }

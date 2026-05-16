@@ -90,12 +90,14 @@ export interface VerifyResult {
   message?: string;
 }
 
-/** Result from /v1/settle-payment for upto scheme */
+/** Result from /v1/settle-payment */
 export interface SettleResult {
   success: boolean;
   transaction?: string;
   network?: string;
   payer?: string;
+  /** Settled amount in microunits, returned by the backend. */
+  amount?: number;
   error_reason?: string;
   error_message?: string;
 }
@@ -130,3 +132,15 @@ export function _settledBody(s: Settled): unknown {
 
 /** The settle function signature passed to upto handlers. */
 export type SettleFn = (amount: number, body: unknown) => Settled;
+
+/** Transaction receipt passed to computedPrice handlers after settlement. */
+export interface SangriaTransaction {
+  /** On-chain transaction hash. */
+  hash: string;
+  /** CAIP-2 network identifier (e.g. "eip155:8453"). */
+  network: string;
+  /** Payer wallet address. */
+  payer: string;
+  /** Amount charged in dollars. */
+  amount: number;
+}

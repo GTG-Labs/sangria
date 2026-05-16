@@ -3,7 +3,6 @@ from __future__ import annotations
 import base64
 import inspect
 import json
-import logging
 from collections.abc import Awaitable, Callable
 from functools import wraps
 from typing import Any
@@ -18,13 +17,11 @@ from ..models import (
     FixedPriceOptions,
     PaymentProceeded,
     PaymentResponse,
+    SangriaTransaction,
     Settled,
     UptoPriceOptions,
     to_microunits,
 )
-
-logger = logging.getLogger("sangria_sdk")
-
 
 # ── Entry point: decorate a FastAPI route to require payment ──
 #
@@ -35,10 +32,7 @@ def require_sangria_payment(
     merchant_client: SangriaMerchantClient,
     amount: float,
     description: str | None = None,
-    bypass_if: Callable[[Request], bool] | None = None,
 ) -> Callable[[Callable[..., Awaitable[Any]]], Callable[..., Awaitable[Any]]]:
-    # Validate at decorator construction time so misconfigured prices fail at
-    # app startup instead of on the first paying request.
     validate_fixed_price_options(
         FixedPriceOptions(price=amount, resource="", description=description)
     )
@@ -55,24 +49,6 @@ def require_sangria_payment(
 
             if request is None:
                 raise HTTPException(status_code=500, detail="FastAPI request not available")
-
-            should_bypass = False
-            if bypass_if is not None:
-                try:
-                    should_bypass = bypass_if(request)
-                except Exception:
-                    # Fail closed: if the merchant's bypass_if callback raises,
-                    # enforce payment rather than risk letting the request
-                    # through for free.
-                    logger.exception(
-                        "[sangria-sdk] bypass_if raised; falling through to payment required"
-                    )
-                    should_bypass = False
-            if should_bypass:
-                try:
-                    return await func(*args, **kwargs)
-                except SangriaHandlerException as exc:
-                    return JSONResponse(status_code=exc.status_code, content=exc.body)
 
             result = await merchant_client.handle_fixed_price(
                 payment_header=request.headers.get("PAYMENT-SIGNATURE"),
@@ -119,7 +95,6 @@ def require_upto_price(
     merchant_client: SangriaMerchantClient,
     max_price: float,
     description: str | None = None,
-    bypass_if: Callable[[Request], bool] | None = None,
 ) -> Callable[[Callable[..., Awaitable[Any]]], Callable[..., Awaitable[Any]]]:
     UptoPriceOptions(max_price=max_price, resource="", description=description)
 
@@ -135,29 +110,6 @@ def require_upto_price(
 
             if request is None:
                 raise HTTPException(status_code=500, detail="FastAPI request not available")
-
-            should_bypass = False
-            if bypass_if is not None:
-                try:
-                    should_bypass = bypass_if(request)
-                except Exception:
-                    logger.exception(
-                        "[sangria-sdk] bypass_if raised; falling through to payment required"
-                    )
-                    should_bypass = False
-
-            if should_bypass:
-                request.state.sangria_payment = PaymentProceeded(paid=False, amount=0)
-                settle_fn, get_result = merchant_client.create_settle_fn(max_price)
-                kwargs["settle"] = settle_fn
-                try:
-                    result = await func(*args, **kwargs)
-                except SangriaHandlerException as exc:
-                    return JSONResponse(status_code=exc.status_code, content=exc.body)
-                if not isinstance(result, Settled):
-                    raise TypeError("Sangria: handler must return settle(amount, body)")
-                settle_data = get_result()
-                return JSONResponse(content=settle_data[1] if settle_data else None)
 
             payment_header = request.headers.get("PAYMENT-SIGNATURE")
 
@@ -243,6 +195,92 @@ def require_upto_price(
         sig = inspect.signature(func)
         wrapper.__signature__ = sig.replace(  # type: ignore[attr-defined]
             parameters=[p for p in sig.parameters.values() if p.name != "settle"]
+        )
+        return wrapper
+
+    return decorator
+
+
+# ── Computed price: dynamic exact pricing based on request ──
+#
+#   @app.post("/buy")
+#   @computed_price(sangria, calc_price)
+#   async def buy(request: Request, transaction: SangriaTransaction):
+#       return {"success": True, "transaction_id": transaction.hash}
+#
+#   calc_price is called on every request (both the initial 402 and the paid
+#   retry). The second call is what detects body tampering — if an attacker
+#   replays a signature with a modified body, the recomputed price won't match
+#   the signed amount and the request is rejected before settlement.
+#
+def computed_price(
+    merchant_client: SangriaMerchantClient,
+    calc_price: Callable[..., Any],
+) -> Callable[[Callable[..., Awaitable[Any]]], Callable[..., Awaitable[Any]]]:
+    def decorator(func: Callable[..., Awaitable[Any]]) -> Callable[..., Awaitable[Any]]:
+        @wraps(func)
+        async def wrapper(*args: Any, **kwargs: Any) -> Any:
+            request: Request | None = kwargs.get("request")
+            if request is None:
+                for arg in args:
+                    if isinstance(arg, Request):
+                        request = arg
+                        break
+
+            if request is None:
+                raise HTTPException(status_code=500, detail="FastAPI request not available")
+
+            price = calc_price(request)
+            if inspect.isawaitable(price):
+                price = await price
+
+            result = await merchant_client.handle_fixed_price(
+                payment_header=request.headers.get("PAYMENT-SIGNATURE"),
+                options=FixedPriceOptions(
+                    price=price,
+                    resource=str(request.url),
+                ),
+            )
+
+            if isinstance(result, PaymentResponse):
+                return JSONResponse(
+                    status_code=result.status_code,
+                    content=result.body,
+                    headers=result.headers,
+                )
+
+            if to_microunits(result.amount) != to_microunits(price):
+                return JSONResponse(
+                    status_code=409,
+                    content={"error": "Price mismatch: settled amount differs from computed price"},
+                )
+
+            transaction = SangriaTransaction(
+                hash=result.transaction or "",
+                network=result.network or "",
+                payer=result.payer or "",
+                amount=result.amount,
+            )
+
+            request.state.sangria_payment = result
+            kwargs["transaction"] = transaction
+            try:
+                response = await func(*args, **kwargs)
+            except SangriaHandlerException as exc:
+                return JSONResponse(status_code=exc.status_code, content=exc.body)
+
+            if isinstance(response, dict):
+                response = JSONResponse(content=response)
+
+            if result.headers and isinstance(response, Response):
+                for k, v in result.headers.items():
+                    response.headers[k] = v
+
+            return response
+
+        sig = inspect.signature(func)
+        wrapper.__signature__ = sig.replace(  # type: ignore[attr-defined]
+            parameters=[p for p in sig.parameters.values() if p.name != "transaction"]
         )
         return wrapper
 

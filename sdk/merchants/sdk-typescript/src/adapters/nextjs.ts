@@ -1,4 +1,4 @@
-import type { SangriaRequestData, FixedPriceOptions, UptoPriceOptions, Settled, SettleFn } from "../types.js";
+import type { SangriaRequestData, SangriaTransaction, FixedPriceOptions, UptoPriceOptions, Settled, SettleFn } from "../types.js";
 import { toMicrounits } from "../types.js";
 import { Sangria, validateFixedPriceOptions, validateUptoPriceOptions, toBase64 } from "../core.js";
 import { SangriaHandlerError } from "../errors.js";
@@ -23,69 +23,29 @@ type NextRouteHandler = (
   context?: any
 ) => Promise<NextResponse> | NextResponse;
 
-export interface NextJSConfig {
-  bypassPaymentIf?: (request: any) => boolean | Promise<boolean>;
-}
-
 // ── Entry point: wrap a route handler to gate it behind payment ──
 //
 //   import { fixedPrice } from "@sangria-sdk/core/nextjs";
 //
 //   export const GET = fixedPrice(sangria, { price: 0.01 }, handler);
-//   export const POST = fixedPrice(sangria, { price: 0.01 }, handler, config);
 //
 export function fixedPrice(
   sangria: Sangria,
   options: FixedPriceOptions,
   handler: NextRouteHandler,
-  config?: NextJSConfig
 ): NextRouteHandler {
   validateFixedPriceOptions(options);
 
   return async (request: any, context?: any) => {
-    // 1. Bypass check — let the request through without payment
-    let shouldBypass = false;
-    if (config?.bypassPaymentIf) {
-      try {
-        // Await handles async callbacks; strict === true rejects Promises/truthy non-booleans.
-        const result = await config.bypassPaymentIf(request);
-        shouldBypass = result === true;
-      } catch (err) {
-        // Fail closed: any throw/reject enforces payment.
-        console.error(
-          "[sangria-sdk] bypassPaymentIf threw; falling through to payment required",
-          err,
-        );
-        shouldBypass = false;
-      }
-    }
-    if (shouldBypass) {
-      request.sangria = { paid: false, amount: 0 } as SangriaRequestData;
-      try {
-        return await handler(request, context);
-      } catch (err) {
-        if (err instanceof SangriaHandlerError) {
-          return new Response(JSON.stringify(err.body), {
-            status: err.statusCode,
-            headers: { "Content-Type": "application/json" },
-          });
-        }
-        throw err;
-      }
-    }
-
-    // 2. Extract payment context from the request
     const paymentHeader =
       request.headers.get("payment-signature") ?? undefined;
     const resourceUrl = request.url;
 
-    // 3. Call core payment logic
     const result = await sangria.handleFixedPrice(
       { paymentHeader, resourceUrl },
       options
     );
 
-    // 4. Block: return 402 challenge or error response
     if (result.action === "respond") {
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
@@ -97,7 +57,6 @@ export function fixedPrice(
       });
     }
 
-    // 5. Proceed: attach payment data to request, run handler
     request.sangria = result.data;
     let handlerResponse: any;
     try {
@@ -142,48 +101,10 @@ export function uptoPrice(
   sangria: Sangria,
   options: UptoPriceOptions,
   handler: (request: any, settle: SettleFn, context?: any) => Promise<Settled>,
-  config?: NextJSConfig
 ): NextRouteHandler {
   validateUptoPriceOptions(options);
 
   return async (request: any, context?: any) => {
-    let shouldBypass = false;
-    if (config?.bypassPaymentIf) {
-      try {
-        const result = await config.bypassPaymentIf(request);
-        shouldBypass = result === true;
-      } catch (err) {
-        console.error(
-          "[sangria-sdk] bypassPaymentIf threw; falling through to payment required",
-          err,
-        );
-        shouldBypass = false;
-      }
-    }
-    if (shouldBypass) {
-      request.sangria = { paid: false, amount: 0 } as SangriaRequestData;
-      const { settleFn, getResult } = sangria.createSettleFn(options.maxPrice);
-      try {
-        await handler(request, settleFn, context);
-      } catch (err) {
-        if (err instanceof SangriaHandlerError) {
-          return new Response(JSON.stringify(err.body), {
-            status: err.statusCode,
-            headers: { "Content-Type": "application/json" },
-          });
-        }
-        throw err;
-      }
-      const settleData = getResult();
-      if (!settleData) {
-        throw new Error("Sangria: handler must call settle()");
-      }
-      return new Response(JSON.stringify(settleData.body), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-
     const paymentHeader =
       request.headers.get("payment-signature") ?? undefined;
     const resourceUrl = request.url;
@@ -288,4 +209,89 @@ export function getSangria(
   request: any
 ): SangriaRequestData | undefined {
   return request.sangria;
+}
+
+// ── Computed price: dynamic exact pricing based on request ──
+//
+//   // app/api/buy/route.ts
+//   export const POST = computedPrice(sangria, calcPrice, async (request, transaction) => {
+//     return Response.json({ success: true, transactionId: transaction.hash });
+//   });
+//
+//   calcPrice is called on every request (both the initial 402 and the paid
+//   retry). The second call is what detects body tampering — if an attacker
+//   replays a signature with a modified body, the recomputed price won't match
+//   the signed amount and the request is rejected before settlement.
+//
+export function computedPrice(
+  sangria: Sangria,
+  calcPrice: (request: any) => number | Promise<number>,
+  handler: (request: any, transaction: SangriaTransaction) => Promise<any> | any
+): NextRouteHandler {
+  return async (request: any, context?: any) => {
+    const price = await calcPrice(request);
+
+    const paymentHeader =
+      request.headers.get("payment-signature") ?? undefined;
+    const resourceUrl = request.url;
+
+    const result = await sangria.handleFixedPrice(
+      { paymentHeader, resourceUrl },
+      { price }
+    );
+
+    if (result.action === "respond") {
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        ...result.headers,
+      };
+      return new Response(JSON.stringify(result.body), {
+        status: result.status,
+        headers,
+      });
+    }
+
+    if (toMicrounits(result.data.amount) !== toMicrounits(price)) {
+      return new Response(
+        JSON.stringify({ error: "Price mismatch: settled amount differs from computed price" }),
+        { status: 409, headers: { "Content-Type": "application/json" } }
+      );
+    }
+
+    request.sangria = result.data;
+
+    const transaction: SangriaTransaction = {
+      hash: result.data.transaction!,
+      network: result.data.network!,
+      payer: result.data.payer!,
+      amount: result.data.amount,
+    };
+
+    let handlerResponse;
+    try {
+      handlerResponse = await handler(request, transaction);
+    } catch (err) {
+      if (err instanceof SangriaHandlerError) {
+        return new Response(JSON.stringify(err.body), {
+          status: err.statusCode,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      throw err;
+    }
+
+    if (result.headers && handlerResponse instanceof Response) {
+      const merged = new Headers(handlerResponse.headers);
+      for (const [k, v] of Object.entries(result.headers)) {
+        merged.set(k, v);
+      }
+      return new Response(handlerResponse.body, {
+        status: handlerResponse.status,
+        statusText: handlerResponse.statusText,
+        headers: merged,
+      });
+    }
+
+    return handlerResponse;
+  };
 }

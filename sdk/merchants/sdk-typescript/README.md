@@ -79,22 +79,6 @@ app.get("/premium", fixedPrice(sangria, { price: 0.01 }), (c) => {
 export default app;
 ```
 
-## Bypass Payments
-
-All adapters support a `bypassPaymentIf` option to skip payment for certain requests. This is useful if you want to let API key users access your endpoints for free while charging anonymous or agent-based callers via x402:
-
-```typescript
-fixedPrice(
-  sangria,
-  { price: 0.01 },
-  {
-    bypassPaymentIf: (req) => !!req.headers["x-api-key"],
-  }
-);
-```
-
-If your `bypassPaymentIf` callback throws, the SDK logs the error (prefixed `[sangria-sdk]`) and falls through to the normal payment-required flow — the request is **not** bypassed. This is intentional: the SDK fails closed so a crashing callback cannot silently leak free access to paid endpoints. Write callbacks defensively against missing headers, unavailable stores, etc.
-
 ## Configuration
 
 ```typescript

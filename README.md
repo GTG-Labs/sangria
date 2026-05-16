@@ -111,7 +111,6 @@ sequenceDiagram
 
 - **Zero gas fees** — Coinbase Facilitator sponsors gas on Base
 - **Framework agnostic** — Express, Fastify, Hono, and FastAPI with more coming
-- **Conditional bypass** — skip payments for API key users with `bypassPaymentIf` / `bypass_if`
 - **Fixed & variable pricing** — `exact` and `upto` payment schemes
 - **Double-entry ledger** — internal credit system with idempotent transactions
 - **Standards-compliant** — EIP-712 typed signing, ERC-3009 USDC transfers, x402 v2

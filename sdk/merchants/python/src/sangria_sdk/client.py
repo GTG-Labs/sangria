@@ -17,6 +17,8 @@ from .models import (
     SettleResult,
     UptoPriceOptions,
     VerifyResult,
+    from_microunits,
+    to_microunits,
     _SETTLE_GUARD,
 )
 
@@ -58,15 +60,43 @@ class SangriaMerchantClient:
         self.settle_endpoint = settle_endpoint
         self.verify_endpoint = verify_endpoint
 
+    # Returns None for unrecognized formats (e.g. Permit2, future x402 versions)
+    # so the backend — which understands all formats — remains the final authority.
+    def _extract_signed_amount_microunits(self, payment_header: str) -> int | None:
+        try:
+            decoded = json.loads(base64.b64decode(payment_header))
+            value = int(decoded["payload"]["authorization"]["value"])
+            if value > 0:
+                return value
+            logger.warning("could not extract signed amount from payment header — deferring validation to backend")
+            return None
+        except (json.JSONDecodeError, KeyError, ValueError, TypeError):
+            logger.warning("could not parse payment header — deferring validation to backend")
+            return None
+
     async def handle_fixed_price(
         self,
         payment_header: str | None,
         options: FixedPriceOptions,
     ) -> PaymentResult:
+        validate_fixed_price_options(options)
+
         if not payment_header:
             return await self._generate_payment(options)
-        else:
-            return await self._settle_payment(payment_header, options)
+
+        # Pre-settlement tamper check: decode the cryptographically-signed amount
+        # from the payment header and compare it against the expected price.
+        #   - Mismatch → fresh 402 with the correct price. No money moves.
+        #   - Match → proceed to settle.
+        #   - None (unrecognized header format) → proceed to settle and let the
+        #     backend validate. The backend is the authoritative validator and
+        #     understands all payment formats; the SDK only parses EIP-3009
+        #     (exact scheme). Upto uses a separate code path entirely.
+        signed_amount = self._extract_signed_amount_microunits(payment_header)
+        if signed_amount is not None and signed_amount != to_microunits(options.price):
+            return await self._generate_payment(options)
+
+        return await self._settle_payment(payment_header, options)
 
     # if we dont have a payment header, it means that we need to hit the generate-payment endpoint on our backend,
     # and send the client a 402 response with details on how to pay us
@@ -121,7 +151,7 @@ class SangriaMerchantClient:
 
         return PaymentProceeded(
             paid=True,
-            amount=options.price,
+            amount=from_microunits(result["amount"]),
             transaction=result.get("transaction"),
             network=result.get("network"),
             payer=result.get("payer"),
@@ -188,6 +218,7 @@ class SangriaMerchantClient:
             transaction=result.get("transaction"),
             network=result.get("network"),
             payer=result.get("payer"),
+            amount=result.get("amount"),
             error_reason=result.get("error_reason"),
             error_message=result.get("error_message"),
         )

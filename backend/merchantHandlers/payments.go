@@ -338,7 +338,7 @@ func buildLedgerLines(chargeAmount, fee int64, walletAccountID string, accts *le
 
 // confirmAndRespond handles the post-settle ledger confirmation and builds
 // the success/error HTTP response. Shared between exact and upto paths.
-func confirmAndRespond(c fiber.Ctx, pool *pgxpool.Pool, txn dbengine.Transaction, settleResp *x402Handlers.SettleResponse, networkCAIP2 string, logger *slog.Logger) error {
+func confirmAndRespond(c fiber.Ctx, pool *pgxpool.Pool, txn dbengine.Transaction, settleResp *x402Handlers.SettleResponse, networkCAIP2 string, chargeAmount int64, logger *slog.Logger) error {
 	if err := dbengine.ConfirmTransaction(c.Context(), pool, txn.ID, settleResp.Transaction); err != nil {
 		switch {
 		case errors.Is(err, dbengine.ErrTransactionNotPending):
@@ -371,6 +371,7 @@ func confirmAndRespond(c fiber.Ctx, pool *pgxpool.Pool, txn dbengine.Transaction
 		"transaction": settleResp.Transaction,
 		"network":     networkCAIP2,
 		"payer":       settleResp.Payer,
+		"amount":      chargeAmount, // SDK relies on this field — do not remove
 	})
 }
 
@@ -590,6 +591,7 @@ func SettlePayment(pool *pgxpool.Pool) fiber.Handler {
 				"transaction": storedTxHash,
 				"network":     netConfig.CAIP2,
 				"payer":       "",
+				"amount":      chargeAmount, // SDK relies on this field — do not remove
 			})
 		}
 		if errors.Is(err, dbengine.ErrPreviouslyFailed) {
@@ -672,6 +674,6 @@ func SettlePayment(pool *pgxpool.Pool) fiber.Handler {
 
 		// ── 10. Confirm the pending ledger transaction ───────────────────
 
-		return confirmAndRespond(c, pool, txn, settleResp, netConfig.CAIP2, logger)
+		return confirmAndRespond(c, pool, txn, settleResp, netConfig.CAIP2, chargeAmount, logger)
 	}
 }
