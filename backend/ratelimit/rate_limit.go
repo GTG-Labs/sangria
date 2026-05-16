@@ -74,8 +74,10 @@ func PerIPFailureLimiter(max int, bucket string) fiber.Handler {
 	})
 }
 
-// PerAPIKeyLimiter keys by the authenticated merchant's API key ID.
-// Must run AFTER APIKeyAuthMiddleware so merchant_api_key is in locals.
+// PerAPIKeyLimiter keys by the authenticated API key ID (merchant or agent).
+// Must run AFTER APIKeyAuthMiddleware so one of merchant_api_key or
+// agent_api_key is in locals. Both types share the same bucket-name prefix
+// "apikey:" since the IDs are UUIDs — no collision possible across types.
 func PerAPIKeyLimiter(max int, bucket string) fiber.Handler {
 	return limiter.New(limiter.Config{
 		Max:        max,
@@ -83,6 +85,9 @@ func PerAPIKeyLimiter(max int, bucket string) fiber.Handler {
 		KeyGenerator: func(c fiber.Ctx) string {
 			if m, ok := c.Locals("merchant_api_key").(*dbengine.Merchant); ok && m != nil {
 				return "apikey:" + m.ID
+			}
+			if k, ok := c.Locals("agent_api_key").(*dbengine.AgentAPIKey); ok && k != nil {
+				return "apikey:" + k.ID
 			}
 			// Fall back to IP — shouldn't happen if middleware ordering is correct,
 			// but we don't want a missing key to open the floodgates.

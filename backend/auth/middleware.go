@@ -253,6 +253,35 @@ func APIKeyAuthMiddleware(pool *pgxpool.Pool) fiber.Handler {
 	}
 }
 
+// RequireAgentKey must run AFTER APIKeyAuthMiddleware. Rejects requests
+// authenticated with a non-agent key with 403. Use on routes that read the
+// agent_api_key / agent_operator Fiber locals — without this gate, a merchant
+// key passing APIKeyAuthMiddleware would reach a handler expecting agent
+// locals and crash on type assertion.
+func RequireAgentKey(c fiber.Ctx) error {
+	keyType, _ := c.Locals("key_type").(string)
+	if keyType != string(KeyTypeAgent) {
+		return c.Status(403).JSON(fiber.Map{
+			"error_code": "wrong_key_type",
+			"message":    "this endpoint requires an agent API key",
+		})
+	}
+	return c.Next()
+}
+
+// RequireMerchantKey is the mirror of RequireAgentKey for merchant routes.
+// Rejects non-merchant keys with 403. Use on routes that read merchant_api_key.
+func RequireMerchantKey(c fiber.Ctx) error {
+	keyType, _ := c.Locals("key_type").(string)
+	if keyType != string(KeyTypeMerchant) {
+		return c.Status(403).JSON(fiber.Map{
+			"error_code": "wrong_key_type",
+			"message":    "this endpoint requires a merchant API key",
+		})
+	}
+	return c.Next()
+}
+
 // RequireAdmin is a middleware that enforces admin access.
 // Must run AFTER WorkosAuthMiddleware (needs workos_user in locals).
 // Checks that the authenticated user exists in the admins table.
