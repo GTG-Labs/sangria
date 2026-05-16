@@ -401,6 +401,25 @@ type AgentAPIKey struct {
 	CreatedAt                     time.Time  `json:"created_at"`
 }
 
+// AgentAPIKeyPublic is the dashboard-safe shape — same fields as AgentAPIKey
+// minus KeyHash. Mirrors MerchantPublic; never construct one by hand, only
+// via ListAgentAPIKeysByOperator which selects the right columns.
+type AgentAPIKeyPublic struct {
+	ID                            string     `json:"id"`
+	AgentOperatorID               string     `json:"agent_operator_id"`
+	KeyID                         string     `json:"key_id"`
+	Name                          string     `json:"name"`
+	AgentName                     string     `json:"agent_name"`
+	MaxPerCallMicrounits          int64      `json:"max_per_call_microunits"`
+	DailyCapMicrounits            int64      `json:"daily_cap_microunits"`
+	MonthlyCapMicrounits          int64      `json:"monthly_cap_microunits"`
+	RequireConfirmAboveMicrounits int64      `json:"require_confirm_above_microunits"`
+	ExpiresAt                     *time.Time `json:"expires_at"`
+	LastUsedAt                    *time.Time `json:"last_used_at"`
+	RevokedAt                     *time.Time `json:"revoked_at"`
+	CreatedAt                     time.Time  `json:"created_at"`
+}
+
 type AgentPayment struct {
 	ID string `json:"id"`
 	// IdempotencyKey is internal dedup data; clients reference rows by ID.
