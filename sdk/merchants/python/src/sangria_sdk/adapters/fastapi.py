@@ -283,10 +283,9 @@ def computed_price(
             if request is None:
                 raise HTTPException(status_code=500, detail="FastAPI request not available")
 
-            if inspect.iscoroutinefunction(calc_price):
-                price = await calc_price(request)
-            else:
-                price = calc_price(request)
+            price = calc_price(request)
+            if inspect.isawaitable(price):
+                price = await price
 
             result = await merchant_client.handle_fixed_price(
                 payment_header=request.headers.get("PAYMENT-SIGNATURE"),
@@ -318,7 +317,13 @@ def computed_price(
 
             request.state.sangria_payment = result
             kwargs["transaction"] = transaction
-            response = await func(*args, **kwargs)
+            try:
+                response = await func(*args, **kwargs)
+            except SangriaHandlerException as exc:
+                return JSONResponse(status_code=exc.status_code, content=exc.body)
+
+            if isinstance(response, dict):
+                response = JSONResponse(content=response)
 
             if result.headers and isinstance(response, Response):
                 for k, v in result.headers.items():
