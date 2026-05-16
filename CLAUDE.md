@@ -15,12 +15,12 @@ For protocol details see [Sangria-Overview.md](Sangria-Overview.md). For archite
 | `backend/` | Orchestration API — accounts, payments, settlement, withdrawals | Go 1.25, Fiber v3, pgx/pgxpool |
 | `dbSchema/` | Database schema — single source of truth | Drizzle ORM (TypeScript), PostgreSQL |
 | `frontend/` | Docs site + merchant dashboard | Next.js 16, React 19, Tailwind 4 |
-| `sdk/sdk-typescript/` | TypeScript merchant SDK (`@sangria-sdk/core`) | TypeScript, adapters for Express/Fastify/Hono |
-| `sdk/python/` | Python merchant SDK (`sangria-core`) | Python 3.10+, httpx, FastAPI adapter |
+| `sdk/merchants/sdk-typescript/` | TypeScript merchant SDK (`@sangria-sdk/core`) | TypeScript, adapters for Express/Fastify/Hono |
+| `sdk/merchants/python/` | Python merchant SDK (`sangria-core`) | Python 3.10+, httpx, FastAPI adapter |
 | `playground/` | Example merchant servers + e2e test client | Express, Fastify, Hono, FastAPI, uv |
 | `mythos/` | Internal admin dashboard | Next.js 16, WorkOS AuthKit, port 3001 |
 
-Per-package build/test commands are in each package's own CLAUDE.md where one exists. See `backend/CLAUDE.md`, `dbSchema/CLAUDE.md`, `frontend/CLAUDE.md`, `sdk/sdk-typescript/CLAUDE.md`.
+Per-package build/test commands are in each package's own CLAUDE.md where one exists. See `backend/CLAUDE.md`, `dbSchema/CLAUDE.md`, `frontend/CLAUDE.md`, `sdk/merchants/sdk-typescript/CLAUDE.md`.
 
 ## Dev vs Prod Environments
 
@@ -80,7 +80,7 @@ Use these terms consistently:
 - Match idioms of each host framework (Express middleware vs Fastify plugin vs FastAPI dependency) rather than forcing a single abstraction.
 - Keep TypeScript and Python SDK behavior in lockstep. If you add a feature to one, either add it to the other or explicitly document why it's language-specific.
 - When changing SDK behavior, update the relevant playground examples.
-- **Bump SDK versions in `deployment/SDK_VERSIONS.md`** — it's the single source of truth. CI auto-bumps the patch version if you forget, but explicit edits communicate intent (patch = fix, minor = feature, major = breaking per semver). Never hand-edit `sdk/sdk-typescript/package.json#version` or `sdk/python/pyproject.toml#version` — CI overwrites them at publish time. See `deployment/DEPLOYMENT.md` for the full flow.
+- **Bump SDK versions in `deployment/SDK_VERSIONS.md`** — it's the single source of truth. CI auto-bumps the patch version if you forget, but explicit edits communicate intent (patch = fix, minor = feature, major = breaking per semver). Never hand-edit `sdk/merchants/sdk-typescript/package.json#version` or `sdk/merchants/python/pyproject.toml#version` — CI overwrites them at publish time. See `deployment/DEPLOYMENT.md` for the full flow.
 
 ### Process
 - Ask clarifying questions before architectural changes.
@@ -96,7 +96,7 @@ Schema changes follow a specific workflow — see `dbSchema/CLAUDE.md` § Schema
 SDK version updates use `deployment/SDK_VERSIONS.md` as the single source of truth. See `deployment/DEPLOYMENT.md` for the complete workflow. To update SDK versions before pushing:
 
 1. Edit version numbers in `deployment/SDK_VERSIONS.md`
-2. Make SDK code changes in `sdk/sdk-typescript/` or `sdk/python/`
+2. Make SDK code changes in `sdk/merchants/sdk-typescript/` or `sdk/merchants/python/`
 3. Push to main — CI auto-deploys changed SDKs
 
 CI auto-bumps patch versions if SDK code changes without version updates.
@@ -141,6 +141,6 @@ Applies to both `frontend/` (merchant portal) and `mythos/` (admin dashboard) �
 - [Backend API reference](backend/README.md) — all endpoints, auth patterns, withdrawal lifecycle
 - [Architecture deep-dive](Sangria-Architecture.md) — layered architecture, component breakdown
 - [Protocol overview](Sangria-Overview.md) — x402 operations, ERC-3009, settlement flow
-- [TypeScript SDK docs](sdk/sdk-typescript/README.md) — all framework adapters, bypass config
-- [Python SDK docs](sdk/python/README.md) — FastAPI adapter, API contract
+- [TypeScript SDK docs](sdk/merchants/sdk-typescript/README.md) — all framework adapters, bypass config
+- [Python SDK docs](sdk/merchants/python/README.md) — FastAPI adapter, API contract
 - [Playground](playground/README.md) — example merchants, e2e testing

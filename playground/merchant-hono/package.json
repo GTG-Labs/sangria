@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@hono/node-server": "^1.19.11",
-    "@sangria-sdk/core": "file:../../sdk/sdk-typescript",
+    "@sangria-sdk/core": "file:../../sdk/merchants/sdk-typescript",
     "dotenv": "^17.4.2",
     "hono": "^4.0.0"
   },

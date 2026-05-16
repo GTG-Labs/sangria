@@ -14,4 +14,4 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.uv.sources]
-sangria-core = { path = "../../sdk/python", editable = true }
+sangria-core = { path = "../../sdk/merchants/python", editable = true }

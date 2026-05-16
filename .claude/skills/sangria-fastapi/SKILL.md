@@ -83,7 +83,7 @@ Then check the project's `pyproject.toml` for the `sangria-core` dependency:
   > dependencies = [..., "sangria-core"]
   >
   > [tool.uv.sources]
-  > sangria-core = { path = "../../sdk/python", editable = true }
+  > sangria-core = { path = "../../sdk/merchants/python", editable = true }
   > ```
   > Then run `uv sync`.
 
