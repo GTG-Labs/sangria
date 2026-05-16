@@ -42,7 +42,11 @@ Amounts are positive integers in microunits with direction encoding sign — see
 
 ### `InsertTransaction(ctx, pool, idempotencyKey, lines []LedgerLine) ([]LedgerEntry, error)`
 
-Validates a batch of ledger lines, then atomically inserts them under a shared `transaction_id`. The caller-supplied `idempotencyKey` is stored in the `transactions` table under a unique constraint — retries with the same key return the existing entries instead of posting duplicates.
+Validates a batch of ledger lines, then atomically inserts them under a shared `transaction_id`. The caller-supplied `idempotencyKey` is stored in the `transactions` table under a unique constraint — retries with the same key return the existing entries instead of posting duplicates. This is the pool-owning entry point: it begins, commits, and rolls back its own `pgx.Tx`.
+
+### `insertTransactionInTx(ctx, tx, idempotencyKey, lines []LedgerLine) ([]LedgerEntry, error)` (unexported)
+
+In-tx core of `InsertTransaction`. Same validation, same SQL, but runs inside a `pgx.Tx` supplied by the caller instead of owning its own. Use this from flows that need the ledger write to commit atomically with other inserts in the same outer envelope — e.g. signup-time trial-credit grants where the operator row, credit accounts, topup record, and the matching ledger entry must all land together or not at all. Caller is responsible for committing or rolling back.
 
 ### Validation rules
 
