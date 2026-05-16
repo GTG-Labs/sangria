@@ -35,11 +35,10 @@ If `API_KEY: MISSING`, the user needs to configure a Sangria **client** API key 
 
 1. Ask the user to create a Sangria account at https://getsangria.com if they don't have one.
 2. Ask them to generate a client API key.
-3. Ask them to export it AND the backend URL:
+3. Ask them to export it:
 
    ```bash
    export SANGRIA_API_KEY="sg_agent_..."
-   export SANGRIA_URL="http://api.getsangria.com"  
    ```
 
    For persistence, add both lines to `~/.zshrc` or `~/.bashrc`.
@@ -301,7 +300,7 @@ All response fields and status values use **lowercase snake_case** (`balance_usd
 
 | Error | Meaning | What to do |
 |-------|---------|------------|
-| `401 Unauthorized` | API key missing or invalid | Check `SANGRIA_API_KEY` is exported. Regenerate at https://app.getsangria.com/keys if needed. |
+| `401 Unauthorized` | API key missing or invalid | Check `SANGRIA_API_KEY` is exported.|
 | `403 Forbidden` | API key is valid but lacks spend permission — account suspended, spend disabled, or this key isn't authorized to buy (e.g., a merchant-only key) | Don't retry. Tell the user to check account status and key permissions at https://app.getsangria.com, or use a different key. |
 | `404 No Merchant Found` | Sangria's catalog has nothing matching the intent + context | Make the intent/description more specific, broaden `where`, or tell the user this isn't currently available via Sangria. Don't fabricate a workaround. |
 | `409 Insufficient Credits` | Credit balance below the quoted amount | Tell the user to top up at https://app.getsangria.com/credits. |
