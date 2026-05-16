@@ -12,7 +12,7 @@ You never sign a payment, never talk to a merchant directly, never see USDC. San
 
 ## Amount representation
 
-All USD amounts in Sangria responses are **decimal strings with 6 decimal places** — e.g., `"6.250000"`, `"0.001000"`. Sangria stores amounts internally as int64 microunits (1 USD = 1,000,000 microunits) and serializes by dividing back out. To compare against on-chain values, multiply by 1,000,000 to recover the integer microunit count. JSON number inputs from the agent (like `context.budget_usd: 7.50`) are normalized internally — you don't need to write them with 6 decimals.
+All USD amounts in Sangria responses are **decimal strings with 6 decimal places** — e.g., `"6.250000"`, `"0.001000"`. Sangria stores amounts internally as int64 microunits (1 USD = 1,000,000 microunits) and serializes by dividing back out. To compare against on-chain values, multiply by 1,000,000 to recover the integer microunit count.
 
 ---
 
@@ -25,7 +25,7 @@ test -n "$SANGRIA_API_KEY" && echo "API_KEY: SET" || echo "API_KEY: MISSING"
 ```
 
 ```bash
-SANGRIA_URL="${SANGRIA_URL:-http://localhost:8080}"
+SANGRIA_URL="${SANGRIA_URL:-http://getsangria.com}"
 curl -sf "$SANGRIA_URL/health" >/dev/null && echo "BACKEND: REACHABLE" || echo "BACKEND: UNREACHABLE"
 ```
 
@@ -33,13 +33,15 @@ curl -sf "$SANGRIA_URL/health" >/dev/null && echo "BACKEND: REACHABLE" || echo "
 
 If `API_KEY: MISSING`, the user needs to configure a Sangria **client** API key (not a merchant key — clients buy, merchants sell):
 
-1. Ask the user to create a Sangria account at https://app.getsangria.com if they don't have one.
-2. Ask them to generate a client API key at https://app.getsangria.com/keys.
+1. Ask the user to create a Sangria account at https://getsangria.com if they don't have one.
+2. Ask them to generate a client API key.
 3. Ask them to export it AND the backend URL:
+
    ```bash
-   export SANGRIA_API_KEY="sng_live_..."
-   export SANGRIA_URL="http://localhost:8080"   # or the prod URL, confirmed with the user
+   export SANGRIA_API_KEY="sg_agent_..."
+   export SANGRIA_URL="http://api.getsangria.com"  
    ```
+
    For persistence, add both lines to `~/.zshrc` or `~/.bashrc`.
 
 Verify:
@@ -49,8 +51,6 @@ curl -s -H "Authorization: Bearer $SANGRIA_API_KEY" "$SANGRIA_URL/balance"
 ```
 
 A 200 with a `balance_usd` field means you're set up. A 401 means the key is missing or invalid.
-
-This skill does not hard-code a production URL. Confirm the production host with the user, do not guess.
 
 ### Ensure the Sangria Buy skill is saved and enabled
 
@@ -85,7 +85,7 @@ The three fields work together. Be specific in all three — Sangria's discovery
 |-------|------------|----------------|--------------|
 | `intent` | The high-level **category** of purchase. One short phrase. No quantity, no spec. | `"Buy a coffee"` | `"Recent public tweets about a keyword"` |
 | `description` | The **spec of the thing** — quantity, qualifiers, fields, format, modifiers. | `"16oz iced latte, oat milk, no syrup, decaf"` | `"10 tweets, English, last 24h. Text + author + timestamp."` |
-| `context` | Everything **around** the purchase — who, where, when, why, how, budget. Used by discovery to pick the right merchant; most fields are forwarded to the merchant on confirm (control fields like `budget_usd` are stripped — see below). Structured JSON. | See below. | See below. |
+| `context` | Everything **around** the purchase — who, where, when, why, how. Used by discovery to pick the right merchant and forwarded to the merchant on confirm. Structured JSON. | See below. | See below. |
 
 Rule of thumb: if you took the `description` out of any user-facing chat reply, would the *kind of thing* still be clear from the `intent` alone? If yes, the split is right. If not, you've leaked spec into intent or category into description.
 
@@ -100,11 +100,10 @@ Rule of thumb: if you took the `description` out of any user-facing chat reply, 
 | `when` | Timing, urgency, scheduling. | `"needed within 20 minutes"` |
 | `why` | Purpose behind the purchase. Helps disambiguate intent. | `"client meeting at 10am"` |
 | `how` | Delivery method, brewing method, format preferences. | `"drip or pour-over preferred over espresso"` |
-| `budget_usd` | Hard upper bound (JSON number) the user has pre-authorized for this task. Sangria rejects quotes above it with `409 Over Budget`. **Stripped server-side; never forwarded to the merchant** — safe to set tight without inviting the merchant to quote up to it. | `7.50` |
 
 Other keys are fine — `context` is treated as semi-structured. Sangria's discovery uses what it understands; the merchant receives relevant fields on confirm.
 
-**Do not put secrets, credentials, or sensitive PII in `context`.** Most `context` fields are passed to the merchant on confirm and may be logged there — assume merchant-visible unless this skill says otherwise (currently only `budget_usd` is stripped).
+**Do not put secrets, credentials, or sensitive PII in `context`.** All `context` fields are passed to the merchant on confirm and may be logged there — assume merchant-visible.
 
 ---
 
@@ -112,11 +111,11 @@ Other keys are fine — `context` is treated as semi-structured. Sangria's disco
 
 | Endpoint | Body | What it does |
 |----------|------|--------------|
-| `POST /buy` | `{intent, description, context}` | Submit the intent. Synchronously discovers a merchant, negotiates an x402 quote, returns `order_id` + `quote.amount_usd`. **Does not charge.** |
+| `POST /buy` | `{intent, description, context}` | Submit the intent. Synchronously discovers a merchant, negotiates an x402 quote, returns `order_id` + `item_name` + `item_description` + `quote.amount_usd`. **Does not charge.** |
 | `POST /buy/{order_id}/confirm` | *(empty — the `order_id` in the path is sufficient)* | Finalize. Charges credits, signs ERC-3009 from treasury, settles via facilitator, fulfills via merchant, returns `result`. |
 | `POST /buy/{order_id}/cancel` | *(empty)* | Abandon an unconfirmed order. Optional — orders auto-expire. |
 | `GET  /buy/{order_id}` | – | Get current status and (if completed) result. Use for polling slow merchants. |
-| `GET  /balance` | – | Get current **client** credit balance in USD. (Merchants have a separate balance endpoint scoped to merchant keys; this skill is client-side.) |
+| `GET  /balance` | – | Get current **client** credit balance in USD. 
 
 All requests require `Authorization: Bearer $SANGRIA_API_KEY` and use JSON.
 
@@ -126,7 +125,7 @@ All requests require `Authorization: Bearer $SANGRIA_API_KEY` and use JSON.
 
 ### The `discovered` object
 
-The `discovered` field in a quote (`merchant`, `endpoint`, `summary`) is **informational only — for surfacing to the user, not for direct action**. **You do not call the merchant yourself.** Sangria mediates all merchant communication; the URL, host, and protocol are intentionally opaque. Don't try to construct a direct request from `discovered.endpoint`.
+The `discovered` field in a quote (`merchant`, `summary`) is **informational only — for surfacing to the user, not for direct action**. **You do not call the merchant yourself.** Sangria mediates all merchant communication; the URL, host, and protocol are intentionally opaque.
 
 ### Quote expiry
 
@@ -152,34 +151,17 @@ curl -s -X POST "$SANGRIA_URL/buy" \
       "where": "Seattle SLU, 98109 — in-store pickup OK",
       "when": "needed within 20 minutes",
       "why": "client meeting at 10am",
-      "budget_usd": 7.50
     }
-  }'
-# -> {
-#      "order_id": "ord_01J7XK4F2N5R8Q3M9V1W7Y2P6S",
-#      "status": "awaiting_confirmation",
-#      "quote": { "amount_usd": "6.250000", "currency": "USD" },
-#      "discovered": {
-#        "merchant": "slu-mercantile-coffee",
-#        "endpoint": "/order",
-#        "summary": "Mercantile Coffee, 4 blocks away, 8-min wait, decaf oat latte available"
-#      },
-#      "expires_at": "2026-05-15T12:39:00Z"
-#    }
+  '
 
-# 2. Decide.  $6.25 is within the $7.50 budget; merchant matches location and
-#    preferences — confirm.
-#    (Step 3 below shows 3a AND 3b for reference; in a real flow you do one
-#    OR the other on a given order, not both.)
 
-# 3a. Confirm (yes).  Empty body — the order_id in the path is the whole request.
+# 2a. Confirm (yes).  Empty body — the order_id in the path is the whole request.
 curl -s -X POST "$SANGRIA_URL/buy/ord_01J7XK4F2N5R8Q3M9V1W7Y2P6S/confirm" \
   -H "Authorization: Bearer $SANGRIA_API_KEY"
 # -> {
 #      "order_id": "ord_01J7XK4F2N5R8Q3M9V1W7Y2P6S",
 #      "status": "completed",
 #      "charged": { "amount_usd": "6.250000" },
-#      "balance_after": "13.750000",
 #      "result": {
 #        "merchant_order_id": "MC-44821",
 #        "pickup_eta_minutes": 8,
@@ -202,41 +184,7 @@ curl -s -X POST "$SANGRIA_URL/buy/ord_01J7XM8H6P3T2K5N9R4V6W8Z1A/cancel" \
 
 ## Example Flows
 
-### Flow 1: Quote exceeds budget — server-side rejection
-
-User: "Grab me a coffee — under $5 if possible."
-
-```bash
-curl -s -X POST "$SANGRIA_URL/buy" \
-  -H "Authorization: Bearer $SANGRIA_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "intent": "Buy a coffee",
-    "description": "12oz drip coffee, black",
-    "context": {
-      "where": "Manhattan, midtown",
-      "budget_usd": 5.00
-    }
-  }'
-# -> (HTTP 409 — curl -s hides the status; use -i to see it)
-# {
-#   "error": {
-#     "code": "OVER_BUDGET",
-#     "message": "Discovered quote $6.750000 exceeds budget_usd $5.000000",
-#     "discovered_quote_usd": "6.750000",
-#     "budget_usd": "5.000000"
-#   }
-# }
-# No order was created; nothing to cancel.
-
-# Go back to user:
-# "Sangria found a $6.75 coffee in midtown — over your $5 budget.
-#  Want to raise the budget or widen the area?"
-```
-
-Note: passing `budget_usd` is what triggered the server-side rejection — no order was created and there's nothing to cancel. If you omit `budget_usd`, Sangria returns an over-budget quote anyway and you have to `POST /buy/{id}/cancel` it manually. Always pass `budget_usd` when the user states a budget.
-
-### Flow 2: Slow merchant — poll status
+### Flow 1: Slow merchant — poll status
 
 Some merchants take time to fulfill after payment (large data scrapes, food orders waiting on a barista). If `/confirm` returns `status: "running"`, poll `GET /buy/{order_id}` every 5–10 seconds.
 
@@ -252,7 +200,7 @@ curl -s -H "Authorization: Bearer $SANGRIA_API_KEY" \
 # -> { "status": "completed", "result": { ... } }
 ```
 
-### Flow 3: Buy data (proves the schema generalizes beyond coffee)
+### Flow 2: Buy data (proves the schema generalizes beyond coffee)
 
 ```bash
 curl -s -X POST "$SANGRIA_URL/buy" \
@@ -262,8 +210,7 @@ curl -s -X POST "$SANGRIA_URL/buy" \
     "intent": "Recent public tweets about a keyword",
     "description": "10 tweets, English, last 24h. Text + author + timestamp.",
     "context": {
-      "why": "sentiment analysis sample for an internal report",
-      "budget_usd": 0.10
+      "why": "sentiment analysis sample for an internal report"
     }
   }'
 # -> Quote: $0.001000 from apify-tweet-scraper.  Trivial — confirm.
@@ -285,7 +232,7 @@ curl -s -X POST "$SANGRIA_URL/buy/ord_01J7XP2K8R5S6N9Q3T7W4V8X1C/confirm" \
 # Verify count: result.tweets has 10 entries as requested.  Save to file if large.
 ```
 
-### Flow 4: Merchant fails — Sangria refunds automatically
+### Flow 3: Merchant fails — Sangria refunds automatically
 
 Sometimes a merchant accepts settlement but then fails to fulfill (timeout, internal error, out-of-stock after payment). Sangria reconciles this and refunds the credits — but you should report the failure cleanly to the user, not retry blindly.
 
@@ -318,8 +265,7 @@ You are spending the user's real money. Every `/buy` confirmation is a financial
 
 - **Vague inputs are the main source of surprise charges.** Sangria's discovery picks from the whole catalog when the intent + description are loose. "Get me coffee" without a location could pull from a high-end hotel concierge merchant; "stock data" without a ticker could pull a full corpus.
 - **Quotes are real money commitments once confirmed.** There is no "preview the result then decide" — confirm charges credits before the merchant fulfills.
-- **`context.budget_usd` is the cheapest way to prevent overruns.** Server-side rejection (`409 Over Budget`) is faster, cheaper, and harder to bypass than agent-side comparison.
-- **Credits are pre-funded.** Insufficient balance is a `402` on `/confirm`, not on `/buy`. The user must top up — there's no overdraft.
+- **Credits are pre-funded.** Insufficient balance is a `409` on `/confirm`, not on `/buy`. The user must top up — there's no overdraft.
 
 ---
 
@@ -356,10 +302,10 @@ All response fields and status values use **lowercase snake_case** (`balance_usd
 | Error | Meaning | What to do |
 |-------|---------|------------|
 | `401 Unauthorized` | API key missing or invalid | Check `SANGRIA_API_KEY` is exported. Regenerate at https://app.getsangria.com/keys if needed. |
-| `402 Insufficient Credits` | Credit balance below the quoted amount | Tell the user to top up at https://app.getsangria.com/credits. |
+| `403 Forbidden` | API key is valid but lacks spend permission — account suspended, spend disabled, or this key isn't authorized to buy (e.g., a merchant-only key) | Don't retry. Tell the user to check account status and key permissions at https://app.getsangria.com, or use a different key. |
 | `404 No Merchant Found` | Sangria's catalog has nothing matching the intent + context | Make the intent/description more specific, broaden `where`, or tell the user this isn't currently available via Sangria. Don't fabricate a workaround. |
+| `409 Insufficient Credits` | Credit balance below the quoted amount | Tell the user to top up at https://app.getsangria.com/credits. |
 | `409 Quote Expired` | `order_id` is past its `expires_at` | Re-submit the original `POST /buy` to get a fresh quote (price may change). |
-| `409 Over Budget` | Quote exceeded `context.budget_usd` | Show the user the actual quote vs. their stated budget and ask whether to raise it. |
 | `429 Too Many Requests` | Sangria-side rate limit | Back off. Read the `Retry-After` response header if present and wait that many seconds. Never retry in a tight loop. |
 | `5xx` on `/confirm` | Backend or settlement failure mid-flight | **Do NOT blindly retry `/confirm`.** Call `GET /buy/{order_id}` — Sangria reconciles ambiguous settlements automatically. The order is the source of truth; the HTTP response is not. |
 
@@ -372,11 +318,9 @@ All response fields and status values use **lowercase snake_case** (`balance_usd
 3. **Show the quote and the discovered merchant to the user before confirming**, unless the user has explicitly pre-authorized spending for the task in this session.
 4. **Don't retry `/confirm` on errors.** If `/confirm` returns 5xx, the order may already be in flight. Use `GET /buy/{order_id}` to read the canonical state. Sangria is the source of truth — never assume failure from a missing HTTP response.
 5. **Cancel quotes you abandon.** Explicit `/cancel` is cleaner than expiry and releases reserved balance immediately.
-6. **Check balance when relevant.** Run `GET /balance` before large purchases or when the user has flagged cost-awareness.
-7. **Treat `result` as opaque per-merchant data.** The shape depends on which merchant Sangria picked. Don't assume a schema across calls — re-read the structure from `result` each time.
-8. **Use `context.budget_usd` whenever the user states a budget.** It moves enforcement to the server (a `409 Over Budget` is cleaner than agent-side comparison).
-9. **Don't put secrets, credentials, or sensitive PII in `context`.** Most `context` fields are forwarded to the merchant on confirm (the documented exception is `budget_usd`, which is stripped server-side). Assume merchant-visible by default.
-10. **The `discovered` object is informational.** Surface it to the user, but never try to call `discovered.endpoint` yourself — Sangria mediates all merchant communication.
-11. **If a field appears in a response that isn't documented here, treat it as informational.** Do not branch on undocumented fields or build flows that depend on them — they may change without notice.
-12. **Verify `result` against your `description`.** Merchants may partially fulfill (e.g., 7 of 10 requested tweets, a substituted item). Compare what you got to what you asked for before telling the user the purchase succeeded.
-13. **Don't retry `POST /buy` after a network-level timeout.** If the request hangs and you abort it, the order may or may not have been created — and each `POST /buy` is a fresh order with its own quote and `order_id`. Retrying could create a duplicate. Surface the network error to the user; if they want to proceed, call `POST /buy` again deliberately.
+6. **Treat `result` as opaque per-merchant data.** The shape depends on which merchant Sangria picked. Don't assume a schema across calls — re-read the structure from `result` each time.
+7. **Don't put secrets, credentials, or sensitive PII in `context`.** All `context` fields are forwarded to the merchant on confirm. Assume merchant-visible by default.
+8. **The `discovered` object is informational.** Surface it to the user, but never try to call `discovered.endpoint` yourself — Sangria mediates all merchant communication.
+9. **If a field appears in a response that isn't documented here, treat it as informational.** Do not branch on undocumented fields or build flows that depend on them — they may change without notice.
+10. **Verify `result` against your `description`.** Merchants may partially fulfill (e.g., 7 of 10 requested tweets, a substituted item). Compare what you got to what you asked for before telling the user the purchase succeeded.
+11. **Don't retry `POST /buy` after a network-level timeout.** If the request hangs and you abort it, the order may or may not have been created — and each `POST /buy` is a fresh order with its own quote and `order_id`. Retrying could create a duplicate. Surface the network error to the user; if they want to proceed, call `POST /buy` again deliberately.
