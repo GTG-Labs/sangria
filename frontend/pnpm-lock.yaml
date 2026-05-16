@@ -15,8 +15,8 @@ dependencies:
     specifier: ^3.1.1
     version: 3.1.1(@types/react@19.2.14)(react@19.2.3)
   '@next/mdx':
-    specifier: ^16.1.6
-    version: 16.1.6(@mdx-js/loader@3.1.1)(@mdx-js/react@3.1.1)
+    specifier: ^16.2.6
+    version: 16.2.6(@mdx-js/loader@3.1.1)(@mdx-js/react@3.1.1)
   '@t3-oss/env-nextjs':
     specifier: ^0.13.11
     version: 0.13.11(typescript@5.9.3)(zod@4.3.6)
@@ -28,7 +28,7 @@ dependencies:
     version: 13.15.10
   '@workos-inc/authkit-nextjs':
     specifier: ^2.15.0
-    version: 2.15.0(next@16.1.6)(react-dom@19.2.3)(react@19.2.3)
+    version: 2.15.0(next@16.2.6)(react-dom@19.2.3)(react@19.2.3)
   disposable-email-domains:
     specifier: ^1.0.62
     version: 1.0.62
@@ -37,13 +37,13 @@ dependencies:
     version: 3.4.0
   fumadocs-core:
     specifier: ^16.6.16
-    version: 16.6.16(@types/react@19.2.14)(lucide-react@0.577.0)(next@16.1.6)(react-dom@19.2.3)(react@19.2.3)(zod@4.3.6)
+    version: 16.6.16(@types/react@19.2.14)(lucide-react@0.577.0)(next@16.2.6)(react-dom@19.2.3)(react@19.2.3)(zod@4.3.6)
   fumadocs-mdx:
     specifier: ^14.2.9
-    version: 14.2.9(@types/mdx@2.0.13)(@types/react@19.2.14)(fumadocs-core@16.6.16)(next@16.1.6)(react@19.2.3)
+    version: 14.2.9(@types/mdx@2.0.13)(@types/react@19.2.14)(fumadocs-core@16.6.16)(next@16.2.6)(react@19.2.3)
   fumadocs-ui:
     specifier: ^16.6.16
-    version: 16.6.16(@types/mdx@2.0.13)(@types/react-dom@19.2.3)(@types/react@19.2.14)(fumadocs-core@16.6.16)(next@16.1.6)(react-dom@19.2.3)(react@19.2.3)(tailwindcss@4.2.1)
+    version: 16.6.16(@types/mdx@2.0.13)(@types/react-dom@19.2.3)(@types/react@19.2.14)(fumadocs-core@16.6.16)(next@16.2.6)(react-dom@19.2.3)(react@19.2.3)(tailwindcss@4.2.1)
   gray-matter:
     specifier: ^4.0.3
     version: 4.0.3
@@ -54,8 +54,8 @@ dependencies:
     specifier: ^0.577.0
     version: 0.577.0(react@19.2.3)
   next:
-    specifier: 16.1.6
-    version: 16.1.6(@babel/core@7.29.0)(react-dom@19.2.3)(react@19.2.3)
+    specifier: 16.2.6
+    version: 16.2.6(@babel/core@7.29.0)(react-dom@19.2.3)(react@19.2.3)
   next-mdx-remote:
     specifier: ^6.0.0
     version: 6.0.0(@types/react@19.2.14)(react@19.2.3)
@@ -101,8 +101,8 @@ devDependencies:
     specifier: ^9
     version: 9.39.4
   eslint-config-next:
-    specifier: 16.1.6
-    version: 16.1.6(@typescript-eslint/parser@8.57.0)(eslint@9.39.4)(typescript@5.9.3)
+    specifier: 16.2.6
+    version: 16.2.6(@typescript-eslint/parser@8.57.0)(eslint@9.39.4)(typescript@5.9.3)
   prettier:
     specifier: ^3.8.1
     version: 3.8.1
@@ -1003,18 +1003,18 @@ packages:
     dev: true
     optional: true
 
-  /@next/env@16.1.6:
-    resolution: {integrity: sha512-N1ySLuZjnAtN3kFnwhAwPvZah8RJxKasD7x1f8shFqhncnWZn4JMfg37diLNuoHsLAlrDfM3g4mawVdtAG8XLQ==}
+  /@next/env@16.2.6:
+    resolution: {integrity: sha512-gd8HoHN4ufj73WmR3JmVolrpJR47ILK6LouP5xElPglaVxir6e1a7VzvTvDWkOoPXT9rkkTzyCxBu4yeZfZwcw==}
     dev: false
 
-  /@next/eslint-plugin-next@16.1.6:
-    resolution: {integrity: sha512-/Qq3PTagA6+nYVfryAtQ7/9FEr/6YVyvOtl6rZnGsbReGLf0jZU6gkpr1FuChAQpvV46a78p4cmHOVP8mbfSMQ==}
+  /@next/eslint-plugin-next@16.2.6:
+    resolution: {integrity: sha512-Z8l6o4JWKUl755x4R+wogD86KPeU+Ckw4K+SYG4kHeOJtRenDeK+OSbGcqZpDtbwn9DsJVdir2UxmwXuinUbUw==}
     dependencies:
       fast-glob: 3.3.1
     dev: true
 
-  /@next/mdx@16.1.6(@mdx-js/loader@3.1.1)(@mdx-js/react@3.1.1):
-    resolution: {integrity: sha512-PT5JR4WPPYOls7WD6xEqUVVI9HDY8kY7XLQsNYB2lSZk5eJSXWu3ECtIYmfR0hZpx8Sg7BKZYKi2+u5OTSEx0w==}
+  /@next/mdx@16.2.6(@mdx-js/loader@3.1.1)(@mdx-js/react@3.1.1):
+    resolution: {integrity: sha512-0hdoSkzRbyud1dNRRDiyqD9FrxR2wwdiW+ffhYx+n+fXrFOJ7Nwpi8o7nUz2LiiM44BB9M0eIO1Evy3BBrS50A==}
     peerDependencies:
       '@mdx-js/loader': '>=0.15.0'
       '@mdx-js/react': '>=0.15.0'
@@ -1029,8 +1029,8 @@ packages:
       source-map: 0.7.6
     dev: false
 
-  /@next/swc-darwin-arm64@16.1.6:
-    resolution: {integrity: sha512-wTzYulosJr/6nFnqGW7FrG3jfUUlEf8UjGA0/pyypJl42ExdVgC6xJgcXQ+V8QFn6niSG2Pb8+MIG1mZr2vczw==}
+  /@next/swc-darwin-arm64@16.2.6:
+    resolution: {integrity: sha512-ZJGkkcNfYgrrMkqOdZ7zoLa1TOy0qpcMfk/z4Mh/FKUz40gVO+HNQWqmLxf67Z5WB64DRp0dhEbyHfel+6sJUg==}
     engines: {node: '>= 10'}
     cpu: [arm64]
     os: [darwin]
@@ -1038,8 +1038,8 @@ packages:
     dev: false
     optional: true
 
-  /@next/swc-darwin-x64@16.1.6:
-    resolution: {integrity: sha512-BLFPYPDO+MNJsiDWbeVzqvYd4NyuRrEYVB5k2N3JfWncuHAy2IVwMAOlVQDFjj+krkWzhY2apvmekMkfQR0CUQ==}
+  /@next/swc-darwin-x64@16.2.6:
+    resolution: {integrity: sha512-v/YLBHIY132Ced3puBJ7YJKw1lqsCrgcNo2aRJlCEyQrrCeRJlvGlnmxhPxNQI3KE3N1DN5r9TPNPvka3nq5RQ==}
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [darwin]
@@ -1047,8 +1047,8 @@ packages:
     dev: false
     optional: true
 
-  /@next/swc-linux-arm64-gnu@16.1.6:
-    resolution: {integrity: sha512-OJYkCd5pj/QloBvoEcJ2XiMnlJkRv9idWA/j0ugSuA34gMT6f5b7vOiCQHVRpvStoZUknhl6/UxOXL4OwtdaBw==}
+  /@next/swc-linux-arm64-gnu@16.2.6:
+    resolution: {integrity: sha512-RPOvqlYBbcQjkz9VQQDZ2T2bARIjXZV1KFlt+V2Mr6SW/e4I9fcKsaA0hdyf2FHoTlsV2xnBd5Y912rP/1Ce6w==}
     engines: {node: '>= 10'}
     cpu: [arm64]
     os: [linux]
@@ -1056,8 +1056,8 @@ packages:
     dev: false
     optional: true
 
-  /@next/swc-linux-arm64-musl@16.1.6:
-    resolution: {integrity: sha512-S4J2v+8tT3NIO9u2q+S0G5KdvNDjXfAv06OhfOzNDaBn5rw84DGXWndOEB7d5/x852A20sW1M56vhC/tRVbccQ==}
+  /@next/swc-linux-arm64-musl@16.2.6:
+    resolution: {integrity: sha512-URUTu1+dMkxJsPFgm+OeEvq9wf5sujw0EvgYy80TDGHTSLTnIHeqb0Eu8A3sC95IRgjejQL+kC4mw+4yPxiAXA==}
     engines: {node: '>= 10'}
     cpu: [arm64]
     os: [linux]
@@ -1065,8 +1065,8 @@ packages:
     dev: false
     optional: true
 
-  /@next/swc-linux-x64-gnu@16.1.6:
-    resolution: {integrity: sha512-2eEBDkFlMMNQnkTyPBhQOAyn2qMxyG2eE7GPH2WIDGEpEILcBPI/jdSv4t6xupSP+ot/jkfrCShLAa7+ZUPcJQ==}
+  /@next/swc-linux-x64-gnu@16.2.6:
+    resolution: {integrity: sha512-DOj182mPV8G3UkrayLoREM5YEYI+Dk5wv7Ox9xl1fFibAELEsFD0lDPfHIeILlutMMfdyhlzYPELG3peuKaurw==}
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [linux]
@@ -1074,8 +1074,8 @@ packages:
     dev: false
     optional: true
 
-  /@next/swc-linux-x64-musl@16.1.6:
-    resolution: {integrity: sha512-oicJwRlyOoZXVlxmIMaTq7f8pN9QNbdes0q2FXfRsPhfCi8n8JmOZJm5oo1pwDaFbnnD421rVU409M3evFbIqg==}
+  /@next/swc-linux-x64-musl@16.2.6:
+    resolution: {integrity: sha512-HKQ5SP/V/ub73UvF7n/zeJlxk2kLmtL7Wzrg4WfmkjmNos5onJ2tKu7yZOPdL18A6Svfn3max29ym+ry7NkK4g==}
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [linux]
@@ -1083,8 +1083,8 @@ packages:
     dev: false
     optional: true
 
-  /@next/swc-win32-arm64-msvc@16.1.6:
-    resolution: {integrity: sha512-gQmm8izDTPgs+DCWH22kcDmuUp7NyiJgEl18bcr8irXA5N2m2O+JQIr6f3ct42GOs9c0h8QF3L5SzIxcYAAXXw==}
+  /@next/swc-win32-arm64-msvc@16.2.6:
+    resolution: {integrity: sha512-LZXpTlPyS5v7HhSmnvsLGP3iIYgYOBnc8r8ArlT55sGHV89bR2HlDdBjWQ+PY6SJMmk8TuVGFuxalnP3k/0Dwg==}
     engines: {node: '>= 10'}
     cpu: [arm64]
     os: [win32]
@@ -1092,8 +1092,8 @@ packages:
     dev: false
     optional: true
 
-  /@next/swc-win32-x64-msvc@16.1.6:
-    resolution: {integrity: sha512-NRfO39AIrzBnixKbjuo2YiYhB6o9d8v/ymU9m/Xk8cyVk+k7XylniXkHwjs4s70wedVffc6bQNbufk5v0xEm0A==}
+  /@next/swc-win32-x64-msvc@16.2.6:
+    resolution: {integrity: sha512-F0+4i0h9J6C4eE3EAPWsoCk7UW/dbzOjyzxY0qnDUOYFu6FFmdZ6l97/XdV3/Nz3VYyO7UWjyEJUXkGqcoXfMA==}
     engines: {node: '>= 10'}
     cpu: [x64]
     os: [win32]
@@ -2497,7 +2497,7 @@ packages:
     resolution: {integrity: sha512-RPmm6kgRbI8e98zSD3RVACvnuktIja5+yLgDAkTmxLr90BEwdTXRQWNLF3ETTTyH/8mKhznZuN5AveXYFEsMGQ==}
     dev: true
 
-  /@workos-inc/authkit-nextjs@2.15.0(next@16.1.6)(react-dom@19.2.3)(react@19.2.3):
+  /@workos-inc/authkit-nextjs@2.15.0(next@16.2.6)(react-dom@19.2.3)(react@19.2.3):
     resolution: {integrity: sha512-HKqtOwlf++8F7XCSwkdvvrGz/tCFoLsymP70HouTM+j8TliWEvBM843vu7cSNic3SA2Dmpfi5C6FZFKNDZufhg==}
     peerDependencies:
       next: ^13.5.9 || ^14.2.26 || ^15.2.3 || ^16
@@ -2507,7 +2507,7 @@ packages:
       '@workos-inc/node': 8.8.0
       iron-session: 8.0.4
       jose: 5.10.0
-      next: 16.1.6(@babel/core@7.29.0)(react-dom@19.2.3)(react@19.2.3)
+      next: 16.2.6(@babel/core@7.29.0)(react-dom@19.2.3)(react@19.2.3)
       path-to-regexp: 6.3.0
       react: 19.2.3
       react-dom: 19.2.3(react@19.2.3)
@@ -3216,8 +3216,8 @@ packages:
     engines: {node: '>=12'}
     dev: false
 
-  /eslint-config-next@16.1.6(@typescript-eslint/parser@8.57.0)(eslint@9.39.4)(typescript@5.9.3):
-    resolution: {integrity: sha512-vKq40io2B0XtkkNDYyleATwblNt8xuh3FWp8SpSz3pt7P01OkBFlKsJZ2mWt5WsCySlDQLckb1zMY9yE9Qy0LA==}
+  /eslint-config-next@16.2.6(@typescript-eslint/parser@8.57.0)(eslint@9.39.4)(typescript@5.9.3):
+    resolution: {integrity: sha512-z2ELYSkyrrJ6cuunTU8vhsT/RpouPkjaSah06nVW6Rg2Hpg0Vs8s497/e5s8G8qtdp4ccsiovz5P1rv+5VSW2Q==}
     peerDependencies:
       eslint: '>=9.0.0'
       typescript: '>=3.3.1'
@@ -3225,7 +3225,7 @@ packages:
       typescript:
         optional: true
     dependencies:
-      '@next/eslint-plugin-next': 16.1.6
+      '@next/eslint-plugin-next': 16.2.6
       eslint: 9.39.4
       eslint-import-resolver-node: 0.3.9
       eslint-import-resolver-typescript: 3.10.1(eslint-plugin-import@2.32.0)(eslint@9.39.4)
@@ -3693,7 +3693,7 @@ packages:
       tslib: 2.8.1
     dev: false
 
-  /fumadocs-core@16.6.16(@types/react@19.2.14)(lucide-react@0.577.0)(next@16.1.6)(react-dom@19.2.3)(react@19.2.3)(zod@4.3.6):
+  /fumadocs-core@16.6.16(@types/react@19.2.14)(lucide-react@0.577.0)(next@16.2.6)(react-dom@19.2.3)(react@19.2.3)(zod@4.3.6):
     resolution: {integrity: sha512-OC5VRAgXDZWpmuaix6TiUlqEyfhLjqnqkQuSqFnbf5Ge4w43I4qlxACxPS7Eq7aE+pPhpqTecQSQIH8KNouLXA==}
     peerDependencies:
       '@mdx-js/mdx': '*'
@@ -3766,7 +3766,7 @@ packages:
       mdast-util-mdx: 3.0.0
       mdast-util-to-markdown: 2.1.2
       negotiator: 1.0.0
-      next: 16.1.6(@babel/core@7.29.0)(react-dom@19.2.3)(react@19.2.3)
+      next: 16.2.6(@babel/core@7.29.0)(react-dom@19.2.3)(react@19.2.3)
       npm-to-yarn: 3.0.1
       path-to-regexp: 8.3.0
       react: 19.2.3
@@ -3785,7 +3785,7 @@ packages:
       - supports-color
     dev: false
 
-  /fumadocs-mdx@14.2.9(@types/mdx@2.0.13)(@types/react@19.2.14)(fumadocs-core@16.6.16)(next@16.1.6)(react@19.2.3):
+  /fumadocs-mdx@14.2.9(@types/mdx@2.0.13)(@types/react@19.2.14)(fumadocs-core@16.6.16)(next@16.2.6)(react@19.2.3):
     resolution: {integrity: sha512-5QbFj3KyNgojjpUsD5Xw2W+ofN9l1WiIxzthwFzGoHOLIoJkdCN4AjHcINC+YSo89d/oZlradrrKRd3uHwVKBA==}
     hasBin: true
     peerDependencies:
@@ -3823,11 +3823,11 @@ packages:
       chokidar: 5.0.0
       esbuild: 0.27.4
       estree-util-value-to-estree: 3.5.0
-      fumadocs-core: 16.6.16(@types/react@19.2.14)(lucide-react@0.577.0)(next@16.1.6)(react-dom@19.2.3)(react@19.2.3)(zod@4.3.6)
+      fumadocs-core: 16.6.16(@types/react@19.2.14)(lucide-react@0.577.0)(next@16.2.6)(react-dom@19.2.3)(react@19.2.3)(zod@4.3.6)
       js-yaml: 4.1.1
       mdast-util-mdx: 3.0.0
       mdast-util-to-markdown: 2.1.2
-      next: 16.1.6(@babel/core@7.29.0)(react-dom@19.2.3)(react@19.2.3)
+      next: 16.2.6(@babel/core@7.29.0)(react-dom@19.2.3)(react@19.2.3)
       picocolors: 1.1.1
       picomatch: 4.0.3
       react: 19.2.3
@@ -3842,7 +3842,7 @@ packages:
       - supports-color
     dev: false
 
-  /fumadocs-ui@16.6.16(@types/mdx@2.0.13)(@types/react-dom@19.2.3)(@types/react@19.2.14)(fumadocs-core@16.6.16)(next@16.1.6)(react-dom@19.2.3)(react@19.2.3)(tailwindcss@4.2.1):
+  /fumadocs-ui@16.6.16(@types/mdx@2.0.13)(@types/react-dom@19.2.3)(@types/react@19.2.14)(fumadocs-core@16.6.16)(next@16.2.6)(react-dom@19.2.3)(react@19.2.3)(tailwindcss@4.2.1):
     resolution: {integrity: sha512-MEpggI+rKvXEPqPmPVb8sIfUuo8ev7X3I6qVwPkHte9kIkiODZH9DmKFEnyuGnTjVXct8Z1wf18kY2xcoJI6eg==}
     peerDependencies:
       '@takumi-rs/image-response': '*'
@@ -3876,10 +3876,10 @@ packages:
       '@types/mdx': 2.0.13
       '@types/react': 19.2.14
       class-variance-authority: 0.7.1
-      fumadocs-core: 16.6.16(@types/react@19.2.14)(lucide-react@0.577.0)(next@16.1.6)(react-dom@19.2.3)(react@19.2.3)(zod@4.3.6)
+      fumadocs-core: 16.6.16(@types/react@19.2.14)(lucide-react@0.577.0)(next@16.2.6)(react-dom@19.2.3)(react@19.2.3)(zod@4.3.6)
       lucide-react: 0.577.0(react@19.2.3)
       motion: 12.36.0(react-dom@19.2.3)(react@19.2.3)
-      next: 16.1.6(@babel/core@7.29.0)(react-dom@19.2.3)(react@19.2.3)
+      next: 16.2.6(@babel/core@7.29.0)(react-dom@19.2.3)(react@19.2.3)
       next-themes: 0.4.6(react-dom@19.2.3)(react@19.2.3)
       react: 19.2.3
       react-dom: 19.2.3(react@19.2.3)
@@ -5430,8 +5430,8 @@ packages:
       react-dom: 19.2.3(react@19.2.3)
     dev: false
 
-  /next@16.1.6(@babel/core@7.29.0)(react-dom@19.2.3)(react@19.2.3):
-    resolution: {integrity: sha512-hkyRkcu5x/41KoqnROkfTm2pZVbKxvbZRuNvKXLRXxs3VfyO0WhY50TQS40EuKO9SW3rBj/sF3WbVwDACeMZyw==}
+  /next@16.2.6(@babel/core@7.29.0)(react-dom@19.2.3)(react@19.2.3):
+    resolution: {integrity: sha512-qOVgKJg1+At15NpeUP+eJgCHvTCgXsogweq87Ri/Ix7PkqQHg4sdaXmSFqKlgaIXE4kW0g25LE68W87UANlHtw==}
     engines: {node: '>=20.9.0'}
     hasBin: true
     peerDependencies:
@@ -5451,7 +5451,7 @@ packages:
       sass:
         optional: true
     dependencies:
-      '@next/env': 16.1.6
+      '@next/env': 16.2.6
       '@swc/helpers': 0.5.15
       baseline-browser-mapping: 2.10.0
       caniuse-lite: 1.0.30001777
@@ -5460,14 +5460,14 @@ packages:
       react-dom: 19.2.3(react@19.2.3)
       styled-jsx: 5.1.6(@babel/core@7.29.0)(react@19.2.3)
     optionalDependencies:
-      '@next/swc-darwin-arm64': 16.1.6
-      '@next/swc-darwin-x64': 16.1.6
-      '@next/swc-linux-arm64-gnu': 16.1.6
-      '@next/swc-linux-arm64-musl': 16.1.6
-      '@next/swc-linux-x64-gnu': 16.1.6
-      '@next/swc-linux-x64-musl': 16.1.6
-      '@next/swc-win32-arm64-msvc': 16.1.6
-      '@next/swc-win32-x64-msvc': 16.1.6
+      '@next/swc-darwin-arm64': 16.2.6
+      '@next/swc-darwin-x64': 16.2.6
+      '@next/swc-linux-arm64-gnu': 16.2.6
+      '@next/swc-linux-arm64-musl': 16.2.6
+      '@next/swc-linux-x64-gnu': 16.2.6
+      '@next/swc-linux-x64-musl': 16.2.6
+      '@next/swc-win32-arm64-msvc': 16.2.6
+      '@next/swc-win32-x64-msvc': 16.2.6
       sharp: 0.34.5
     transitivePeerDependencies:
       - '@babel/core'
