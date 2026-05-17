@@ -6,6 +6,7 @@ import (
 
 	"sangria/backend/agentHandlers"
 	"sangria/backend/auth"
+	"sangria/backend/buyHandlers"
 	"sangria/backend/config"
 	"sangria/backend/merchantHandlers"
 	"sangria/backend/ratelimit"
@@ -28,8 +29,15 @@ func RegisterAPIKeyRoutes(app *fiber.App, pool *pgxpool.Pool) {
 	merchant.Post("/settle-payment", merchantHandlers.SettlePayment(pool))
 
 	// Agent SDK routes — gated to reject merchant keys for the mirror reason.
-	// The /buy purchase flow lands as part of the discovery-model PR; this
-	// group currently exposes only the balance lookup.
-	agent := v1.Group("/agent", auth.RequireAgentKey)
+	// Mounted at the root of /v1 (not /v1/agent) so paths match the agent
+	// SDK skill: /v1/balance, /v1/buy, /v1/buy/{id}/confirm, etc.
+	agent := v1.Group("", auth.RequireAgentKey)
 	agent.Get("/balance", agentHandlers.GetAgentBalance(pool))
+
+	// /v1/buy discovery + checkout flow. Full handler logic + state machine
+	// in backend/buyHandlers/; see agent-sdk-planning/BUY_ENDPOINT_PLAN.md.
+	agent.Post("/buy", buyHandlers.Buy(pool))
+	agent.Post("/buy/:id/confirm", buyHandlers.Confirm(pool))
+	agent.Post("/buy/:id/cancel", buyHandlers.Cancel(pool))
+	agent.Get("/buy/:id", buyHandlers.Status(pool))
 }
