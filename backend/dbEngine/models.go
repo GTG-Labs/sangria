@@ -4,6 +4,7 @@ package dbengine
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 )
 
@@ -355,6 +356,20 @@ const (
 	AgentPaymentStatusUnresolved AgentPaymentStatus = "unresolved"
 )
 
+// AgentPaymentType discriminates the protocol that produced an agent_payments
+// row. "x402" rows carry on-chain signing material (merchant_pay_to_address,
+// network, scheme, payment_signature_b64) and a tx_hash on confirm.
+// "sangria_native" rows leave all of those NULL — Sangria orchestrates the
+// merchant call directly and settlement is an internal ledger accrual via
+// Merchant Settlement Payable. Paired DB CHECKs enforce that the right
+// subset of columns is populated for each type.
+type AgentPaymentType string
+
+const (
+	AgentPaymentTypeX402          AgentPaymentType = "x402"
+	AgentPaymentTypeSangriaNative AgentPaymentType = "sangria_native"
+)
+
 // Per-operator agent credit account names. One pair (Trial + Paid) is created
 // per operator on first top-up; the names embed the orgID so balance lookups
 // are queryable by name pattern. ASCII colon separator is intentional — easy
@@ -374,13 +389,57 @@ func AgentCreditsPaidAccountName(orgID string) string {
 }
 
 type AgentOperator struct {
-	ID                    string         `json:"id"`
-	OrganizationID        string         `json:"organization_id"`
-	TrialCreditMicrounits int64          `json:"trial_credit_microunits"`
-	StripeCustomerID      *string        `json:"stripe_customer_id"`
-	KYCStatus             AgentKYCStatus `json:"kyc_status"`
-	Address   json.RawMessage `json:"address,omitempty"`
-	CreatedAt time.Time       `json:"created_at"`
+	ID                    string          `json:"id"`
+	OrganizationID        string          `json:"organization_id"`
+	TrialCreditMicrounits int64           `json:"trial_credit_microunits"`
+	StripeCustomerID      *string         `json:"stripe_customer_id"`
+	KYCStatus             AgentKYCStatus  `json:"kyc_status"`
+	Address               json.RawMessage `json:"address,omitempty"`
+	// Email + Phone are forwarded to merchants on /v1/buy/{id}/confirm.
+	// Both nullable in the DB and pointer-typed here so absent values
+	// stay distinguishable from empty strings. Confirm-handler validates
+	// non-empty before calling the merchant.
+	Email     *string   `json:"email,omitempty"`
+	Phone     *string   `json:"phone,omitempty"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// OperatorAddress is the parsed shape of agent_operators.address.
+// The jsonb column holds Stripe-Address-shaped values so we can round-trip
+// with Stripe Checkout (which collects addresses). nil sub-fields mean
+// "operator hasn't set this yet."
+type OperatorAddress struct {
+	Shipping *PostalAddress `json:"shipping,omitempty"`
+	Billing  *PostalAddress `json:"billing,omitempty"`
+}
+
+// PostalAddress matches the Stripe Address shape stored on the operator row.
+// Field names are wire-identical to Stripe Checkout's collected address,
+// so the same shape forwards verbatim to merchants on /v1/buy/{id}/confirm
+// without a translation layer.
+type PostalAddress struct {
+	Line1      string `json:"line1"`
+	Line2      string `json:"line2,omitempty"`
+	City       string `json:"city"`
+	State      string `json:"state"` // 2-letter US state code for V1 service-area matching
+	PostalCode string `json:"postal_code"`
+	Country    string `json:"country"` // ISO-3166 alpha-2; "US" in V1
+}
+
+// ParseOperatorAddress decodes the operator's address jsonb into the typed
+// OperatorAddress shape. Returns a zero-value OperatorAddress (Shipping +
+// Billing both nil) when the input is empty or NULL. Caller is responsible
+// for treating nil sub-fields and empty leaf strings as "operator hasn't set
+// this" — the handler validates per-field before consuming.
+func ParseOperatorAddress(raw json.RawMessage) (OperatorAddress, error) {
+	var addr OperatorAddress
+	if len(raw) == 0 {
+		return addr, nil
+	}
+	if err := json.Unmarshal(raw, &addr); err != nil {
+		return OperatorAddress{}, fmt.Errorf("parse operator address: %w", err)
+	}
+	return addr, nil
 }
 
 type AgentAPIKey struct {
@@ -424,18 +483,23 @@ type AgentPayment struct {
 	ID string `json:"id"`
 	// IdempotencyKey is internal dedup data; clients reference rows by ID.
 	// Hidden from JSON to mirror the withdrawals.IdempotencyKey pattern.
-	IdempotencyKey             string        `json:"-"`
-	APIKeyID                   string        `json:"api_key_id"`
-	MerchantURLOrHost          string        `json:"merchant_url_or_host"`
-	MerchantPayToAddress       string        `json:"merchant_pay_to_address"`
-	Network                    string        `json:"network"`
-	Scheme                     PaymentScheme `json:"scheme"`
+	IdempotencyKey string           `json:"-"`
+	APIKeyID       string           `json:"api_key_id"`
+	PaymentType    AgentPaymentType `json:"payment_type"`
+	MerchantURLOrHost string `json:"merchant_url_or_host"`
+	// The four x402-only columns. For sangria-native rows these scan as
+	// empty strings (DB stores NULL) and the JSON omitempty keeps them out
+	// of dashboard payloads. Paired DB CHECKs enforce the discriminator;
+	// see schema.ts § agentPayments.
+	MerchantPayToAddress       string        `json:"merchant_pay_to_address,omitempty"`
+	Network                    string        `json:"network,omitempty"`
+	Scheme                     PaymentScheme `json:"scheme,omitempty"`
 	MaxAmountMicrounits        int64         `json:"max_amount_microunits"`
 	SettlementAmountMicrounits *int64        `json:"settlement_amount_microunits"`
 	PlatformFeeMicrounits      *int64        `json:"platform_fee_microunits"`
 	ValidBefore                time.Time     `json:"valid_before"`
-	// PaymentSignatureB64 is the signed PAYMENT-SIGNATURE payload. Sensitive
-	// authorization material; NEVER serialized to clients.
+	// PaymentSignatureB64 is the signed PAYMENT-SIGNATURE payload (x402-only).
+	// Sensitive authorization material; NEVER serialized to clients.
 	PaymentSignatureB64 string             `json:"-"`
 	Status              AgentPaymentStatus `json:"status"`
 	TxHash              *string            `json:"tx_hash"`
@@ -472,4 +536,60 @@ type AgentTopup struct {
 	FailureMessage        *string          `json:"failure_message"`
 	CreatedAt             time.Time        `json:"created_at"`
 	CompletedAt           *time.Time       `json:"completed_at"`
+}
+
+// ---------------------------------------------------------------------------
+// /v1/buy discovery + order lifecycle
+// ---------------------------------------------------------------------------
+
+type OrderStatus string
+
+const (
+	OrderStatusAwaitingConfirmation OrderStatus = "awaiting_confirmation"
+	OrderStatusRunning              OrderStatus = "running"
+	OrderStatusCompleted            OrderStatus = "completed"
+	OrderStatusCancelled            OrderStatus = "cancelled"
+	OrderStatusFailed               OrderStatus = "failed"
+)
+
+// Order is a row in orders — one per discovery hit produced by POST /v1/buy.
+// Up to 3 are minted per /v1/buy call; the agent confirms one and the others
+// expire when their 60s quote TTL elapses.
+//
+// V1 has a single merchant configured via MERCHANT_CATALOG_URL env var, so
+// no MerchantID field — the source merchant is implicit. Multi-merchant
+// routing will re-introduce it.
+type Order struct {
+	ID              string `json:"id"`
+	AgentAPIKeyID   string `json:"agent_api_key_id"`
+	AgentOperatorID string `json:"agent_operator_id"`
+
+	Intent      string          `json:"intent"`
+	Description string          `json:"description"`
+	Context     json.RawMessage `json:"context,omitempty"`
+
+	Status OrderStatus `json:"status"`
+
+	// LineItems is the JSONB array of {sku, quantity} sent to the merchant's
+	// /buy endpoint on confirm. V1 always emits quantity=1; multi-unit orders
+	// are a follow-up.
+	LineItems json.RawMessage `json:"line_items"`
+
+	QuoteAmountMicrounits int64     `json:"quote_amount_microunits"`
+	QuotedAt              time.Time `json:"quoted_at"`
+	ExpiresAt             time.Time `json:"expires_at"`
+
+	ConfirmedAt *time.Time `json:"confirmed_at"`
+	CompletedAt *time.Time `json:"completed_at"`
+	CancelledAt *time.Time `json:"cancelled_at"`
+	FailedAt    *time.Time `json:"failed_at"`
+
+	Result         json.RawMessage `json:"result,omitempty"`
+	FailureCode    *string         `json:"failure_code"`
+	FailureMessage *string         `json:"failure_message"`
+
+	// Set when status transitions out of awaiting_confirmation.
+	PaymentID *string `json:"payment_id"`
+
+	CreatedAt time.Time `json:"created_at"`
 }

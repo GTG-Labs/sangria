@@ -427,6 +427,19 @@ export const agentPaymentStatusEnum = pgEnum("agent_payment_status", [
   "unresolved",
 ]);
 
+// Protocol discriminator on agent_payments. "x402" is the original on-chain
+// path (EIP-3009 signed transfers via the facilitator); "sangria_native" is
+// the new path used by /v1/buy where Sangria orchestrates the merchant call
+// directly and settlement is an internal ledger accrual via Merchant
+// Settlement Payable. The four x402-only columns
+// (merchant_pay_to_address, network, scheme, payment_signature_b64) are
+// required for "x402" rows and forbidden for "sangria_native" rows; paired
+// CHECKs on the table enforce this.
+export const agentPaymentTypeEnum = pgEnum("agent_payment_type", [
+  "x402",
+  "sangria_native",
+]);
+
 // ---------------------------------------------------------------------------
 // agentOperators — org-level enrollment in the agent SDK side of the network.
 // Mandatory 1:1 with organizations: every org has exactly one agent_operators
@@ -462,6 +475,13 @@ export const agentOperators = pgTable(
     //     ... (any other operator-defined label)
     //   }
     address: jsonb("address"),
+
+    // Operator contact info forwarded to merchants on /v1/buy/{id}/confirm.
+    // Both nullable — operator can sign up without setting them; confirm
+    // requires them at call time (returns 400 missing_operator_profile if
+    // either is missing). No format CHECKs — the receiving merchant validates.
+    email: varchar({ length: 320 }), // RFC 5321 max
+    phone: varchar({ length: 32 }),  // generous for international formats
 
     kycStatus: agentKycStatusEnum("kyc_status").notNull().default("unverified"),
 
@@ -571,15 +591,23 @@ export const agentPayments = pgTable(
       .notNull()
       .references(() => agentApiKeys.id),
 
+    // Protocol discriminator. Determines which subset of columns must be
+    // populated. Defaults to "x402" so existing rows backfill cleanly when the
+    // column lands; new sangria-native rows set this explicitly. See the
+    // paired CHECKs at the bottom of this table.
+    paymentType: agentPaymentTypeEnum("payment_type").notNull().default("x402"),
+
     // The full URL the agent paid for. Operators rename this to a host-only column
     // (or add a per-key privacy toggle) when a sensitive-content use case needs it;
     // V1 records full URLs unconditionally for dashboard / debugging value.
     merchantUrlOrHost: text("merchant_url_or_host").notNull(),
-    merchantPayToAddress: varchar("merchant_pay_to_address", {
-      length: 64,
-    }).notNull(),
-    network: varchar({ length: 64 }).notNull(), // CAIP-2, e.g. "eip155:8453"; sized for max CAIP-2 (~41 chars) plus headroom — Solana CAIP-2 is 39
-    scheme: paymentSchemeEnum().notNull(),
+
+    // x402-only columns — required for payment_type='x402', forbidden for
+    // 'sangria_native'. Enforced by chk_agent_payments_x402_fields /
+    // chk_agent_payments_native_fields below.
+    merchantPayToAddress: varchar("merchant_pay_to_address", { length: 64 }),
+    network: varchar({ length: 64 }), // CAIP-2, e.g. "eip155:8453"; sized for max CAIP-2 (~41 chars) plus headroom — Solana CAIP-2 is 39
+    scheme: paymentSchemeEnum(),
 
     // Amounts. settlement and fee are populated on /confirm.
     maxAmountMicrounits: bigint("max_amount_microunits", {
@@ -597,8 +625,10 @@ export const agentPayments = pgTable(
     validBefore: timestamp("valid_before", { withTimezone: true }).notNull(),
 
     // Signed PAYMENT-SIGNATURE bytes. Kept so retries can reuse the same
-    // signature without minting a new ERC-3009 nonce.
-    paymentSignatureB64: text("payment_signature_b64").notNull(),
+    // signature without minting a new ERC-3009 nonce. x402-only — must be
+    // NULL for sangria-native rows (no on-chain signing). Enforced by
+    // the paired CHECKs below.
+    paymentSignatureB64: text("payment_signature_b64"),
 
     status: agentPaymentStatusEnum().notNull().default("pending"),
     txHash: varchar("tx_hash", { length: 255 }),
@@ -643,16 +673,39 @@ export const agentPayments = pgTable(
     ),
     // Confirmed rows must carry all the fields that the confirm step fills in.
     // Prevents a half-written confirm transaction from leaving the DB in a state
-    // where status says success but the proof (tx_hash, ledger entry, fee, amount)
-    // isn't there.
+    // where status says success but the proof (ledger entry, fee, amount) isn't
+    // there. tx_hash is required only for x402 confirms (sangria-native has no
+    // on-chain tx); the paired chk_agent_payments_native_fields CHECK below
+    // already forbids tx_hash on sangria-native rows.
     check(
       "chk_agent_payments_confirmed_fields_required",
       sql`${table.status} <> 'confirmed' OR (
         ${table.settlementAmountMicrounits} IS NOT NULL
         AND ${table.platformFeeMicrounits} IS NOT NULL
-        AND ${table.txHash} IS NOT NULL
         AND ${table.ledgerTransactionId} IS NOT NULL
         AND ${table.confirmedAt} IS NOT NULL
+        AND (${table.paymentType} = 'sangria_native' OR ${table.txHash} IS NOT NULL)
+      )`,
+    ),
+    // Paired discriminator CHECKs — every row must populate exactly the
+    // columns its payment_type calls for, no more, no less.
+    check(
+      "chk_agent_payments_x402_fields",
+      sql`${table.paymentType} <> 'x402' OR (
+        ${table.merchantPayToAddress} IS NOT NULL
+        AND ${table.network} IS NOT NULL
+        AND ${table.scheme} IS NOT NULL
+        AND ${table.paymentSignatureB64} IS NOT NULL
+      )`,
+    ),
+    check(
+      "chk_agent_payments_native_fields",
+      sql`${table.paymentType} <> 'sangria_native' OR (
+        ${table.merchantPayToAddress} IS NULL
+        AND ${table.network} IS NULL
+        AND ${table.scheme} IS NULL
+        AND ${table.paymentSignatureB64} IS NULL
+        AND ${table.txHash} IS NULL
       )`,
     ),
   ],
@@ -754,6 +807,106 @@ export const agentTopups = pgTable(
     check(
       "chk_agent_topups_direction_matches_source",
       sql`(${table.direction} = 'DEBIT' AND ${table.source} = 'stripe_refund') OR (${table.direction} = 'CREDIT' AND ${table.source} <> 'stripe_refund')`,
+    ),
+  ],
+);
+
+// ---------------------------------------------------------------------------
+// orders — per-/buy lifecycle row. One per discovery hit (up to 3 per POST
+// /v1/buy call). State machine: awaiting_confirmation → running → {completed,
+// failed} or → cancelled. See agent-sdk-planning/BUY_ENDPOINT_PLAN.md for
+// the full lifecycle + handler flow.
+//
+// V1 ships with a single merchant configured via MERCHANT_CATALOG_URL env
+// var, so no merchant_id column or merchants_catalog FK lives here yet.
+// Multi-merchant routing will re-introduce both when that work lands.
+// ---------------------------------------------------------------------------
+
+export const orderStatusEnum = pgEnum("order_status", [
+  "awaiting_confirmation", // quoted, no money moved
+  "running",               // payment confirmed, awaiting merchant fulfillment
+  "completed",             // merchant returned result
+  "cancelled",             // user cancelled OR quote expired
+  "failed",                // merchant failed after confirm
+]);
+
+export const orders = pgTable(
+  "orders",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+
+    agentApiKeyId: uuid("agent_api_key_id")
+      .notNull()
+      .references(() => agentApiKeys.id),
+    agentOperatorId: uuid("agent_operator_id")
+      .notNull()
+      .references(() => agentOperators.id),
+
+    intent: text().notNull(),
+    description: text().notNull(),
+    // Operator's context object, forwarded to merchant verbatim. Nullable.
+    context: jsonb(),
+
+    status: orderStatusEnum().notNull().default("awaiting_confirmation"),
+
+    // Items the agent will buy. JSONB array of {sku, quantity} matching the
+    // merchant's /buy request shape. V1 always emits quantity=1; multi-unit
+    // orders are a follow-up (would need NLP on description to extract).
+    lineItems: jsonb("line_items").notNull(),
+
+    quoteAmountMicrounits: bigint("quote_amount_microunits", {
+      mode: "bigint",
+    }).notNull(),
+    quotedAt: timestamp("quoted_at", { withTimezone: true }).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+
+    confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+    failedAt: timestamp("failed_at", { withTimezone: true }),
+
+    // Merchant's opaque response payload when status='completed'.
+    result: jsonb(),
+    failureCode: varchar("failure_code", { length: 100 }),
+    failureMessage: text("failure_message"),
+
+    // Set when status transitions out of awaiting_confirmation.
+    paymentId: uuid("payment_id").references(() => agentPayments.id),
+
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("idx_orders_agent_operator_id").on(table.agentOperatorId),
+    index("idx_orders_agent_api_key_id").on(table.agentApiKeyId),
+    index("idx_orders_status").on(table.status),
+    index("idx_orders_created_at").on(table.createdAt.desc()),
+    check(
+      "chk_orders_quote_amount_positive",
+      sql`${table.quoteAmountMicrounits} > 0`,
+    ),
+    // Status-coupled field-presence guards. Mirrors the discipline already
+    // used on agent_payments / withdrawals — terminal states must carry the
+    // fields that pin down their proof / cause.
+    check(
+      "chk_orders_completed_fields_required",
+      sql`${table.status} <> 'completed' OR (
+        ${table.result} IS NOT NULL
+        AND ${table.completedAt} IS NOT NULL
+        AND ${table.paymentId} IS NOT NULL
+      )`,
+    ),
+    check(
+      "chk_orders_failed_fields_required",
+      sql`${table.status} <> 'failed' OR (
+        ${table.failureCode} IS NOT NULL
+        AND ${table.failedAt} IS NOT NULL
+      )`,
+    ),
+    check(
+      "chk_orders_cancelled_fields_required",
+      sql`${table.status} <> 'cancelled' OR ${table.cancelledAt} IS NOT NULL`,
     ),
   ],
 );

@@ -11,14 +11,15 @@ import (
 
 // System account names — used as lookup keys. Must be unique.
 const (
-	SystemAccountConversionClearing = "Conversion Clearing"
-	SystemAccountPlatformFeeRevenue = "Platform Fee Revenue"
-	SystemAccountConversionFees     = "Conversion Fees"
-	SystemAccountGasFees            = "Gas Fees"
-	SystemAccountUSDMerchantPool    = "USD Merchant Pool"
-	SystemAccountOwnerEquity        = "Owner Equity"
-	SystemAccountWithdrawalClearing = "Withdrawal Clearing"
-	SystemAccountTrialGrantsIssued  = "Trial Grants Issued"
+	SystemAccountConversionClearing        = "Conversion Clearing"
+	SystemAccountPlatformFeeRevenue        = "Platform Fee Revenue"
+	SystemAccountConversionFees            = "Conversion Fees"
+	SystemAccountGasFees                   = "Gas Fees"
+	SystemAccountUSDMerchantPool           = "USD Merchant Pool"
+	SystemAccountOwnerEquity               = "Owner Equity"
+	SystemAccountWithdrawalClearing        = "Withdrawal Clearing"
+	SystemAccountTrialGrantsIssued         = "Trial Grants Issued"
+	SystemAccountMerchantSettlementPayable = "Merchant Settlement Payable"
 )
 
 // ensureSystemAccount creates a system-level account if it doesn't exist.
@@ -100,6 +101,12 @@ func EnsureSystemAccounts(ctx context.Context, pool *pgxpool.Pool) error {
 		// Trial grants issued — marketing-funded expense, debited each time a new
 		// agent operator receives their signup trial credit.
 		{SystemAccountTrialGrantsIssued, AccountTypeExpense, USD},
+
+		// Merchant settlement payable — accrues when an operator confirms a
+		// sangria-native /v1/buy order. CREDIT lands here, operator's
+		// Agent Credits Trial/Paid get DEBITed. Drains to USDC/cash when
+		// real merchant payouts ship (V2+).
+		{SystemAccountMerchantSettlementPayable, AccountTypeLiability, USD},
 	}
 
 	for _, a := range accounts {
@@ -127,4 +134,20 @@ func GetSystemAccount(ctx context.Context, q queryer, name string, currency Curr
 		name, currency,
 	).Scan(&a.ID, &a.Name, &a.Type, &a.Currency, &a.OrganizationID, &a.CreatedAt)
 	return a, err
+}
+
+// MerchantSettlementPayableAccountID returns the ID of the singleton
+// "Merchant Settlement Payable" (LIABILITY/USD) system account. Thin wrapper
+// over GetSystemAccount — sangria-native confirm flows call this to build
+// ledger lines without rediscovering the lookup arguments each time.
+//
+// Returns pgx.ErrNoRows if EnsureSystemAccounts hasn't run yet — treat as
+// 500 internal in the handler. The row is created at backend startup and
+// is idempotent; see deploy-order note in agent-sdk-planning/BUY_ENDPOINT_PLAN.md.
+func MerchantSettlementPayableAccountID(ctx context.Context, q queryer) (string, error) {
+	a, err := GetSystemAccount(ctx, q, SystemAccountMerchantSettlementPayable, USD)
+	if err != nil {
+		return "", err
+	}
+	return a.ID, nil
 }

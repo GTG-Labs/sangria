@@ -35,3 +35,10 @@ var ErrAgentOperatorNotFound = errors.New("agent operator not found")
 // ErrAgentAPIKeyNotFound is returned when a lookup by key ID matches no
 // agent_api_keys row.
 var ErrAgentAPIKeyNotFound = errors.New("agent API key not found")
+
+// ErrWrongPaymentType is returned by protocol-specific confirm functions
+// (e.g. ConfirmSangriaNativePayment) when the row they locked has a
+// payment_type that doesn't match what they handle. Almost always a
+// programmer routing bug — the right confirm function for the row's type
+// should have been called instead. Surface loudly rather than recover.
+var ErrWrongPaymentType = errors.New("agent payment has the wrong payment_type for this confirm function")
