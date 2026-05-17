@@ -39,11 +39,10 @@ export async function PATCH(
     });
   }
 
-  const { csrf_token: _csrf_token, ...sanitizedBody } = body;
   return proxyToBackend(
     "PATCH",
     `/internal/client/agent/keys/${encodeURIComponent(id)}`,
-    { body: sanitizedBody, rawResponse: true },
+    { body, rawResponse: true },
     request,
   );
 }

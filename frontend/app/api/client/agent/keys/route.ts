@@ -23,11 +23,10 @@ export async function POST(request: Request) {
     });
   }
 
-  const { csrf_token: _csrf_token, ...sanitizedBody } = body;
   return proxyToBackend(
     "POST",
     "/internal/client/agent/keys",
-    { body: sanitizedBody },
+    { body },
     request,
   );
 }
