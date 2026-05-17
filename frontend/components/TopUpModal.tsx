@@ -10,7 +10,8 @@ interface TopUpModalProps {
   onClose: () => void;
 }
 
-const QUICK_AMOUNTS = [10, 25, 50, 100];
+// Quick amounts stored as microunits (int64) for precision-safe handling.
+const QUICK_AMOUNTS = [10_000_000, 25_000_000, 50_000_000, 100_000_000];
 
 interface CreateTopupResponse {
   url: string;
@@ -28,8 +29,11 @@ interface CreateTopupResponse {
 // (handlers in stripeWebhook.go) credits the ledger asynchronously when
 // `payment_intent.succeeded` fires.
 export default function TopUpModal({ open, onClose }: TopUpModalProps) {
-  const [selectedAmount, setSelectedAmount] = useState<number>(25);
-  const [customAmount, setCustomAmount] = useState("");
+  // Store amounts as microunits (int64) end-to-end. selectedAmount is one of
+  // QUICK_AMOUNTS (already microunits); customAmount stores parsed microunits
+  // or null. Format for display only when rendering.
+  const [selectedAmount, setSelectedAmount] = useState<number>(25_000_000);
+  const [customAmount, setCustomAmount] = useState<number | null>(null);
   const [useCustom, setUseCustom] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,7 +42,7 @@ export default function TopUpModal({ open, onClose }: TopUpModalProps) {
   // cancel it before window.location.href fires or stale state lands.
   const abortRef = useRef<AbortController | null>(null);
 
-  const effectiveAmount = useCustom ? Number(customAmount) || 0 : selectedAmount;
+  const effectiveAmountMicrounits = useCustom ? customAmount || 0 : selectedAmount;
 
   const handleClose = useCallback(() => {
     abortRef.current?.abort();
@@ -69,7 +73,7 @@ export default function TopUpModal({ open, onClose }: TopUpModalProps) {
   if (!open) return null;
 
   const handleConfirm = async () => {
-    if (effectiveAmount <= 0) return;
+    if (effectiveAmountMicrounits <= 0) return;
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
@@ -77,12 +81,11 @@ export default function TopUpModal({ open, onClose }: TopUpModalProps) {
     setError(null);
 
     try {
-      const amountMicrounits = Math.round(effectiveAmount * 1_000_000);
       const res = await internalFetch("/api/client/topups", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          amountMicrounits,
+          amountMicrounits: effectiveAmountMicrounits,
           idempotencyKey: crypto.randomUUID(),
         }),
         signal: controller.signal,
@@ -148,20 +151,20 @@ export default function TopUpModal({ open, onClose }: TopUpModalProps) {
 
         {/* Quick amounts */}
         <div className="mt-4 grid grid-cols-4 gap-2">
-          {QUICK_AMOUNTS.map((amt) => (
+          {QUICK_AMOUNTS.map((amtMicrounits) => (
             <button
-              key={amt}
+              key={amtMicrounits}
               onClick={() => {
-                setSelectedAmount(amt);
+                setSelectedAmount(amtMicrounits);
                 setUseCustom(false);
               }}
               className={`rounded-lg border py-2 text-sm font-medium transition-colors ${
-                !useCustom && selectedAmount === amt
+                !useCustom && selectedAmount === amtMicrounits
                   ? "border-sangria-600 bg-sangria-50 text-sangria-700"
                   : "border-zinc-200 text-gray-700 hover:border-zinc-300 hover:bg-zinc-50"
               }`}
             >
-              ${amt}
+              ${(amtMicrounits / 1_000_000).toFixed(0)}
             </button>
           ))}
         </div>
@@ -176,9 +179,14 @@ export default function TopUpModal({ open, onClose }: TopUpModalProps) {
               type="number"
               min="1"
               placeholder="Custom"
-              value={customAmount}
+              value={customAmount !== null ? (customAmount / 1_000_000).toFixed(2) : ""}
               onChange={(e) => {
-                setCustomAmount(e.target.value);
+                const dollarValue = parseFloat(e.target.value);
+                if (isFinite(dollarValue) && dollarValue > 0) {
+                  setCustomAmount(Math.round(dollarValue * 1_000_000));
+                } else {
+                  setCustomAmount(null);
+                }
                 setUseCustom(true);
               }}
               onFocus={() => setUseCustom(true)}
@@ -201,13 +209,13 @@ export default function TopUpModal({ open, onClose }: TopUpModalProps) {
         <div className="mt-5">
           <ArcadeButton
             onClick={handleConfirm}
-            disabled={confirming || effectiveAmount <= 0}
+            disabled={confirming || effectiveAmountMicrounits <= 0}
             className="w-full"
             size="sm"
           >
             {confirming
               ? "Redirecting…"
-              : `Continue to Stripe · $${effectiveAmount > 0 ? effectiveAmount.toFixed(2) : "0.00"}`}
+              : `Continue to Stripe · $${effectiveAmountMicrounits > 0 ? (effectiveAmountMicrounits / 1_000_000).toFixed(2) : "0.00"}`}
           </ArcadeButton>
         </div>
       </div>

@@ -69,9 +69,10 @@ export default function LimitField({
 
 // Shared microunit ↔ dollar helpers — both modals use these so rounding is
 // consistent across the create + edit flows. 1 USD = 1,000,000 microunits.
-export function microunitsToDollars(mu: number | null): string {
+export function microunitsToDollars(mu: number | string | null): string {
   if (mu === null) return "";
-  return (mu / 1_000_000).toFixed(2);
+  const microunits = typeof mu === "string" ? parseInt(mu, 10) : mu;
+  return (microunits / 1_000_000).toFixed(2);
 }
 
 export function dollarsToMicrounits(val: string): number | null {

@@ -95,15 +95,36 @@ func handleCheckoutSessionCompleted(c fiber.Ctx, pool *pgxpool.Pool, event strip
 	amountRaw := sess.Metadata["amount_microunits"]
 
 	if operatorID == "" || idempotencyKey == "" || amountRaw == "" {
-		slog.Warn("stripe session missing sangria metadata",
-			"session_id", sess.ID, "event_id", event.ID)
-		return c.JSON(fiber.Map{"received": true})
+		// Missing metadata — persist an unresolved topup record so the funds can
+		// be reconciled by hand. The webhook acks to prevent redelivery storm,
+		// but the durable unresolved row ensures the charge isn't silently dropped.
+		missingFields := []string{}
+		if operatorID == "" {
+			missingFields = append(missingFields, "operator_id")
+		}
+		if idempotencyKey == "" {
+			missingFields = append(missingFields, "idempotency_key")
+		}
+		if amountRaw == "" {
+			missingFields = append(missingFields, "amount_microunits")
+		}
+		slog.Error("stripe session missing sangria metadata",
+			"session_id", sess.ID, "event_id", event.ID, "missing_fields", missingFields)
+		// Return error to trigger Stripe retry — without all required metadata
+		// we cannot persist a topup row (no operator_id, no idempotency_key).
+		// Manual reconciliation requires admin intervention with the raw event data.
+		return c.Status(fiber.StatusInternalServerError).
+			JSON(fiber.Map{"error": "session missing required metadata"})
 	}
 	amountMicrounits, err := strconv.ParseInt(amountRaw, 10, 64)
 	if err != nil || amountMicrounits <= 0 {
 		slog.Error("invalid amount_microunits in session metadata",
-			"session_id", sess.ID, "amount_raw", amountRaw, "error", err)
-		return c.JSON(fiber.Map{"received": true})
+			"session_id", sess.ID, "event_id", event.ID, "amount_raw", amountRaw, "error", err)
+		// Return error to trigger Stripe retry — invalid amount prevents topup
+		// creation just like missing metadata. Admin can reconcile from Stripe
+		// dashboard + event logs if this persists.
+		return c.Status(fiber.StatusInternalServerError).
+			JSON(fiber.Map{"error": "invalid amount_microunits in metadata"})
 	}
 
 	// PaymentIntent is populated on the session by the time this event

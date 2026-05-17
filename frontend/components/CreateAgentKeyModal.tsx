@@ -67,15 +67,16 @@ function CreateAgentKeyContent({
 
   // Escape closes only the pre-reveal modal — after creation we force the
   // user through the Done button so they can't dismiss the one-time-secret
-  // dialog by accident. Lives in the inner component so it can read
+  // dialog by accident. Also guard on submitting to prevent losing the
+  // in-flight response. Lives in the inner component so it can read
   // `created`; the outer wrapper can't see this state.
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !created) onClose();
+      if (e.key === "Escape" && !created && !submitting) onClose();
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [onClose, created]);
+  }, [onClose, created, submitting]);
 
   const validate = (): string | null => {
     if (!name.trim()) return "Name is required.";
@@ -154,14 +155,15 @@ function CreateAgentKeyContent({
       aria-labelledby="create-key-title"
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm overflow-y-auto py-10"
       onClick={(e) => {
-        if (e.target === overlayRef.current && !created) onClose();
+        if (e.target === overlayRef.current && !created && !submitting) onClose();
       }}
     >
       <div className="relative w-full max-w-md rounded-2xl bg-white shadow-xl p-6">
         {!created && (
           <button
             onClick={onClose}
-            className="absolute right-4 top-4 text-gray-400 transition-colors hover:text-gray-700"
+            disabled={submitting}
+            className="absolute right-4 top-4 text-gray-400 transition-colors hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
             aria-label="Close"
           >
             <X className="h-4 w-4" />

@@ -15,18 +15,18 @@ import CardSettingsModal, {
 // APIKeyView carries everything CardSettingsModal needs to pre-fill its form,
 // on top of the visual identity the dashboard renders.
 interface APIKeyView extends APIKeyIdentity {
-  maxPerCallMicrounits: number;
-  dailyCapMicrounits: number;
-  monthlyCapMicrounits: number;
+  maxPerCallMicrounits: string;
+  dailyCapMicrounits: string;
+  monthlyCapMicrounits: string;
   createdAt: string;
 }
 
 interface AgentInfo {
   operatorId: string;
   apiKeys: APIKeyView[];
-  balanceMicrounits: number;
-  trialMicrounits: number;
-  paidMicrounits: number;
+  balanceMicrounits: string;
+  trialMicrounits: string;
+  paidMicrounits: string;
 }
 
 interface ClientTransaction {
@@ -52,8 +52,8 @@ const STATUS_LABELS: Record<string, string> = {
   failed: "Failed",
 };
 
-function formatDollars(microunits: number) {
-  const dollars = microunits / 1_000_000;
+function formatDollars(microunits: string) {
+  const dollars = parseInt(microunits, 10) / 1_000_000;
   return dollars.toLocaleString("en-US", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,

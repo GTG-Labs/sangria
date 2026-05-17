@@ -17,9 +17,9 @@ export interface CardSettings {
   keyId: string;
   name: string;
   agentName: string;
-  maxPerCallMicrounits: number; // math.MaxInt64 sentinel → "unlimited"
-  dailyCapMicrounits: number;
-  monthlyCapMicrounits: number;
+  maxPerCallMicrounits: string; // math.MaxInt64 sentinel → "unlimited"
+  dailyCapMicrounits: string;
+  monthlyCapMicrounits: string;
 }
 
 interface CardSettingsModalProps {
@@ -36,8 +36,9 @@ interface CardSettingsModalProps {
 // reliably maps back to the unlimited checkbox in the UI.
 const UNLIMITED_THRESHOLD = 1_000_000_000_000_000; // 1 quadrillion microunits ≈ $1B
 
-function isUnlimited(microunits: number): boolean {
-  return microunits >= UNLIMITED_THRESHOLD;
+function isUnlimited(microunits: string): boolean {
+  const parsed = parseInt(microunits, 10);
+  return parsed >= UNLIMITED_THRESHOLD;
 }
 
 function CardSettingsContent({

@@ -11,9 +11,9 @@ import CardSettingsModal, {
 } from "@/components/CardSettingsModal";
 
 interface APIKeyView extends APIKeyIdentity {
-  maxPerCallMicrounits: number;
-  dailyCapMicrounits: number;
-  monthlyCapMicrounits: number;
+  maxPerCallMicrounits: string;
+  dailyCapMicrounits: string;
+  monthlyCapMicrounits: string;
   createdAt: string;
 }
 
