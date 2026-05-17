@@ -96,8 +96,35 @@ func CreateAgentPayment(ctx context.Context, pool *pgxpool.Pool, params CreateAg
 	if err != nil {
 		return AgentPayment{}, fmt.Errorf("compute balance: %w", err)
 	}
-	if trial+paid < params.UpperBoundCost {
-		return AgentPayment{}, fmt.Errorf("%w: have %d, need %d", ErrInsufficientOperatorBalance, trial+paid, params.UpperBoundCost)
+
+	// Also subtract the sum of any currently-pending payments across all of this
+	// operator's keys. Pending rows don't write ledger entries until confirm, so
+	// the ledger-based balance above would otherwise over-report the available
+	// amount and let concurrent sign requests both pass even when the operator
+	// can't actually afford both. The FOR UPDATE lock above serializes this read
+	// across concurrent CreateAgentPayment calls for the same operator.
+	//
+	// Uses max_amount_microunits since UpperBoundCost isn't stored per row; for
+	// V0 with no platform fee they're equal, and using the smaller value is
+	// conservative-but-acceptable when fees do land later (caller may pass a
+	// pre-check that then fails at confirm, vs the opposite which would silently
+	// over-spend). Orphan pending rows (signed but never confirmed/failed) hold
+	// balance until cleaned up — sweeper is a V1.x gap shared with order expiry.
+	var pendingHold int64
+	err = tx.QueryRow(ctx, `
+		SELECT COALESCE(SUM(p.max_amount_microunits), 0)
+		FROM agent_payments p
+		JOIN agent_api_keys k ON k.id = p.api_key_id
+		WHERE k.agent_operator_id = $1 AND p.status = 'pending'
+	`, params.AgentOperatorID).Scan(&pendingHold)
+	if err != nil {
+		return AgentPayment{}, fmt.Errorf("compute pending hold: %w", err)
+	}
+
+	available := trial + paid - pendingHold
+	if available < params.UpperBoundCost {
+		return AgentPayment{}, fmt.Errorf("%w: have %d, need %d (pending hold: %d)",
+			ErrInsufficientOperatorBalance, available, params.UpperBoundCost, pendingHold)
 	}
 
 	// Normalize Metadata: nil/empty → NULL in the DB.
@@ -171,6 +198,12 @@ func validateCreateAgentPaymentParams(p CreateAgentPaymentParams) error {
 	}
 	if strings.TrimSpace(p.PaymentSignatureB64) == "" {
 		return fmt.Errorf("payment signature must not be empty")
+	}
+	if p.ValidBefore.IsZero() {
+		return fmt.Errorf("valid_before must be set")
+	}
+	if !p.ValidBefore.After(time.Now().UTC()) {
+		return fmt.Errorf("valid_before must be in the future, got %s", p.ValidBefore.Format(time.RFC3339))
 	}
 	return nil
 }

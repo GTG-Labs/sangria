@@ -93,7 +93,9 @@ func AuthenticateAPIKey(ctx context.Context, pool *pgxpool.Pool, providedKey str
 		return authenticateAgentKey(ctx, pool, providedKey, keyID)
 	default:
 		// parseAPIKey guarantees one of the two known types on a nil-error path.
-		return AuthResult{}, fmt.Errorf("unexpected key type from parser: %q", keyType)
+		// Wrap ErrUnknownKeyType for consistency with prefixForKeyType's default
+		// branch so callers can branch on errors.Is(err, ErrUnknownKeyType).
+		return AuthResult{}, fmt.Errorf("%w: %q", ErrUnknownKeyType, keyType)
 	}
 }
 

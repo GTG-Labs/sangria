@@ -182,13 +182,16 @@ func getOrCreateAgentCreditsAccountsInTx(ctx context.Context, tx pgx.Tx, orgID s
 // getOrCreateLiabilityAccountInTx upserts a single LIABILITY/USD account for an
 // org. Uses INSERT ... ON CONFLICT DO NOTHING RETURNING with a fallback SELECT
 // — same pattern as InsertTransaction's idempotency-key handling, conflict-safe
-// against the uq_accounts_org_name_liability_usd partial unique index.
+// against the uq_accounts_org_name_liability_usd partial unique index. The
+// ON CONFLICT clause uses column+predicate inference (not ON CONSTRAINT)
+// because partial unique INDEXES aren't named constraints in Postgres's eyes;
+// the WHERE clause must exactly match the partial-index predicate.
 func getOrCreateLiabilityAccountInTx(ctx context.Context, tx pgx.Tx, orgID, name string) (Account, error) {
 	var a Account
 	err := tx.QueryRow(ctx,
 		`INSERT INTO accounts (name, type, currency, organization_id)
 		 VALUES ($1, 'LIABILITY', 'USD', $2)
-		 ON CONFLICT ON CONSTRAINT uq_accounts_org_name_liability_usd DO NOTHING
+		 ON CONFLICT (organization_id, name) WHERE type = 'LIABILITY' AND currency = 'USD' DO NOTHING
 		 RETURNING id, name, type, currency, organization_id, created_at`,
 		name, orgID,
 	).Scan(&a.ID, &a.Name, &a.Type, &a.Currency, &a.OrganizationID, &a.CreatedAt)
@@ -212,12 +215,25 @@ func getOrCreateLiabilityAccountInTx(ctx context.Context, tx pgx.Tx, orgID, name
 	return a, nil
 }
 
-// grantTrialCreditInTx records the signup trial credit: inserts an agent_topups
-// row (source='trial', direction='CREDIT'), writes the matching double-entry
-// ledger transaction via insertTransactionInTx (DEBIT the marketing expense
-// account, CREDIT the operator's trial liability), then marks the topup
-// completed with the ledger linkage. All inside the caller's tx so the trial
-// grant commits atomically with the operator creation.
+// grantTrialCreditInTx records the SIGNUP-TIME trial credit: inserts an
+// agent_topups row (source='trial', direction='CREDIT'), writes the matching
+// double-entry ledger transaction via insertTransactionInTx (DEBIT the
+// marketing expense account, CREDIT the operator's trial liability), then
+// marks the topup completed with the ledger linkage. All inside the caller's
+// tx so the trial grant commits atomically with the operator creation.
+//
+// This is the only path that uses the deterministic idempotency key
+// "trial-grant-<operator_id>". That key is load-bearing for retry safety —
+// it ensures a partial-failure retry of CreateAgentOperator returns the
+// existing topup row rather than double-granting. As a side effect, this
+// function can only be called ONCE per operator; the second call no-ops on
+// the unique (agent_operator_id, idempotency_key) constraint.
+//
+// For any other credit grant — support comps, beta-promo bonuses, refund-
+// then-regrant, etc. — call dbengine.CreateAgentTopup directly with a
+// distinct caller-supplied idempotency key. Do NOT extend this function to
+// take a sequence number; the at-signup grant is a separate concern from
+// arbitrary post-signup grants and shouldn't be confused with them.
 func grantTrialCreditInTx(ctx context.Context, tx pgx.Tx, operatorID, trialAcctID string, amount int64) error {
 	trialGrantsAcct, err := GetSystemAccount(ctx, tx, SystemAccountTrialGrantsIssued, USD)
 	if err != nil {

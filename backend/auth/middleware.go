@@ -262,8 +262,7 @@ func RequireAgentKey(c fiber.Ctx) error {
 	keyType, _ := c.Locals("key_type").(string)
 	if keyType != string(KeyTypeAgent) {
 		return c.Status(403).JSON(fiber.Map{
-			"error_code": "wrong_key_type",
-			"message":    "this endpoint requires an agent API key",
+			"error": "this endpoint requires an agent API key",
 		})
 	}
 	return c.Next()
@@ -275,8 +274,7 @@ func RequireMerchantKey(c fiber.Ctx) error {
 	keyType, _ := c.Locals("key_type").(string)
 	if keyType != string(KeyTypeMerchant) {
 		return c.Status(403).JSON(fiber.Map{
-			"error_code": "wrong_key_type",
-			"message":    "this endpoint requires a merchant API key",
+			"error": "this endpoint requires a merchant API key",
 		})
 	}
 	return c.Next()

@@ -21,8 +21,7 @@ func GetAgentBalance(pool *pgxpool.Pool) fiber.Handler {
 		if !ok || operator == nil {
 			slog.Error("agent_operator local missing or wrong type on GET /v1/agent/balance")
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"error_code": "internal_error",
-				"message":    "authentication context missing",
+				"error": "authentication context missing",
 			})
 		}
 
@@ -30,8 +29,7 @@ func GetAgentBalance(pool *pgxpool.Pool) fiber.Handler {
 		if err != nil {
 			slog.Error("get agent credits balances", "operator_id", operator.ID, "error", err)
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"error_code": "internal_error",
-				"message":    "failed to read balance",
+				"error": "failed to read balance",
 			})
 		}
 

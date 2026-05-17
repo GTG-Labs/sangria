@@ -10,6 +10,11 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// AgentAPIKeyIDLength is the expected character length of the 8-char hex prefix
+// stored in agent_api_keys.key_id. Mirrors auth.KeyIDLength but lives here
+// because dbengine can't import auth (auth imports dbengine, would cycle).
+const AgentAPIKeyIDLength = 8
+
 // agentApiKeyColumns is the full SELECT / RETURNING column list for agent_api_keys.
 // Includes key_hash — used for auth-path queries where bcrypt verify needs it.
 const agentApiKeyColumns = `id, agent_operator_id, key_hash, key_id, name, agent_name,
@@ -66,9 +71,13 @@ type CreateAgentAPIKeyParams struct {
 // this function only validates + stores. DB uniqueness violations (e.g.
 // duplicate active name within the operator) surface as-is so the caller can
 // decide how to handle them.
-func CreateAgentAPIKey(ctx context.Context, pool *pgxpool.Pool, params CreateAgentAPIKeyParams) (AgentAPIKey, error) {
+//
+// Returns AgentAPIKeyPublic (hash excluded) — the caller already holds the
+// hash since it computed and passed it in, so echoing it back is unnecessary
+// surface area for secret material. Matches root CLAUDE.md § Security.
+func CreateAgentAPIKey(ctx context.Context, pool *pgxpool.Pool, params CreateAgentAPIKeyParams) (AgentAPIKeyPublic, error) {
 	if err := validateCreateAgentAPIKeyParams(params); err != nil {
-		return AgentAPIKey{}, err
+		return AgentAPIKeyPublic{}, err
 	}
 
 	row := pool.QueryRow(ctx,
@@ -77,21 +86,25 @@ func CreateAgentAPIKey(ctx context.Context, pool *pgxpool.Pool, params CreateAge
 			max_per_call_microunits, daily_cap_microunits, monthly_cap_microunits,
 			require_confirm_above_microunits, expires_at
 		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-		RETURNING `+agentApiKeyColumns,
+		RETURNING `+agentApiKeyPublicColumns,
 		params.AgentOperatorID, params.KeyHash, params.KeyID, params.Name, params.AgentName,
 		params.MaxPerCallMicrounits, params.DailyCapMicrounits, params.MonthlyCapMicrounits,
 		params.RequireConfirmAboveMicrounits, params.ExpiresAt,
 	)
-	k, err := scanAgentAPIKey(row)
+	k, err := scanAgentAPIKeyPublic(row)
 	if err != nil {
-		return AgentAPIKey{}, fmt.Errorf("insert agent api key: %w", err)
+		return AgentAPIKeyPublic{}, fmt.Errorf("insert agent api key: %w", err)
 	}
 	return k, nil
 }
 
 // validateCreateAgentAPIKeyParams runs defensive input checks before hitting the
 // DB. The schema CHECK constraints provide the final guarantee; this layer
-// gives better error messages.
+// gives better error messages. Returns ad-hoc fmt.Errorf strings matching the
+// existing dbengine convention (see transaction.go::validateLines,
+// merchants.go::CreateAPIKey); adopting a sentinel-wrapping pattern for typed
+// validation errors is tracked as a cross-cutting cleanup so all dbengine
+// validators move in lockstep.
 func validateCreateAgentAPIKeyParams(p CreateAgentAPIKeyParams) error {
 	if strings.TrimSpace(p.AgentOperatorID) == "" {
 		return fmt.Errorf("agent operator ID must not be empty")
@@ -99,8 +112,8 @@ func validateCreateAgentAPIKeyParams(p CreateAgentAPIKeyParams) error {
 	if strings.TrimSpace(p.KeyHash) == "" {
 		return fmt.Errorf("key hash must not be empty")
 	}
-	if len(p.KeyID) != 8 {
-		return fmt.Errorf("key ID must be 8 characters, got %d", len(p.KeyID))
+	if len(p.KeyID) != AgentAPIKeyIDLength {
+		return fmt.Errorf("key ID must be %d characters, got %d", AgentAPIKeyIDLength, len(p.KeyID))
 	}
 	if strings.TrimSpace(p.Name) == "" {
 		return fmt.Errorf("name must not be empty")
@@ -119,6 +132,9 @@ func validateCreateAgentAPIKeyParams(p CreateAgentAPIKeyParams) error {
 	}
 	if p.RequireConfirmAboveMicrounits < 0 {
 		return fmt.Errorf("require_confirm_above_microunits must be non-negative, got %d", p.RequireConfirmAboveMicrounits)
+	}
+	if p.ExpiresAt != nil && p.ExpiresAt.Before(time.Now().UTC()) {
+		return fmt.Errorf("expires_at must be in the future, got %s", p.ExpiresAt.Format(time.RFC3339))
 	}
 	return nil
 }

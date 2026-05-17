@@ -108,6 +108,20 @@ func validateCreateAgentTopupParams(p CreateAgentTopupParams) error {
 	if !validAgentTopupSources[p.Source] {
 		return fmt.Errorf("invalid source %q", p.Source)
 	}
+	// Mirror chk_agent_topups_direction_matches_source: DEBIT ⟺ source='stripe_refund'.
+	if p.Direction == Debit && p.Source != AgentTopupSourceStripeRefund {
+		return fmt.Errorf("direction DEBIT requires source 'stripe_refund', got %q", p.Source)
+	}
+	if p.Direction == Credit && p.Source == AgentTopupSourceStripeRefund {
+		return fmt.Errorf("source 'stripe_refund' requires direction DEBIT, got %q", p.Direction)
+	}
+	// Mirror chk_agent_topups_stripe_pi_required: stripe_* sources need a PI.
+	switch p.Source {
+	case AgentTopupSourceStripeCard, AgentTopupSourceStripeACH, AgentTopupSourceStripeRefund:
+		if p.StripePaymentIntentID == nil || strings.TrimSpace(*p.StripePaymentIntentID) == "" {
+			return fmt.Errorf("source %q requires stripe_payment_intent_id", p.Source)
+		}
+	}
 	if p.AmountCreditsMicrounits <= 0 {
 		return fmt.Errorf("amount must be positive, got %d", p.AmountCreditsMicrounits)
 	}

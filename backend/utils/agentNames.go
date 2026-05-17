@@ -15,7 +15,7 @@ var agentNameAdjectives = []string{
 	"raw", "zen", "neo", "hot", "dry", "dim", "pure", "bold",
 	"cool", "dark", "fast", "free", "grim", "holy", "keen",
 	"lazy", "loud", "mega", "mild", "mute", "pale", "rare",
-	"real", "soft", "true", "vagu", "warm", "wild", "wise",
+	"real", "soft", "true", "vague", "warm", "wild", "wise",
 	"agile", "blind", "brisk", "crisp", "crypt", "heavy",
 	"quick", "rapid", "sharp", "swift", "vivid",
 }
