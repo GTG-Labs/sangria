@@ -94,7 +94,6 @@ These are called by the Sangria frontend dashboard. The user logs in via WorkOS 
 | POST | `/internal/users` | WorkOS JWT | Register/upsert user on login |
 | GET | `/internal/balance` | WorkOS JWT | Get organization USD balance |
 | GET | `/internal/transactions` | WorkOS JWT | List organization transactions (paginated) |
-| POST | `/internal/merchants` | WorkOS JWT | Create a merchant API key + USD liability account |
 | GET | `/internal/api-keys` | WorkOS JWT | List organization's API keys |
 | DELETE | `/internal/api-keys/:id` | WorkOS JWT | Revoke an API key |
 | POST | `/internal/api-keys/:id/approve` | WorkOS JWT + Admin | Approve a pending API key (organization admin only) |
@@ -180,10 +179,9 @@ API keys have three statuses: `active`, `pending`, `inactive`.
 - **Cross-organization security**: Admins can only approve/reject keys within their own organizations
 
 API key creation flow:
-1. User creates API key via `POST /internal/merchants`
-2. If user is admin of target organization → Status: `active` (immediate use)
-3. If user is member of target organization → Status: `pending` (awaits approval)
-4. Organization admins can approve/reject pending keys via `/internal/api-keys/:id/approve|reject`
+1. Merchant API key creation is currently disabled on the public dashboard — `POST /internal/merchants` was removed when the public dashboard pivoted to operator-only. Merchant key creation will move to Mythos admin per `AGENT_SDK_PLAN.md` § 9 V1.3.
+2. Once re-wired under `/admin/*`, the same admin-vs-member status logic still applies: if user is admin of target organization → Status: `active` (immediate use); if user is member → Status: `pending` (awaits approval).
+3. Organization admins can approve/reject pending keys via `/internal/api-keys/:id/approve|reject` (still live on the public dashboard).
 
 ## Project structure
 

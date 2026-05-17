@@ -195,22 +195,41 @@ func TouchAgentAPIKeyLastUsed(ctx context.Context, pool *pgxpool.Pool, id string
 	return nil
 }
 
-// ListAgentAPIKeysByOperator returns all API keys for an operator (including
-// revoked ones, for dashboard audit visibility) in newest-first order.
+// ListAgentAPIKeysByOperator returns API keys for an operator (including
+// revoked ones, for dashboard audit visibility) in newest-first order,
+// paginated by created_at cursor. Mirrors the ListAgentPaymentsByAPIKey /
+// ListAgentTopupsByOperator pattern: fetches limit+1 to peek-ahead for
+// nextCursor; returns nil cursor when there are no more pages.
 // Returns the Public shape — key_hash is never selected, let alone returned.
-func ListAgentAPIKeysByOperator(ctx context.Context, pool *pgxpool.Pool, agentOperatorID string) ([]AgentAPIKeyPublic, error) {
+func ListAgentAPIKeysByOperator(ctx context.Context, pool *pgxpool.Pool, agentOperatorID string, limit int, cursor *time.Time) ([]AgentAPIKeyPublic, *time.Time, error) {
 	if strings.TrimSpace(agentOperatorID) == "" {
-		return nil, fmt.Errorf("agent operator ID must not be empty")
+		return nil, nil, fmt.Errorf("agent operator ID must not be empty")
 	}
-	rows, err := pool.Query(ctx,
+	if limit <= 0 {
+		return nil, nil, fmt.Errorf("limit must be positive, got %d", limit)
+	}
+
+	args := []any{agentOperatorID}
+	cursorWhere := ""
+	if cursor != nil {
+		cursorWhere = " AND created_at < $2"
+		args = append(args, *cursor)
+	}
+	args = append(args, limit+1)
+	limitParam := len(args)
+
+	query := fmt.Sprintf(
 		`SELECT `+agentApiKeyPublicColumns+`
 		 FROM agent_api_keys
-		 WHERE agent_operator_id = $1
-		 ORDER BY created_at DESC`,
-		agentOperatorID,
+		 WHERE agent_operator_id = $1%s
+		 ORDER BY created_at DESC
+		 LIMIT $%d`,
+		cursorWhere, limitParam,
 	)
+
+	rows, err := pool.Query(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("query agent api keys: %w", err)
+		return nil, nil, fmt.Errorf("query agent api keys: %w", err)
 	}
 	defer rows.Close()
 
@@ -218,14 +237,22 @@ func ListAgentAPIKeysByOperator(ctx context.Context, pool *pgxpool.Pool, agentOp
 	for rows.Next() {
 		k, err := scanAgentAPIKeyPublic(rows)
 		if err != nil {
-			return nil, fmt.Errorf("scan agent api key: %w", err)
+			return nil, nil, fmt.Errorf("scan agent api key: %w", err)
 		}
 		keys = append(keys, k)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate agent api keys: %w", err)
+		return nil, nil, fmt.Errorf("iterate agent api keys: %w", err)
 	}
-	return keys, nil
+
+	var nextCursor *time.Time
+	if len(keys) > limit {
+		keys = keys[:limit]
+		last := keys[len(keys)-1].CreatedAt
+		nextCursor = &last
+	}
+
+	return keys, nextCursor, nil
 }
 
 // RevokeAgentAPIKey marks an agent API key as revoked (sets revoked_at = NOW)

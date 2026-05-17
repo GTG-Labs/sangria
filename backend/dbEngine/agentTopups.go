@@ -69,7 +69,7 @@ func CreateAgentTopup(ctx context.Context, pool *pgxpool.Pool, params CreateAgen
 			agent_operator_id, direction, source, amount_credits_microunits,
 			idempotency_key, stripe_payment_intent_id, bridge_transaction_id, status
 		) VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending')
-		ON CONFLICT ON CONSTRAINT uq_agent_topups_operator_idempotency_key DO NOTHING
+		ON CONFLICT (agent_operator_id, idempotency_key) DO NOTHING
 		RETURNING `+agentTopupColumns,
 		params.AgentOperatorID, params.Direction, params.Source, params.AmountCreditsMicrounits,
 		params.IdempotencyKey, params.StripePaymentIntentID, params.BridgeTransactionID,
