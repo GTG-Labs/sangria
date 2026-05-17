@@ -1,5 +1,7 @@
-import { redirect } from "next/navigation";
+import ClientDashboardContent from "./ClientDashboardContent";
 
-export default function DashboardPage() {
-  redirect("/dashboard/transactions");
+export const metadata = { title: "Dashboard — Sangria Agent" };
+
+export default function ClientDashboardPage() {
+  return <ClientDashboardContent />;
 }

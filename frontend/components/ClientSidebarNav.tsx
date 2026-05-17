@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, ArrowLeftRight, SlidersHorizontal } from "lucide-react";
+import { LayoutDashboard, ArrowLeftRight, CreditCard } from "lucide-react";
 
+// Settings has moved per-card — each card on the dashboard opens its own
+// settings modal — so there is no top-level Settings nav entry.
 const NAV_ITEMS = [
-  { href: "/client/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/client/transactions", label: "Transactions", icon: ArrowLeftRight },
-  { href: "/client/settings", label: "Settings", icon: SlidersHorizontal },
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/dashboard/cards", label: "Cards", icon: CreditCard },
+  { href: "/dashboard/transactions", label: "Transactions", icon: ArrowLeftRight },
 ];
 
 export default function ClientSidebarNav() {
@@ -18,7 +20,14 @@ export default function ClientSidebarNav() {
       <nav className="space-y-1">
         {NAV_ITEMS.map((item) => {
           const Icon = item.icon;
-          const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
+          // `/dashboard` is a prefix of every other nav route, so it would
+          // light up on every child page if we used the same startsWith check.
+          // Match it exactly; nested routes use the prefix check.
+          const isActive =
+            item.href === "/dashboard"
+              ? pathname === "/dashboard"
+              : pathname === item.href ||
+                pathname.startsWith(`${item.href}/`);
 
           return (
             <Link

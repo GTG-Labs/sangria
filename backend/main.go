@@ -11,6 +11,7 @@ import (
 
 	"sangria/backend/adminHandlers"
 	"sangria/backend/auth"
+	"sangria/backend/clientHandlers"
 	"sangria/backend/config"
 	dbengine "sangria/backend/dbEngine"
 	"sangria/backend/routes"
@@ -74,6 +75,21 @@ func main() {
 	if err := x402Handlers.FetchFacilitatorAddresses(context.Background()); err != nil {
 		slog.Warn("failed to fetch facilitator addresses (upto scheme will not work)", "error", err)
 	}
+
+	if err := config.LoadAgentCreditsConfig(); err != nil {
+		slog.Error("failed to load agent credits config", "error", err)
+		os.Exit(1)
+	}
+	slog.Info("agent credits config loaded",
+		"trial_microunits", config.AgentCredits.TrialMicrounits)
+
+	if err := config.LoadStripeConfig(); err != nil {
+		slog.Error("failed to load stripe config", "error", err)
+		os.Exit(1)
+	}
+	clientHandlers.InitStripeClient()
+	slog.Info("stripe config loaded",
+		"publishable_key_prefix", stripeKeyPrefix(config.Stripe.PublishableKey))
 
 	if err := config.SetupWorkOS(); err != nil {
 		slog.Error("failed to setup WorkOS", "error", err)
@@ -179,4 +195,15 @@ func setupRoutes(app *fiber.App, pool *pgxpool.Pool) {
 	routes.RegisterJWTRoutes(app, pool)
 	routes.RegisterAPIKeyRoutes(app, pool)
 	routes.RegisterAdminRoutes(app, pool)
+}
+
+// stripeKeyPrefix returns the first 8 chars of a Stripe key so boot logs can
+// confirm the right account is loaded without leaking the secret half of
+// the publishable key (which itself isn't sensitive, but the logging
+// pattern should generalize to never-leak for secret-key cases).
+func stripeKeyPrefix(k string) string {
+	if len(k) < 8 {
+		return k
+	}
+	return k[:8] + "..."
 }

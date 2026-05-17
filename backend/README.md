@@ -19,6 +19,36 @@ go run .
 
 The server starts on the port specified by the `PORT` environment variable (required).
 
+### Local development with Stripe
+
+The dashboard's "Top Up" flow redirects users to Stripe-hosted Checkout. Stripe then fires a `checkout.session.completed` webhook back to `POST /webhooks/stripe`, which writes the ledger entries that move the balance. Since Stripe can't reach `localhost`, you need the Stripe CLI's forwarder running for any local test that touches top-up:
+
+1. **Get test-mode keys.** In the Stripe dashboard, toggle **Test mode** on (orange "TEST DATA" banner), then **Developers → API keys**. Copy the `pk_test_…` and `sk_test_…` values into `backend/.env`:
+   ```
+   STRIPE_PUBLISHABLE_KEY=pk_test_...
+   STRIPE_SECRET_KEY=sk_test_...
+   ```
+2. **Install the Stripe CLI** (one-time):
+   ```
+   brew install stripe/stripe-cli/stripe
+   stripe login
+   ```
+3. **Start the forwarder** in a separate terminal tab and leave it running:
+   ```
+   stripe listen --forward-to localhost:8080/webhooks/stripe
+   ```
+   It prints a line like `Ready! Your webhook signing secret is whsec_...`. Copy that value into `backend/.env`:
+   ```
+   STRIPE_WEBHOOK_SECRET=whsec_...
+   ```
+   Then start (or restart) the backend so it picks up the new secret.
+
+The whsec rotates every time you Ctrl+C and re-run `stripe listen`, so the path of least friction is to start it once at the beginning of the dev session and leave it alone. Without the forwarder running, top-up payments succeed on Stripe's side but the backend never sees the webhook and the dashboard balance stays at $0.
+
+For card numbers in test mode: `4242 4242 4242 4242` succeeds, `4000 0000 0000 0002` declines, any future expiry, any CVC, any ZIP. The full list is at https://stripe.com/docs/testing.
+
+In production no forwarder is needed — the backend's `/webhooks/stripe` URL gets registered as a fixed webhook endpoint in the Stripe dashboard and the whsec stamped on that endpoint is permanent.
+
 ### Upgrade notes
 
 > **Required migration step before this revision rolls out:** populate `WORKOS_WEBHOOK_ALLOWED_IPS` in every environment. The WorkOS webhook handler is fail-closed — if this variable is unset or empty, **every** incoming `/webhooks/workos` request is rejected with `403`, silently breaking invitation acceptance and any other WorkOS-driven flows. See the `WORKOS_WEBHOOK_ALLOWED_IPS` row in the env table below.

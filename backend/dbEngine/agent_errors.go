@@ -35,3 +35,12 @@ var ErrAgentOperatorNotFound = errors.New("agent operator not found")
 // ErrAgentAPIKeyNotFound is returned when a lookup by key ID matches no
 // agent_api_keys row.
 var ErrAgentAPIKeyNotFound = errors.New("agent API key not found")
+
+// ErrAgentTopupNotFound is returned when a Stripe-webhook lookup by PI ID
+// matches no agent_topups row.
+var ErrAgentTopupNotFound = errors.New("agent topup not found")
+
+// ErrAgentTopupAlreadyFailed is returned when CompleteStripeAgentTopup is
+// called on a topup that has already been marked failed. The webhook handler
+// surfaces this as a 200 (the event was processed; the row stays failed).
+var ErrAgentTopupAlreadyFailed = errors.New("agent topup already failed")

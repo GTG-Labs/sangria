@@ -1,6 +1,6 @@
 # Frontend CLAUDE.md
 
-Next.js 16 docs site + merchant dashboard. Auth via WorkOS AuthKit.
+Next.js 16 docs site + agent-operator dashboard. Auth via WorkOS AuthKit. The legacy merchant-side surface lives under `(portal)/dashboard/_merchant/`; Next.js's leading-underscore convention keeps it out of the routing tree, so those pages aren't currently reachable. See [Agent-Dashboard.md](../Agent-Dashboard.md) for the live route/component breakdown.
 
 ## Commands
 

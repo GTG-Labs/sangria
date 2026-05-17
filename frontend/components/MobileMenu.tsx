@@ -47,7 +47,7 @@ export default function MobileMenu({ isLoggedIn }: MobileMenuProps) {
             <div className="pt-2 border-t border-zinc-100 dark:border-white/10 mt-1">
               {isLoggedIn ? (
                 <Link
-                  href="/dashboard/api-keys"
+                  href="/dashboard"
                   onClick={() => setOpen(false)}
                   className="py-2.5 text-sm font-medium text-sangria-500 hover:text-sangria-600 transition-colors"
                 >
