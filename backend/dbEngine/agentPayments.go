@@ -104,12 +104,17 @@ func CreateAgentPayment(ctx context.Context, pool *pgxpool.Pool, params CreateAg
 	// can't actually afford both. The FOR UPDATE lock above serializes this read
 	// across concurrent CreateAgentPayment calls for the same operator.
 	//
-	// Uses max_amount_microunits since UpperBoundCost isn't stored per row; for
-	// V0 with no platform fee they're equal, and using the smaller value is
-	// conservative-but-acceptable when fees do land later (caller may pass a
-	// pre-check that then fails at confirm, vs the opposite which would silently
-	// over-spend). Orphan pending rows (signed but never confirmed/failed) hold
-	// balance until cleaned up — sweeper is a V1.x gap shared with order expiry.
+	// Uses max_amount_microunits as a proxy for the upper-bound cost. This is
+	// EXACT only while platform fees are zero (the case here — platform-fee
+	// computation is unimplemented and the column doesn't exist on
+	// agent_payments). With non-zero fees, this SUM would UNDER-COUNT the
+	// pending hold, and ConfirmAgentPayment performs no balance check to catch
+	// the overspend at confirm time — the overspend would land silently.
+	// Supporting non-zero fees requires either persisting upper_bound_cost as a
+	// column on agent_payments, or adding a balance check inside
+	// ConfirmAgentPayment that fails the payment if it would push the operator
+	// negative. Orphan pending rows (signed but never confirmed/failed) hold
+	// balance until cleaned up; sweeper not yet implemented.
 	var pendingHold int64
 	err = tx.QueryRow(ctx, `
 		SELECT COALESCE(SUM(p.max_amount_microunits), 0)

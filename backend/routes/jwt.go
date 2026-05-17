@@ -38,12 +38,9 @@ func RegisterJWTRoutes(app *fiber.App, pool *pgxpool.Pool) {
 	internal.Get("/me", auth.GetCurrentUser(pool))
 	internal.Get("/balance", merchantHandlers.GetMerchantBalance(pool))
 	internal.Get("/transactions", merchantHandlers.GetMerchantTransactions(pool))
-	// POST /internal/merchants — REMOVED. Merchant API key creation moves to
-	// Mythos admin per AGENT_SDK_PLAN.md § 9 V1.3 (public dashboard becomes
-	// operator-only; merchant management lives in Mythos). The handler
-	// adminHandlers.CreateMerchantAPIKey is intentionally still defined for
-	// future re-wiring under /admin/* once the Mythos admin path lands.
-	// Frontend cleanup tracked in agent-sdk-planning/FRONTEND_MERCHANT_CLEANUP.md.
+	// POST /internal/merchants is intentionally not mounted. The public
+	// dashboard does not expose merchant API key creation. The
+	// adminHandlers.CreateMerchantAPIKey handler is unused.
 
 	apiKeys := internal.Group("/api-keys")
 	apiKeys.Get("/", auth.ListAPIKeys(pool))

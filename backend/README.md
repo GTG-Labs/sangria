@@ -178,10 +178,10 @@ API keys have three statuses: `active`, `pending`, `inactive`.
 - **Organization members**: Create API keys with `pending` status requiring admin approval
 - **Cross-organization security**: Admins can only approve/reject keys within their own organizations
 
-API key creation flow:
-1. Merchant API key creation is currently disabled on the public dashboard — `POST /internal/merchants` was removed when the public dashboard pivoted to operator-only. Merchant key creation will move to Mythos admin per `AGENT_SDK_PLAN.md` § 9 V1.3.
-2. Once re-wired under `/admin/*`, the same admin-vs-member status logic still applies: if user is admin of target organization → Status: `active` (immediate use); if user is member → Status: `pending` (awaits approval).
-3. Organization admins can approve/reject pending keys via `/internal/api-keys/:id/approve|reject` (still live on the public dashboard).
+API key approval (admin actions on existing pending keys):
+- Organization admins approve or reject pending keys via `POST /internal/api-keys/:id/approve|reject`.
+- Status semantics: keys created with `active` status are usable immediately; keys with `pending` status require admin approval before use.
+- Merchant API key creation is not exposed on the public dashboard — `POST /internal/merchants` is not mounted (handler defined but not routed).
 
 ## Project structure
 

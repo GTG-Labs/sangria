@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
@@ -14,9 +15,7 @@ import (
 // to a user's PERSONAL agent operator at signup. $1 USD == 1_000_000 microunits.
 // Only personal orgs (is_personal=true) receive this — user-created additional
 // orgs get an operator with $0 trial. Caps each WorkOS user to one trial
-// regardless of how many orgs they create. Hardcoded for V0/V1; promote to
-// env-var config when the agent platform has a real fee model and we want to
-// tune the trial as a growth lever.
+// regardless of how many orgs they create.
 const DefaultTrialCreditMicrounits int64 = 1_000_000
 
 // agentOperatorColumns is the canonical SELECT / RETURNING column list for
@@ -97,7 +96,9 @@ func CreateAgentOperatorTx(ctx context.Context, tx pgx.Tx, orgID string, trialAm
 	}
 
 	// 1. Insert the operator row. The UNIQUE on organization_id serializes
-	//    concurrent creates; on conflict we return the existing row.
+	//    concurrent creates; on conflict we read the existing row and keep going
+	//    (the credit-accounts step below is idempotent and worth re-ensuring as
+	//    cheap insurance against a partial-state operator from a prior bug).
 	row := tx.QueryRow(ctx,
 		`INSERT INTO agent_operators (organization_id, trial_credit_microunits, kyc_status)
 		 VALUES ($1, $2, 'unverified')
@@ -106,26 +107,42 @@ func CreateAgentOperatorTx(ctx context.Context, tx pgx.Tx, orgID string, trialAm
 		orgID, trialAmount,
 	)
 	op, err := scanAgentOperator(row)
+	operatorIsNew := true
 	if errors.Is(err, pgx.ErrNoRows) {
-		// Operator already exists — return it; do NOT re-grant trial.
+		operatorIsNew = false
 		existing, getErr := getAgentOperatorByOrgIDInTx(ctx, tx, orgID)
 		if getErr != nil {
 			return AgentOperator{}, fmt.Errorf("read existing operator after conflict: %w", getErr)
 		}
-		return existing, nil
-	}
-	if err != nil {
+		op = existing
+		// Caller's trialAmount is silently ignored on the existing-operator path
+		// (the trial-grant idempotency key would block a re-grant at the topup
+		// layer anyway). Log when the caller's intent is non-zero so a
+		// misordered retry that pretended to be a fresh signup is visible.
+		if trialAmount > 0 {
+			slog.Info("CreateAgentOperatorTx: operator already exists, trialAmount ignored",
+				"organization_id", orgID,
+				"existing_trial_credit_microunits", op.TrialCreditMicrounits,
+				"caller_requested_trial_microunits", trialAmount,
+			)
+		}
+	} else if err != nil {
 		return AgentOperator{}, fmt.Errorf("insert agent operator: %w", err)
 	}
 
-	// 2. Ensure the operator's per-org credit accounts exist.
+	// 2. Ensure the operator's per-org credit accounts exist. Idempotent —
+	//    re-runs cheaply for an existing operator and self-repairs partial
+	//    state if accounts were somehow deleted out from under us.
 	trialAcct, _, err := getOrCreateAgentCreditsAccountsInTx(ctx, tx, orgID)
 	if err != nil {
 		return AgentOperator{}, fmt.Errorf("ensure credit accounts: %w", err)
 	}
 
-	// 3. If a trial was granted, record the topup + matching ledger entry.
-	if trialAmount > 0 {
+	// 3. If a trial was granted AND we just created the operator, record the
+	//    topup + matching ledger entry. Skipped on the existing-operator path
+	//    to avoid double-granting (also blocked at the topup-idempotency layer
+	//    via the deterministic "trial-grant-<operator_id>" key).
+	if operatorIsNew && trialAmount > 0 {
 		if err := grantTrialCreditInTx(ctx, tx, op.ID, trialAcct.ID, trialAmount); err != nil {
 			return AgentOperator{}, err
 		}
@@ -245,9 +262,10 @@ func getOrCreateLiabilityAccountInTx(ctx context.Context, tx pgx.Tx, orgID, name
 // grantTrialCreditInTx records the SIGNUP-TIME trial credit: inserts an
 // agent_topups row (source='trial', direction='CREDIT'), writes the matching
 // double-entry ledger transaction via insertTransactionInTx (DEBIT the
-// marketing expense account, CREDIT the operator's trial liability), then
-// marks the topup completed with the ledger linkage. All inside the caller's
-// tx so the trial grant commits atomically with the operator creation.
+// Trial Grants Issued expense account, CREDIT the operator's
+// Agent Credits Trial: <orgID> liability account), then marks the topup
+// completed with the ledger linkage. All inside the caller's tx so the trial
+// grant commits atomically with the operator creation.
 //
 // This is the only path that uses the deterministic idempotency key
 // "trial-grant-<operator_id>". That key is load-bearing for retry safety —
