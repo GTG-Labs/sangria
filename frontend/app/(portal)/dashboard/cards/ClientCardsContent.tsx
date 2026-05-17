@@ -132,14 +132,16 @@ export default function ClientCardsContent() {
       )}
 
       {cards.length === 0 ? (
-        <button
+        <ArcadeButton
+          variant="secondary"
+          size="md"
           onClick={() => setCreateKeyOpen(true)}
-          className="flex w-full max-w-[340px] flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-zinc-300 bg-white/50 py-12 text-sm text-gray-500 transition-colors hover:border-sangria-400 hover:bg-white hover:text-sangria-600"
+          className="w-full max-w-[340px]"
           style={{ aspectRatio: "1.586" }}
         >
-          <Plus className="h-6 w-6" />
+          <Plus className="mr-1.5 inline h-6 w-6" />
           Create your first card
-        </button>
+        </ArcadeButton>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {cards.map((k) => (
