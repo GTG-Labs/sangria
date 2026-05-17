@@ -75,6 +75,12 @@ func main() {
 		slog.Warn("failed to fetch facilitator addresses (upto scheme will not work)", "error", err)
 	}
 
+	if err := config.LoadMerchantConfig(); err != nil {
+		slog.Error("failed to load merchant config", "error", err)
+		os.Exit(1)
+	}
+	slog.Info("merchant config loaded", "catalog_url", config.Merchant.CatalogURL)
+
 	if err := config.SetupWorkOS(); err != nil {
 		slog.Error("failed to setup WorkOS", "error", err)
 		os.Exit(1)

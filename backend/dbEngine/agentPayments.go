@@ -14,8 +14,9 @@ import (
 
 // agentPaymentColumns is the canonical SELECT / RETURNING column list for
 // agent_payments rows. Keeps SQL and Scan() target order in lockstep.
-const agentPaymentColumns = `id, idempotency_key, api_key_id, merchant_url_or_host, merchant_pay_to_address,
-	network, scheme, max_amount_microunits, settlement_amount_microunits, platform_fee_microunits,
+const agentPaymentColumns = `id, idempotency_key, api_key_id, payment_type, merchant_url_or_host,
+	merchant_pay_to_address, network, scheme,
+	max_amount_microunits, settlement_amount_microunits, platform_fee_microunits,
 	valid_before, payment_signature_b64, status, tx_hash, ledger_transaction_id,
 	failure_code, failure_message, metadata,
 	created_at, confirmed_at, failed_at, unresolved_at`
@@ -28,33 +29,65 @@ var validPaymentSchemes = map[PaymentScheme]bool{
 }
 
 // scanAgentPayment scans a row produced by SELECT agentPaymentColumns.
+// The four x402-only columns (merchant_pay_to_address, network, scheme,
+// payment_signature_b64) are nullable in the DB; sangria-native rows store
+// them as NULL. We decode through *string locals so NULL → "" on the Go
+// struct, matching the empty-string-as-NULL convention used in the INSERT.
 func scanAgentPayment(row pgx.Row) (AgentPayment, error) {
 	var p AgentPayment
+	var payToAddr, network, scheme, sigB64 *string
 	err := row.Scan(
-		&p.ID, &p.IdempotencyKey, &p.APIKeyID, &p.MerchantURLOrHost, &p.MerchantPayToAddress,
-		&p.Network, &p.Scheme, &p.MaxAmountMicrounits, &p.SettlementAmountMicrounits, &p.PlatformFeeMicrounits,
-		&p.ValidBefore, &p.PaymentSignatureB64, &p.Status, &p.TxHash, &p.LedgerTransactionID,
+		&p.ID, &p.IdempotencyKey, &p.APIKeyID, &p.PaymentType, &p.MerchantURLOrHost,
+		&payToAddr, &network, &scheme,
+		&p.MaxAmountMicrounits, &p.SettlementAmountMicrounits, &p.PlatformFeeMicrounits,
+		&p.ValidBefore, &sigB64, &p.Status, &p.TxHash, &p.LedgerTransactionID,
 		&p.FailureCode, &p.FailureMessage, &p.Metadata,
 		&p.CreatedAt, &p.ConfirmedAt, &p.FailedAt, &p.UnresolvedAt,
 	)
-	return p, err
+	if err != nil {
+		return p, err
+	}
+	if payToAddr != nil {
+		p.MerchantPayToAddress = *payToAddr
+	}
+	if network != nil {
+		p.Network = *network
+	}
+	if scheme != nil {
+		p.Scheme = PaymentScheme(*scheme)
+	}
+	if sigB64 != nil {
+		p.PaymentSignatureB64 = *sigB64
+	}
+	return p, nil
 }
 
 // CreateAgentPaymentParams holds the inputs for CreateAgentPayment. The caller
-// (the /v1/agent/sign handler) assembles these from the SDK request + the
-// CDP signing output + the merchant's PAYMENT-REQUIRED challenge.
+// assembles these from the SDK request + protocol-specific material (CDP
+// signing output for x402; just the order context for sangria-native).
+//
+// PaymentType discriminates which subset of fields below must be populated:
+//   - "x402": MerchantPayToAddress, Network, Scheme, PaymentSignatureB64 all
+//     required (non-empty). Validator enforces.
+//   - "sangria_native": those four MUST be empty. Validator enforces; the DB
+//     CHECK chk_agent_payments_native_fields is the source of truth.
+//
+// The INSERT translates empty strings → NULL via the metadataArg pattern so
+// callers don't have to deal with *string. Convention: pass "" for fields
+// the protocol doesn't use.
 type CreateAgentPaymentParams struct {
-	IdempotencyKey       string          // client-supplied UUIDv4 from SDK
-	APIKeyID             string          // from the authenticated key
-	AgentOperatorID      string          // for FOR UPDATE lock + balance check
+	IdempotencyKey       string           // client-supplied UUIDv4 from SDK
+	APIKeyID             string           // from the authenticated key
+	AgentOperatorID      string           // for FOR UPDATE lock + balance check
+	PaymentType          AgentPaymentType // "x402" | "sangria_native"
 	MerchantURLOrHost    string
-	MerchantPayToAddress string
-	Network              string // CAIP-2 chain identifier
-	Scheme               PaymentScheme
+	MerchantPayToAddress string        // x402 only — "" for sangria_native
+	Network              string        // x402 only — "" for sangria_native (CAIP-2 chain ID when set)
+	Scheme               PaymentScheme // x402 only — "" for sangria_native
 	MaxAmountMicrounits  int64
 	UpperBoundCost       int64 // MaxAmount + worst-case fee; balance must cover this
 	ValidBefore          time.Time
-	PaymentSignatureB64  string
+	PaymentSignatureB64  string          // x402 only — "" for sangria_native
 	Metadata             json.RawMessage // operator passthrough; nullable
 }
 
@@ -138,17 +171,34 @@ func CreateAgentPayment(ctx context.Context, pool *pgxpool.Pool, params CreateAg
 		metadataArg = params.Metadata
 	}
 
+	// Empty-string-as-NULL for the four x402-only columns. Sangria-native
+	// callers pass "" for these; the paired DB CHECK constraints enforce that
+	// NULL is the only allowed value for those rows. Same pattern as
+	// metadataArg above.
+	emptyToNil := func(s string) any {
+		if s == "" {
+			return nil
+		}
+		return s
+	}
+	payToAddrArg := emptyToNil(params.MerchantPayToAddress)
+	networkArg := emptyToNil(params.Network)
+	schemeArg := emptyToNil(string(params.Scheme))
+	sigB64Arg := emptyToNil(params.PaymentSignatureB64)
+
 	// Insert pending row. Idempotency-key unique catches duplicate retries.
 	row := tx.QueryRow(ctx,
 		`INSERT INTO agent_payments (
-			idempotency_key, api_key_id, merchant_url_or_host, merchant_pay_to_address,
-			network, scheme, max_amount_microunits, valid_before, payment_signature_b64,
+			idempotency_key, api_key_id, payment_type, merchant_url_or_host,
+			merchant_pay_to_address, network, scheme,
+			max_amount_microunits, valid_before, payment_signature_b64,
 			status, metadata
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'pending', $10)
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'pending', $11)
 		ON CONFLICT (idempotency_key) DO NOTHING
 		RETURNING `+agentPaymentColumns,
-		params.IdempotencyKey, params.APIKeyID, params.MerchantURLOrHost, params.MerchantPayToAddress,
-		params.Network, params.Scheme, params.MaxAmountMicrounits, params.ValidBefore, params.PaymentSignatureB64,
+		params.IdempotencyKey, params.APIKeyID, params.PaymentType, params.MerchantURLOrHost,
+		payToAddrArg, networkArg, schemeArg,
+		params.MaxAmountMicrounits, params.ValidBefore, sigB64Arg,
 		metadataArg,
 	)
 	p, err := scanAgentPayment(row)
@@ -174,6 +224,7 @@ func CreateAgentPayment(ctx context.Context, pool *pgxpool.Pool, params CreateAg
 }
 
 func validateCreateAgentPaymentParams(p CreateAgentPaymentParams) error {
+	// Universal fields (both protocols)
 	if strings.TrimSpace(p.IdempotencyKey) == "" {
 		return fmt.Errorf("idempotency key must not be empty")
 	}
@@ -186,29 +237,51 @@ func validateCreateAgentPaymentParams(p CreateAgentPaymentParams) error {
 	if strings.TrimSpace(p.MerchantURLOrHost) == "" {
 		return fmt.Errorf("merchant URL or host must not be empty")
 	}
-	if strings.TrimSpace(p.MerchantPayToAddress) == "" {
-		return fmt.Errorf("merchant pay-to address must not be empty")
-	}
-	if strings.TrimSpace(p.Network) == "" {
-		return fmt.Errorf("network must not be empty")
-	}
-	if !validPaymentSchemes[p.Scheme] {
-		return fmt.Errorf("invalid scheme %q (must be exact or upto)", p.Scheme)
-	}
 	if p.MaxAmountMicrounits <= 0 {
 		return fmt.Errorf("max_amount_microunits must be positive, got %d", p.MaxAmountMicrounits)
 	}
 	if p.UpperBoundCost < p.MaxAmountMicrounits {
 		return fmt.Errorf("upper_bound_cost (%d) must be >= max_amount_microunits (%d)", p.UpperBoundCost, p.MaxAmountMicrounits)
 	}
-	if strings.TrimSpace(p.PaymentSignatureB64) == "" {
-		return fmt.Errorf("payment signature must not be empty")
-	}
 	if p.ValidBefore.IsZero() {
 		return fmt.Errorf("valid_before must be set")
 	}
 	if !p.ValidBefore.After(time.Now().UTC()) {
 		return fmt.Errorf("valid_before must be in the future, got %s", p.ValidBefore.Format(time.RFC3339))
+	}
+
+	// Protocol-specific fields. The DB CHECKs are the source of truth — these
+	// Go-side branches surface a clean error before pgx bubbles a constraint
+	// violation from deep in the call stack.
+	switch p.PaymentType {
+	case AgentPaymentTypeX402:
+		if strings.TrimSpace(p.MerchantPayToAddress) == "" {
+			return fmt.Errorf("x402: merchant pay-to address must not be empty")
+		}
+		if strings.TrimSpace(p.Network) == "" {
+			return fmt.Errorf("x402: network must not be empty")
+		}
+		if !validPaymentSchemes[p.Scheme] {
+			return fmt.Errorf("x402: invalid scheme %q (must be exact or upto)", p.Scheme)
+		}
+		if strings.TrimSpace(p.PaymentSignatureB64) == "" {
+			return fmt.Errorf("x402: payment signature must not be empty")
+		}
+	case AgentPaymentTypeSangriaNative:
+		if p.MerchantPayToAddress != "" {
+			return fmt.Errorf("sangria_native: merchant pay-to address must be empty (got %q)", p.MerchantPayToAddress)
+		}
+		if p.Network != "" {
+			return fmt.Errorf("sangria_native: network must be empty (got %q)", p.Network)
+		}
+		if p.Scheme != "" {
+			return fmt.Errorf("sangria_native: scheme must be empty (got %q)", p.Scheme)
+		}
+		if p.PaymentSignatureB64 != "" {
+			return fmt.Errorf("sangria_native: payment signature must be empty")
+		}
+	default:
+		return fmt.Errorf("invalid payment_type %q (must be x402 or sangria_native)", p.PaymentType)
 	}
 	return nil
 }

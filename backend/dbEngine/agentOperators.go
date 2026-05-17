@@ -20,7 +20,7 @@ const DefaultTrialCreditMicrounits int64 = 1_000_000
 
 // agentOperatorColumns is the canonical SELECT / RETURNING column list for
 // agent_operators rows. Keeps the Scan() target order in sync everywhere.
-const agentOperatorColumns = `id, organization_id, trial_credit_microunits, stripe_customer_id, kyc_status, address, created_at`
+const agentOperatorColumns = `id, organization_id, trial_credit_microunits, stripe_customer_id, address, email, phone, kyc_status, created_at`
 
 // scanAgentOperator scans a row produced by SELECT agentOperatorColumns into
 // an AgentOperator struct.
@@ -28,7 +28,7 @@ func scanAgentOperator(row pgx.Row) (AgentOperator, error) {
 	var o AgentOperator
 	err := row.Scan(
 		&o.ID, &o.OrganizationID, &o.TrialCreditMicrounits,
-		&o.StripeCustomerID, &o.KYCStatus, &o.Address, &o.CreatedAt,
+		&o.StripeCustomerID, &o.Address, &o.Email, &o.Phone, &o.KYCStatus, &o.CreatedAt,
 	)
 	return o, err
 }
