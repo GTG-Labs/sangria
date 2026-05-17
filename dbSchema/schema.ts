@@ -442,11 +442,12 @@ export const agentOperators = pgTable(
       .notNull()
       .references(() => organizations.id),
 
-    // Per-partner trial credit override. Null means use the env-var default
-    // applied at signup.
+    // Trial credit granted at operator creation. 0 = no trial; positive = amount.
     trialCreditMicrounits: bigint("trial_credit_microunits", {
       mode: "bigint",
-    }),
+    })
+      .notNull()
+      .default(sql`0`),
 
     // Set after first successful card top-up.
     stripeCustomerId: varchar("stripe_customer_id", { length: 255 }),
@@ -477,10 +478,9 @@ export const agentOperators = pgTable(
     uniqueIndex("uq_agent_operators_stripe_customer_id")
       .on(table.stripeCustomerId)
       .where(sql`stripe_customer_id IS NOT NULL`),
-    // Allow 0 (operator explicitly granted no trial) — distinct from NULL (use env default).
     check(
       "chk_agent_operators_trial_credit_nonneg",
-      sql`${table.trialCreditMicrounits} IS NULL OR ${table.trialCreditMicrounits} >= 0`,
+      sql`${table.trialCreditMicrounits} >= 0`,
     ),
   ],
 );

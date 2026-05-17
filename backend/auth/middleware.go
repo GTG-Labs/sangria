@@ -195,11 +195,12 @@ func WorkosAuthMiddleware(c fiber.Ctx) error {
 // APIKeyAuthMiddleware validates API keys and authenticates the caller.
 //
 // Locals written on success:
-//   - "key_type"         (string):              "merchant" | "agent" — set always
-//   - "organization_id"  (string UUID):         authenticated principal's org — set always
-//   - "merchant_api_key" (*dbengine.Merchant):  set when key_type == "merchant".
-//     Kept for backward compatibility with existing readers; new code should prefer the
-//     neutral locals.
+//   - "key_type"         (string):                  "merchant" | "agent" — set always
+//   - "organization_id"  (string UUID):             authenticated principal's org — set always
+//   - "merchant_api_key" (*dbengine.Merchant):      set when key_type == "merchant"
+//   - "agent_api_key"    (*dbengine.AgentAPIKey):   set when key_type == "agent"
+//   - "agent_operator"   (*dbengine.AgentOperator): set when key_type == "agent" (loaded
+//     during auth so handlers can read it without an extra DB call)
 func APIKeyAuthMiddleware(pool *pgxpool.Pool) fiber.Handler {
 	return func(c fiber.Ctx) error {
 		// Get API key from Authorization header or X-API-Key header
@@ -223,36 +224,60 @@ func APIKeyAuthMiddleware(pool *pgxpool.Pool) fiber.Handler {
 		}
 
 		// Validate and authenticate the API key
-		merchantKey, keyType, err := AuthenticateAPIKey(c.Context(), pool, apiKey)
+		result, err := AuthenticateAPIKey(c.Context(), pool, apiKey)
 		if err != nil {
 			slog.Error("API key authentication failed", "error", err)
 			return c.Status(401).JSON(fiber.Map{"error": "Invalid API key"})
 		}
 
 		// Neutral locals — set for all key types.
-		c.Locals("key_type", string(keyType))
+		c.Locals("key_type", string(result.KeyType))
+		c.Locals("organization_id", result.OrganizationID)
 
 		// Type-specific locals.
-		switch keyType {
+		switch result.KeyType {
 		case KeyTypeMerchant:
-			c.Locals("merchant_api_key", merchantKey)
-			c.Locals("organization_id", merchantKey.OrganizationID)
+			c.Locals("merchant_api_key", result.Merchant)
 		case KeyTypeAgent:
-			// Currently unreachable — AuthenticateAPIKey rejects agent keys before this point.
-			// Defensive branch: if an agent key ever reaches here, something upstream is
-			// inconsistent and the safe action is to refuse the request.
-			slog.Error("agent key reached middleware locals dispatch unexpectedly")
-			return c.Status(401).JSON(fiber.Map{"error": "Invalid API key"})
+			c.Locals("agent_api_key", result.AgentAPIKey)
+			c.Locals("agent_operator", result.AgentOperator)
 		default:
 			// AuthenticateAPIKey should only return a known KeyType on a nil-error path.
 			// Reaching here means that contract is broken (zero value, unknown type, etc.).
 			// Fail closed rather than calling c.Next() with missing locals.
-			slog.Error("unexpected key type from AuthenticateAPIKey", "key_type", keyType)
+			slog.Error("unexpected key type from AuthenticateAPIKey", "key_type", result.KeyType)
 			return c.Status(401).JSON(fiber.Map{"error": "Invalid API key"})
 		}
 
 		return c.Next()
 	}
+}
+
+// RequireAgentKey must run AFTER APIKeyAuthMiddleware. Rejects requests
+// authenticated with a non-agent key with 403. Use on routes that read the
+// agent_api_key / agent_operator Fiber locals — without this gate, a merchant
+// key passing APIKeyAuthMiddleware would reach a handler expecting agent
+// locals and crash on type assertion.
+func RequireAgentKey(c fiber.Ctx) error {
+	keyType, _ := c.Locals("key_type").(string)
+	if keyType != string(KeyTypeAgent) {
+		return c.Status(403).JSON(fiber.Map{
+			"error": "this endpoint requires an agent API key",
+		})
+	}
+	return c.Next()
+}
+
+// RequireMerchantKey is the mirror of RequireAgentKey for merchant routes.
+// Rejects non-merchant keys with 403. Use on routes that read merchant_api_key.
+func RequireMerchantKey(c fiber.Ctx) error {
+	keyType, _ := c.Locals("key_type").(string)
+	if keyType != string(KeyTypeMerchant) {
+		return c.Status(403).JSON(fiber.Map{
+			"error": "this endpoint requires a merchant API key",
+		})
+	}
+	return c.Next()
 }
 
 // RequireAdmin is a middleware that enforces admin access.

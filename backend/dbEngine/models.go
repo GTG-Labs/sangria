@@ -376,7 +376,7 @@ func AgentCreditsPaidAccountName(orgID string) string {
 type AgentOperator struct {
 	ID                    string         `json:"id"`
 	OrganizationID        string         `json:"organization_id"`
-	TrialCreditMicrounits *int64         `json:"trial_credit_microunits"`
+	TrialCreditMicrounits int64          `json:"trial_credit_microunits"`
 	StripeCustomerID      *string        `json:"stripe_customer_id"`
 	KYCStatus             AgentKYCStatus `json:"kyc_status"`
 	Address   json.RawMessage `json:"address,omitempty"`
@@ -391,6 +391,25 @@ type AgentAPIKey struct {
 	KeyID   string `json:"key_id"`
 	Name                          string     `json:"name"`       // user-supplied label
 	AgentName                     string     `json:"agent_name"` // auto-generated whimsical handle (e.g. "paddlepop")
+	MaxPerCallMicrounits          int64      `json:"max_per_call_microunits"`
+	DailyCapMicrounits            int64      `json:"daily_cap_microunits"`
+	MonthlyCapMicrounits          int64      `json:"monthly_cap_microunits"`
+	RequireConfirmAboveMicrounits int64      `json:"require_confirm_above_microunits"`
+	ExpiresAt                     *time.Time `json:"expires_at"`
+	LastUsedAt                    *time.Time `json:"last_used_at"`
+	RevokedAt                     *time.Time `json:"revoked_at"`
+	CreatedAt                     time.Time  `json:"created_at"`
+}
+
+// AgentAPIKeyPublic is the dashboard-safe shape — same fields as AgentAPIKey
+// minus KeyHash. Mirrors MerchantPublic; never construct one by hand, only
+// via ListAgentAPIKeysByOperator which selects the right columns.
+type AgentAPIKeyPublic struct {
+	ID                            string     `json:"id"`
+	AgentOperatorID               string     `json:"agent_operator_id"`
+	KeyID                         string     `json:"key_id"`
+	Name                          string     `json:"name"`
+	AgentName                     string     `json:"agent_name"`
 	MaxPerCallMicrounits          int64      `json:"max_per_call_microunits"`
 	DailyCapMicrounits            int64      `json:"daily_cap_microunits"`
 	MonthlyCapMicrounits          int64      `json:"monthly_cap_microunits"`

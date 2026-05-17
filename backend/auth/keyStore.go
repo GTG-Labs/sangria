@@ -16,9 +16,21 @@ import (
 var ErrAPIKeyNotFound = errors.New("API key not found or not owned by user")
 
 // ErrInvalidAPIKey is returned when AuthenticateAPIKey cannot match the
-// provided key to any active merchant (no key_id match, or key_id matched
+// provided key to any active principal (no key_id match, or key_id matched
 // but the hash comparison failed). Callers should use errors.Is to detect.
 var ErrInvalidAPIKey = errors.New("invalid API key")
+
+// AuthResult is the type-discriminated outcome of AuthenticateAPIKey. KeyType
+// indicates which branch authenticated; the corresponding pointer fields are
+// populated and the others are nil. OrganizationID is always set so neutral
+// callers (middleware, audit logging) don't need to switch on KeyType.
+type AuthResult struct {
+	KeyType        KeyType
+	OrganizationID string
+	Merchant       *dbengine.Merchant      // set when KeyType == KeyTypeMerchant
+	AgentAPIKey    *dbengine.AgentAPIKey   // set when KeyType == KeyTypeAgent
+	AgentOperator  *dbengine.AgentOperator // set when KeyType == KeyTypeAgent
+}
 
 // precomputed bcrypt dummy hash
 var dummyHash []byte
@@ -60,54 +72,97 @@ func GetAPIKeysByOrganizationID(ctx context.Context, pool *pgxpool.Pool, organiz
 	return dbengine.ListAPIKeysByOrganization(ctx, pool, organizationID)
 }
 
-// AuthenticateAPIKey validates an API key and returns the associated merchant
-// along with the detected key type. Uses GitHub-style indexed lookup by key_id
-// for O(1) performance.
+// AuthenticateAPIKey validates an API key and returns an AuthResult describing
+// the authenticated principal. Uses indexed lookup by key_id for O(1) (modulo
+// rare prefix collisions which iterate up to a handful of candidates).
 //
-// Returns:
-//   - (merchant, KeyTypeMerchant, nil) for valid merchant keys
-//   - (nil, KeyTypeAgent, ErrInvalidAPIKey) for agent-prefixed keys — agent authentication
-//     has no backing table yet, so these always reject with the same error as any unknown key
-//   - (nil, "", err) for malformed keys or DB errors
-func AuthenticateAPIKey(ctx context.Context, pool *pgxpool.Pool, providedKey string) (*dbengine.Merchant, KeyType, error) {
+// Returns AuthResult{} + ErrInvalidAPIKey when no active key matches the
+// provided value. Returns AuthResult{} + ErrInvalidAPIKeyFormat when the key
+// is malformed. Returns AuthResult{} + wrapped DB error on lookup failure.
+func AuthenticateAPIKey(ctx context.Context, pool *pgxpool.Pool, providedKey string) (AuthResult, error) {
 	keyType, _, keyID, err := parseAPIKey(providedKey)
 	if err != nil {
 		// parseAPIKey already wraps ErrInvalidAPIKeyFormat with a descriptive message.
-		return nil, "", err
+		return AuthResult{}, err
 	}
 
-	// Agent keys have no backing table yet — reject with ErrInvalidAPIKey so the middleware
-	// returns the same 401 as any unauthenticated key. Run dummy bcrypt to keep response
-	// time roughly constant.
-	if keyType == KeyTypeAgent {
-		_ = bcrypt.CompareHashAndPassword(dummyHash, []byte(providedKey))
-		return nil, KeyTypeAgent, ErrInvalidAPIKey
+	switch keyType {
+	case KeyTypeMerchant:
+		return authenticateMerchantKey(ctx, pool, providedKey, keyID)
+	case KeyTypeAgent:
+		return authenticateAgentKey(ctx, pool, providedKey, keyID)
+	default:
+		// parseAPIKey guarantees one of the two known types on a nil-error path.
+		// Wrap ErrUnknownKeyType for consistency with prefixForKeyType's default
+		// branch so callers can branch on errors.Is(err, ErrUnknownKeyType).
+		return AuthResult{}, fmt.Errorf("%w: %q", ErrUnknownKeyType, keyType)
 	}
+}
 
-	// Merchant path. Query by key_id instead of scanning all keys (O(1) vs O(N)).
+// authenticateMerchantKey looks up active merchant keys by prefix, verifies
+// the provided key against each candidate's bcrypt hash, and on match returns
+// the populated AuthResult and bumps last_used_at.
+func authenticateMerchantKey(ctx context.Context, pool *pgxpool.Pool, providedKey, keyID string) (AuthResult, error) {
 	candidates, err := dbengine.GetActiveMerchantsByKeyID(ctx, pool, keyID)
 	if err != nil {
-		return nil, "", err
+		return AuthResult{}, err
 	}
 
 	for _, merchant := range candidates {
-		// Verify the key against this hash
 		if VerifyAPIKey(providedKey, merchant.APIKey) {
-			// Update last used timestamp — log but don't fail authentication
 			if err := dbengine.UpdateMerchantLastUsedAt(ctx, pool, merchant.ID); err != nil {
-				slog.Warn("failed to update last_used_at", "merchant_id", merchant.ID, "error", err)
+				slog.Warn("failed to update merchant last_used_at", "merchant_id", merchant.ID, "error", err)
 			}
-
-			return &merchant, KeyTypeMerchant, nil
+			return AuthResult{
+				KeyType:        KeyTypeMerchant,
+				OrganizationID: merchant.OrganizationID,
+				Merchant:       &merchant,
+			}, nil
 		}
 	}
 
-	// No candidates matched!
+	// No candidates matched — run dummy bcrypt to keep response time constant.
 	if len(candidates) == 0 {
 		_ = bcrypt.CompareHashAndPassword(dummyHash, []byte(providedKey))
 	}
+	return AuthResult{}, ErrInvalidAPIKey
+}
 
-	return nil, KeyTypeMerchant, ErrInvalidAPIKey
+// authenticateAgentKey looks up active (not revoked, not expired) agent keys
+// by prefix, verifies the provided key against each candidate, and on match
+// loads the owning operator (for OrganizationID + downstream handler use) and
+// bumps last_used_at. Mirrors authenticateMerchantKey shape exactly.
+func authenticateAgentKey(ctx context.Context, pool *pgxpool.Pool, providedKey, keyID string) (AuthResult, error) {
+	candidates, err := dbengine.GetActiveAgentAPIKeysByKeyID(ctx, pool, keyID)
+	if err != nil {
+		return AuthResult{}, err
+	}
+
+	for _, key := range candidates {
+		if VerifyAPIKey(providedKey, key.KeyHash) {
+			// Load operator for OrganizationID + reuse-on-request-by-handlers.
+			operator, err := dbengine.GetAgentOperatorByID(ctx, pool, key.AgentOperatorID)
+			if err != nil {
+				// FK should prevent this; surface loudly if it ever happens.
+				return AuthResult{}, fmt.Errorf("agent key matched but operator lookup failed: %w", err)
+			}
+			if err := dbengine.TouchAgentAPIKeyLastUsed(ctx, pool, key.ID); err != nil {
+				slog.Warn("failed to touch agent api key last_used_at", "id", key.ID, "error", err)
+			}
+			return AuthResult{
+				KeyType:        KeyTypeAgent,
+				OrganizationID: operator.OrganizationID,
+				AgentAPIKey:    &key,
+				AgentOperator:  &operator,
+			}, nil
+		}
+	}
+
+	// No candidates matched — run dummy bcrypt to keep response time constant.
+	if len(candidates) == 0 {
+		_ = bcrypt.CompareHashAndPassword(dummyHash, []byte(providedKey))
+	}
+	return AuthResult{}, ErrInvalidAPIKey
 }
 
 // RevokeAPIKey atomically deactivates an API key, but only if the requesting

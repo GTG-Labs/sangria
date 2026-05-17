@@ -92,9 +92,13 @@ func IsAdmin(ctx context.Context, pool *pgxpool.Pool, workosID string) (bool, er
 	return exists, err
 }
 
-// EnsurePersonalOrganizationTx creates a personal organization for the user if one
-// doesn't already exist. Must be called within an existing transaction. Acquires a
-// row lock on the user to serialize concurrent signup flows.
+// EnsurePersonalOrganizationTx creates a personal organization for the user if
+// one doesn't already exist, atomically with the user's agent_operator (which
+// is granted DefaultTrialCreditMicrounits trial credit). If the personal org
+// already exists, returns early with no side effects — does NOT backfill
+// missing operators on existing orgs. Must be called within an existing
+// transaction. Acquires a row lock on the user to serialize concurrent signup
+// flows.
 func EnsurePersonalOrganizationTx(ctx context.Context, tx pgx.Tx, userWorkosID, userName string) error {
 	// Acquire a row lock on the user to serialize concurrent flows
 	var lockCheck bool
@@ -134,6 +138,12 @@ func EnsurePersonalOrganizationTx(ctx context.Context, tx pgx.Tx, userWorkosID, 
 	err = AddUserToOrganizationTx(ctx, tx, userWorkosID, personalOrgID, true)
 	if err != nil {
 		return fmt.Errorf("failed to add user to personal organization: %w", err)
+	}
+
+	// Create the org's agent_operator atomically with the org + member inserts,
+	// granting the per-user trial credit.
+	if _, err := CreateAgentOperatorTx(ctx, tx, personalOrgID, DefaultTrialCreditMicrounits); err != nil {
+		return fmt.Errorf("failed to create agent operator: %w", err)
 	}
 
 	return nil

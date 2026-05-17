@@ -42,12 +42,44 @@ var validDirections = map[Direction]bool{
 	Debit: true, Credit: true,
 }
 
+// queryer is the read-side subset shared by *pgxpool.Pool and pgx.Tx.
+type queryer interface {
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+}
+
 // InsertTransaction validates a batch of ledger lines for double-entry
 // correctness (zero-net per currency) and atomically inserts them as a
 // single transaction. The caller-supplied idempotencyKey is stored under a
 // unique constraint so that retries with the same key return the existing
 // entries instead of posting duplicate movements.
+//
+// Pool-owning entry point. Callers that need to compose the ledger write
+// with other inserts in an outer atomic envelope should call
+// insertTransactionInTx directly with their existing tx.
 func InsertTransaction(ctx context.Context, pool *pgxpool.Pool, idempotencyKey string, lines []LedgerLine) ([]LedgerEntry, error) {
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx) // safe: if Commit() already fired, Rollback() is a no-op
+
+	entries, err := insertTransactionInTx(ctx, tx, idempotencyKey, lines)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit transaction: %w", err)
+	}
+	return entries, nil
+}
+
+// insertTransactionInTx is the in-tx core of InsertTransaction. Caller owns
+// the tx (begin/commit/rollback). On idempotency-key conflict the existing
+// entries are read from the same tx — safe because we never dirty it before
+// detecting the conflict.
+func insertTransactionInTx(ctx context.Context, tx pgx.Tx, idempotencyKey string, lines []LedgerLine) ([]LedgerEntry, error) {
 	if idempotencyKey == "" {
 		return nil, fmt.Errorf("idempotency key must not be empty")
 	}
@@ -55,16 +87,10 @@ func InsertTransaction(ctx context.Context, pool *pgxpool.Pool, idempotencyKey s
 		return nil, err
 	}
 
-	tx, err := pool.Begin(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("begin transaction: %w", err)
-	}
-	defer tx.Rollback(ctx) // safe: if Commit() already fired, Rollback() is a no-op
-
 	// Insert into transactions table; the unique constraint on
 	// idempotency_key prevents duplicate ledger writes.
 	var txnID string
-	err = tx.QueryRow(ctx,
+	err := tx.QueryRow(ctx,
 		`INSERT INTO transactions (idempotency_key)
 		 VALUES ($1)
 		 ON CONFLICT (idempotency_key) DO NOTHING
@@ -73,15 +99,13 @@ func InsertTransaction(ctx context.Context, pool *pgxpool.Pool, idempotencyKey s
 	).Scan(&txnID)
 
 	if errors.Is(err, pgx.ErrNoRows) {
-		// Idempotency key already exists — return existing entries.
-		tx.Rollback(ctx)
-		return getExistingEntries(ctx, pool, idempotencyKey)
+		// Idempotency key already exists — return existing entries via the same tx.
+		return getExistingEntries(ctx, tx, idempotencyKey)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("insert transaction: %w", err)
 	}
 
-	// Verify each line's currency matches its referenced account.
 	if err := validateAccountCurrencies(ctx, tx, lines); err != nil {
 		return nil, err
 	}
@@ -105,17 +129,13 @@ func InsertTransaction(ctx context.Context, pool *pgxpool.Pool, idempotencyKey s
 		entries[i] = e
 	}
 
-	if err := tx.Commit(ctx); err != nil {
-		return nil, fmt.Errorf("commit transaction: %w", err)
-	}
-
 	return entries, nil
 }
 
 // getExistingEntries fetches ledger entries for a previously committed
-// transaction identified by its idempotency key.
-func getExistingEntries(ctx context.Context, pool *pgxpool.Pool, idempotencyKey string) ([]LedgerEntry, error) {
-	rows, err := pool.Query(ctx,
+// transaction identified by its idempotency key. Accepts a pool or pgx.Tx.
+func getExistingEntries(ctx context.Context, q queryer, idempotencyKey string) ([]LedgerEntry, error) {
+	rows, err := q.Query(ctx,
 		`SELECT le.id, le.transaction_id, le.currency, le.amount, le.direction,
 		        le.account_id
 		 FROM ledger_entries le

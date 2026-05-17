@@ -94,7 +94,6 @@ These are called by the Sangria frontend dashboard. The user logs in via WorkOS 
 | POST | `/internal/users` | WorkOS JWT | Register/upsert user on login |
 | GET | `/internal/balance` | WorkOS JWT | Get organization USD balance |
 | GET | `/internal/transactions` | WorkOS JWT | List organization transactions (paginated) |
-| POST | `/internal/merchants` | WorkOS JWT | Create a merchant API key + USD liability account |
 | GET | `/internal/api-keys` | WorkOS JWT | List organization's API keys |
 | DELETE | `/internal/api-keys/:id` | WorkOS JWT | Revoke an API key |
 | POST | `/internal/api-keys/:id/approve` | WorkOS JWT + Admin | Approve a pending API key (organization admin only) |
@@ -179,11 +178,10 @@ API keys have three statuses: `active`, `pending`, `inactive`.
 - **Organization members**: Create API keys with `pending` status requiring admin approval
 - **Cross-organization security**: Admins can only approve/reject keys within their own organizations
 
-API key creation flow:
-1. User creates API key via `POST /internal/merchants`
-2. If user is admin of target organization → Status: `active` (immediate use)
-3. If user is member of target organization → Status: `pending` (awaits approval)
-4. Organization admins can approve/reject pending keys via `/internal/api-keys/:id/approve|reject`
+API key approval (admin actions on existing pending keys):
+- Organization admins approve or reject pending keys via `POST /internal/api-keys/:id/approve|reject`.
+- Status semantics: keys created with `active` status are usable immediately; keys with `pending` status require admin approval before use.
+- Merchant API key creation is not exposed on the public dashboard — `POST /internal/merchants` is not mounted (handler defined but not routed).
 
 ## Project structure
 

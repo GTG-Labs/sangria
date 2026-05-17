@@ -38,7 +38,9 @@ func RegisterJWTRoutes(app *fiber.App, pool *pgxpool.Pool) {
 	internal.Get("/me", auth.GetCurrentUser(pool))
 	internal.Get("/balance", merchantHandlers.GetMerchantBalance(pool))
 	internal.Get("/transactions", merchantHandlers.GetMerchantTransactions(pool))
-	internal.Post("/merchants", adminHandlers.CreateMerchantAPIKey(pool))
+	// POST /internal/merchants is intentionally not mounted. The public
+	// dashboard does not expose merchant API key creation. The
+	// adminHandlers.CreateMerchantAPIKey handler is unused.
 
 	apiKeys := internal.Group("/api-keys")
 	apiKeys.Get("/", auth.ListAPIKeys(pool))

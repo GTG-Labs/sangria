@@ -18,6 +18,7 @@ const (
 	SystemAccountUSDMerchantPool    = "USD Merchant Pool"
 	SystemAccountOwnerEquity        = "Owner Equity"
 	SystemAccountWithdrawalClearing = "Withdrawal Clearing"
+	SystemAccountTrialGrantsIssued  = "Trial Grants Issued"
 )
 
 // ensureSystemAccount creates a system-level account if it doesn't exist.
@@ -95,6 +96,10 @@ func EnsureSystemAccounts(ctx context.Context, pool *pgxpool.Pool) error {
 
 		// Withdrawal clearing — holds funds in transit during merchant payouts.
 		{SystemAccountWithdrawalClearing, AccountTypeAsset, USD},
+
+		// Trial grants issued — marketing-funded expense, debited each time a new
+		// agent operator receives their signup trial credit.
+		{SystemAccountTrialGrantsIssued, AccountTypeExpense, USD},
 	}
 
 	for _, a := range accounts {
@@ -111,9 +116,11 @@ func EnsureSystemAccounts(ctx context.Context, pool *pgxpool.Pool) error {
 }
 
 // GetSystemAccount retrieves a system-level account by name and currency.
-func GetSystemAccount(ctx context.Context, pool *pgxpool.Pool, name string, currency Currency) (Account, error) {
+// Accepts either a pool or a pgx.Tx via the queryer interface so it can be
+// composed inside an outer atomic transaction.
+func GetSystemAccount(ctx context.Context, q queryer, name string, currency Currency) (Account, error) {
 	var a Account
-	err := pool.QueryRow(ctx,
+	err := q.QueryRow(ctx,
 		`SELECT id, name, type, currency, organization_id, created_at
 		 FROM accounts
 		 WHERE name = $1 AND currency = $2 AND organization_id IS NULL`,
