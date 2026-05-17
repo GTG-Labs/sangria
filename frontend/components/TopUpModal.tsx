@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { X, AlertCircle } from "lucide-react";
 import ArcadeButton from "@/components/ArcadeButton";
 import { internalFetch } from "@/lib/fetch";
@@ -34,22 +34,34 @@ export default function TopUpModal({ open, onClose }: TopUpModalProps) {
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
+  // Tracks the in-flight checkout-session fetch so closing the modal can
+  // cancel it before window.location.href fires or stale state lands.
+  const abortRef = useRef<AbortController | null>(null);
 
   const effectiveAmount = useCustom ? Number(customAmount) || 0 : selectedAmount;
+
+  const handleClose = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    onClose();
+  }, [onClose]);
 
   useEffect(() => {
     if (!open) return;
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") handleClose();
     };
     document.addEventListener("keydown", handleKey);
     return () => document.removeEventListener("keydown", handleKey);
-  }, [open, onClose]);
+  }, [open, handleClose]);
 
   // Reset transient state every time the modal closes — no stale "confirming"
-  // spinner if the user reopens it after dismissing.
+  // spinner if the user reopens it after dismissing. Also abort any in-flight
+  // checkout-session request so a late redirect can't fire after close.
   useEffect(() => {
     if (open) return;
+    abortRef.current?.abort();
+    abortRef.current = null;
     setConfirming(false);
     setError(null);
   }, [open]);
@@ -58,6 +70,9 @@ export default function TopUpModal({ open, onClose }: TopUpModalProps) {
 
   const handleConfirm = async () => {
     if (effectiveAmount <= 0) return;
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
     setConfirming(true);
     setError(null);
 
@@ -70,14 +85,18 @@ export default function TopUpModal({ open, onClose }: TopUpModalProps) {
           amountMicrounits,
           idempotencyKey: crypto.randomUUID(),
         }),
+        signal: controller.signal,
       });
+      if (controller.signal.aborted) return;
       if (!res.ok) {
         const data = await res.json().catch(() => ({ error: "Unknown error" }));
+        if (controller.signal.aborted) return;
         setError(data.error ?? "Failed to start top-up");
         setConfirming(false);
         return;
       }
       const { url } = (await res.json()) as CreateTopupResponse;
+      if (controller.signal.aborted) return;
       if (!url) {
         setError("Backend did not return a checkout URL");
         setConfirming(false);
@@ -89,6 +108,7 @@ export default function TopUpModal({ open, onClose }: TopUpModalProps) {
       // flight.
       window.location.href = url;
     } catch (err) {
+      if (controller.signal.aborted) return;
       console.error("Top-up failed:", err);
       setError("Top-up failed");
       setConfirming(false);
@@ -103,12 +123,12 @@ export default function TopUpModal({ open, onClose }: TopUpModalProps) {
       aria-labelledby="topup-modal-title"
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
       onClick={(e) => {
-        if (e.target === overlayRef.current) onClose();
+        if (e.target === overlayRef.current) handleClose();
       }}
     >
       <div className="relative w-full max-w-sm rounded-2xl bg-white shadow-xl p-6">
         <button
-          onClick={onClose}
+          onClick={handleClose}
           className="absolute right-4 top-4 text-gray-400 hover:text-gray-700 transition-colors"
           aria-label="Close"
         >

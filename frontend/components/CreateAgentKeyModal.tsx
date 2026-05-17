@@ -65,6 +65,18 @@ function CreateAgentKeyContent({
 
   const overlayRef = useRef<HTMLDivElement>(null);
 
+  // Escape closes only the pre-reveal modal — after creation we force the
+  // user through the Done button so they can't dismiss the one-time-secret
+  // dialog by accident. Lives in the inner component so it can read
+  // `created`; the outer wrapper can't see this state.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !created) onClose();
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [onClose, created]);
+
   const validate = (): string | null => {
     if (!name.trim()) return "Name is required.";
     const pc = perCallUnlimited ? null : dollarsToMicrounits(perCall);
@@ -146,13 +158,15 @@ function CreateAgentKeyContent({
       }}
     >
       <div className="relative w-full max-w-md rounded-2xl bg-white shadow-xl p-6">
-        <button
-          onClick={onClose}
-          className="absolute right-4 top-4 text-gray-400 transition-colors hover:text-gray-700"
-          aria-label="Close"
-        >
-          <X className="h-4 w-4" />
-        </button>
+        {!created && (
+          <button
+            onClick={onClose}
+            className="absolute right-4 top-4 text-gray-400 transition-colors hover:text-gray-700"
+            aria-label="Close"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
 
         {created ? (
           // --- Reveal step ---
@@ -304,18 +318,6 @@ export default function CreateAgentKeyModal({
   onClose,
   onCreated,
 }: CreateAgentKeyModalProps) {
-  // Escape closes only the pre-reveal modal — after creation we force the
-  // user through the Done button so they can't dismiss the one-time-secret
-  // dialog by accident.
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
-  }, [open, onClose]);
-
   if (!open) return null;
   return <CreateAgentKeyContent onClose={onClose} onCreated={onCreated} />;
 }

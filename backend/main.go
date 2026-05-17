@@ -76,6 +76,21 @@ func main() {
 		slog.Warn("failed to fetch facilitator addresses (upto scheme will not work)", "error", err)
 	}
 
+	if err := config.LoadAgentCreditsConfig(); err != nil {
+		slog.Error("failed to load agent credits config", "error", err)
+		os.Exit(1)
+	}
+	slog.Info("agent credits config loaded",
+		"trial_microunits", config.AgentCredits.TrialMicrounits)
+
+	if err := config.LoadStripeConfig(); err != nil {
+		slog.Error("failed to load stripe config", "error", err)
+		os.Exit(1)
+	}
+	clientHandlers.InitStripeClient()
+	slog.Info("stripe config loaded",
+		"publishable_key_prefix", stripeKeyPrefix(config.Stripe.PublishableKey))
+
 	if err := config.SetupWorkOS(); err != nil {
 		slog.Error("failed to setup WorkOS", "error", err)
 		os.Exit(1)
@@ -104,21 +119,6 @@ func main() {
 	}
 	slog.Info("payment config loaded",
 		"max_amount_microunits", config.PaymentConfig.MaxAmountMicrounits)
-
-	if err := config.LoadAgentCreditsConfig(); err != nil {
-		slog.Error("failed to load agent credits config", "error", err)
-		os.Exit(1)
-	}
-	slog.Info("agent credits config loaded",
-		"trial_microunits", config.AgentCredits.TrialMicrounits)
-
-	if err := config.LoadStripeConfig(); err != nil {
-		slog.Error("failed to load stripe config", "error", err)
-		os.Exit(1)
-	}
-	clientHandlers.InitStripeClient()
-	slog.Info("stripe config loaded",
-		"publishable_key_prefix", stripeKeyPrefix(config.Stripe.PublishableKey))
 
 	if err := config.LoadRateLimitConfig(); err != nil {
 		slog.Error("failed to load rate limit config", "error", err)

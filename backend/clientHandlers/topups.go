@@ -113,7 +113,7 @@ func CreateTopupIntent(pool *pgxpool.Pool) fiber.Handler {
 		params.AddMetadata("operator_id", op.Operator.ID)
 		params.AddMetadata("idempotency_key", req.IdempotencyKey)
 		params.AddMetadata("amount_microunits", strconv.FormatInt(req.AmountMicrounits, 10))
-		params.SetIdempotencyKey("topup-" + req.IdempotencyKey)
+		params.SetIdempotencyKey("topup-" + op.Operator.ID + "-" + req.IdempotencyKey)
 
 		sess, err := session.New(params)
 		if err != nil {

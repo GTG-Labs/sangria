@@ -146,10 +146,15 @@ func handleCheckoutSessionCompleted(c fiber.Ctx, pool *pgxpool.Pool, event strip
 	if err != nil {
 		switch {
 		case errors.Is(err, dbengine.ErrAgentTopupNotFound):
-			// Shouldn't happen — we just inserted the row above. Log loudly.
+			// Shouldn't happen — we just inserted the row above. Return 5xx so
+			// Stripe redelivers: the create path is idempotent on
+			// (operator_id, idempotency_key) and complete is idempotent on PI,
+			// so a retry either succeeds (whatever transient state cleared) or
+			// surfaces the same anomaly again instead of silently swallowing it.
 			slog.Error("stripe webhook: row vanished between create and complete",
 				"topup_id", topup.ID, "pi_id", piID, "event_id", event.ID)
-			return c.JSON(fiber.Map{"received": true})
+			return c.Status(fiber.StatusInternalServerError).
+				JSON(fiber.Map{"error": "topup row vanished after create"})
 		case errors.Is(err, dbengine.ErrAgentTopupAlreadyFailed):
 			slog.Warn("stripe webhook: completed event for failed topup",
 				"topup_id", topup.ID, "pi_id", piID, "event_id", event.ID)
