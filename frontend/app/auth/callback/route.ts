@@ -3,7 +3,7 @@ import { env } from "@/lib/env";
 
 export const GET = handleAuth({
   baseURL: env.BASE_URL,
-  returnPathname: "/dashboard/api-keys",
+  returnPathname: "/dashboard",
   onSuccess: async (authData) => {
     const accessToken = authData.accessToken;
     if (!accessToken) {

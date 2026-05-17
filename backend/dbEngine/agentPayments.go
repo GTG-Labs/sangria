@@ -20,6 +20,17 @@ const agentPaymentColumns = `id, idempotency_key, api_key_id, merchant_url_or_ho
 	failure_code, failure_message, metadata,
 	created_at, confirmed_at, failed_at, unresolved_at`
 
+// agentPaymentColumnsPrefixed is the same column list with each column
+// prefixed `p.`, for use in SELECTs that join agent_payments against another
+// table that also has an `id` or `created_at` column (e.g. agent_api_keys).
+// The trailing-AS aliases match the bare names so the same scanAgentPayment
+// target order works on the result rows.
+const agentPaymentColumnsPrefixed = `p.id, p.idempotency_key, p.api_key_id, p.merchant_url_or_host, p.merchant_pay_to_address,
+	p.network, p.scheme, p.max_amount_microunits, p.settlement_amount_microunits, p.platform_fee_microunits,
+	p.valid_before, p.payment_signature_b64, p.status, p.tx_hash, p.ledger_transaction_id,
+	p.failure_code, p.failure_message, p.metadata,
+	p.created_at, p.confirmed_at, p.failed_at, p.unresolved_at`
+
 // validPaymentSchemes enumerates the scheme values accepted at the Go layer.
 // Mirrors paymentSchemeEnum in the schema; DB enum is the final guarantee.
 var validPaymentSchemes = map[PaymentScheme]bool{
@@ -560,4 +571,81 @@ func ListAgentPaymentsByAPIKey(ctx context.Context, pool *pgxpool.Pool, apiKeyID
 	}
 
 	return payments, nextCursor, nil
+}
+
+// ListAgentPaymentsByOperator returns all payments made under any of an
+// operator's API keys, newest-first, paginated by created_at cursor. Same
+// peek-ahead pattern as ListAgentPaymentsByAPIKey; additionally returns the
+// operator-wide total so the dashboard can render "showing N of M".
+//
+// The join on agent_api_keys filters by agent_operator_id, so revoked keys
+// still contribute their historical payments (the dashboard wants the full
+// audit trail, not the active-keys-only view).
+func ListAgentPaymentsByOperator(ctx context.Context, pool *pgxpool.Pool, agentOperatorID string, limit int, cursor *time.Time) ([]AgentPayment, *time.Time, int, error) {
+	if strings.TrimSpace(agentOperatorID) == "" {
+		return nil, nil, 0, fmt.Errorf("agent operator ID must not be empty")
+	}
+	if limit <= 0 {
+		return nil, nil, 0, fmt.Errorf("limit must be positive, got %d", limit)
+	}
+
+	var total int
+	err := pool.QueryRow(ctx,
+		`SELECT COUNT(*)
+		 FROM agent_payments p
+		 JOIN agent_api_keys k ON k.id = p.api_key_id
+		 WHERE k.agent_operator_id = $1`,
+		agentOperatorID,
+	).Scan(&total)
+	if err != nil {
+		return nil, nil, 0, fmt.Errorf("count agent payments by operator: %w", err)
+	}
+
+	args := []any{agentOperatorID}
+	cursorWhere := ""
+	if cursor != nil {
+		cursorWhere = " AND p.created_at < $2"
+		args = append(args, *cursor)
+	}
+	args = append(args, limit+1)
+	limitParam := len(args)
+
+	// Use the prefixed column list — joining against agent_api_keys creates
+	// ambiguous `id` and `created_at` references that the bare list can't survive.
+	query := fmt.Sprintf(
+		`SELECT `+agentPaymentColumnsPrefixed+`
+		 FROM agent_payments p
+		 JOIN agent_api_keys k ON k.id = p.api_key_id
+		 WHERE k.agent_operator_id = $1%s
+		 ORDER BY p.created_at DESC
+		 LIMIT $%d`,
+		cursorWhere, limitParam,
+	)
+
+	rows, err := pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, nil, 0, fmt.Errorf("query agent payments by operator: %w", err)
+	}
+	defer rows.Close()
+
+	var payments []AgentPayment
+	for rows.Next() {
+		p, err := scanAgentPayment(rows)
+		if err != nil {
+			return nil, nil, 0, fmt.Errorf("scan agent payment: %w", err)
+		}
+		payments = append(payments, p)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, nil, 0, fmt.Errorf("iterate agent payments: %w", err)
+	}
+
+	var nextCursor *time.Time
+	if len(payments) > limit {
+		payments = payments[:limit]
+		last := payments[len(payments)-1].CreatedAt
+		nextCursor = &last
+	}
+
+	return payments, nextCursor, total, nil
 }

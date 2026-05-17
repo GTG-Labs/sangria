@@ -6,6 +6,7 @@ import (
 
 	"sangria/backend/adminHandlers"
 	"sangria/backend/auth"
+	"sangria/backend/clientHandlers"
 	"sangria/backend/config"
 	"sangria/backend/merchantHandlers"
 	"sangria/backend/ratelimit"
@@ -15,6 +16,12 @@ func RegisterJWTRoutes(app *fiber.App, pool *pgxpool.Pool) {
 	// Public endpoints. /webhooks/workos uses an IP allowlist inside the
 	// handler; /accept-invitation is per-IP since the token is the only auth.
 	app.Post("/webhooks/workos", adminHandlers.HandleWorkOSWebhook(pool))
+
+	// Stripe webhook authenticates via the Stripe-Signature HMAC header
+	// (verified against config.Stripe.WebhookSecret inside the handler), so
+	// no auth middleware here. Per-IP limiting would block legitimate
+	// retries on a busy day — Stripe's network is the trusted source.
+	app.Post("/webhooks/stripe", clientHandlers.HandleStripeWebhook(pool))
 	app.Post("/accept-invitation",
 		ratelimit.PerIPLimiter(config.RateLimit.AcceptInvitationPerMin, "accept-invitation"),
 		adminHandlers.AcceptOrganizationInvitation(pool),
@@ -52,6 +59,19 @@ func RegisterJWTRoutes(app *fiber.App, pool *pgxpool.Pool) {
 	internal.Post("/withdrawals", merchantHandlers.RequestWithdrawal(pool))
 	internal.Get("/withdrawals", merchantHandlers.ListWithdrawals(pool))
 	internal.Post("/withdrawals/:id/cancel", merchantHandlers.CancelWithdrawal(pool))
+
+	// Agent-operator dashboard routes — same pool + WorkOS auth as the rest
+	// of /internal; the handlers ensure the agent_operator row exists on
+	// first call (idempotent on org). See clientHandlers/ package docs.
+	client := internal.Group("/client")
+	client.Get("/agent", clientHandlers.GetOrCreateOperator(pool))
+	client.Post("/agent/keys", clientHandlers.CreateAPIKey(pool))
+	client.Get("/agent/keys", clientHandlers.ListAPIKeys(pool))
+	client.Patch("/agent/keys/:id", clientHandlers.UpdateAPIKeySettings(pool))
+	client.Delete("/agent/keys/:id", clientHandlers.RevokeAPIKey(pool))
+	client.Get("/transactions", clientHandlers.ListTransactions(pool))
+	client.Post("/topups", clientHandlers.CreateTopupIntent(pool))
+	client.Get("/topups", clientHandlers.ListTopups(pool))
 
 	// Organization routes. Invitations have a tighter per-org limit on top
 	// of the per-user bucket because each call sends a paid Resend email.

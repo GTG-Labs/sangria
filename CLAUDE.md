@@ -14,7 +14,7 @@ For protocol details see [Sangria-Overview.md](Sangria-Overview.md). For archite
 |---|---|---|
 | `backend/` | Orchestration API — accounts, payments, settlement, withdrawals | Go 1.25, Fiber v3, pgx/pgxpool |
 | `dbSchema/` | Database schema — single source of truth | Drizzle ORM (TypeScript), PostgreSQL |
-| `frontend/` | Docs site + merchant dashboard | Next.js 16, React 19, Tailwind 4 |
+| `frontend/` | Docs site + agent-operator dashboard (merchant dashboard parked under `_merchant/` and hidden from routing) | Next.js 16, React 19, Tailwind 4 |
 | `sdk/merchants/sdk-typescript/` | TypeScript merchant SDK (`@sangria-sdk/core`) | TypeScript, adapters for Express/Fastify/Hono |
 | `sdk/merchants/python/` | Python merchant SDK (`sangria-core`) | Python 3.10+, httpx, FastAPI adapter |
 | `playground/` | Example merchant servers + e2e test client | Express, Fastify, Hono, FastAPI, uv |
@@ -38,6 +38,8 @@ Sangria runs two strictly separated environments — different Postgres database
 **When ambiguous, stop and ask.** If an env file, command, connection string, or config path isn't unambiguously dev, do not run it.
 
 **Never read .env files.** Only read `.env.example` (or equivalent template files). Real env files contain live credentials. Never cat, grep, Read, or otherwise ingest their contents — read the example file instead.
+
+**Local Stripe webhooks need the CLI forwarder.** Any local flow that touches top-ups (e.g. the agent dashboard's "Top Up" button) requires `stripe listen --forward-to localhost:8080/webhooks/stripe` running in a separate terminal — Stripe's hosted infra can't reach `localhost`, so without it the charge succeeds but the ledger write never fires and the dashboard balance silently stays at $0. Full setup (test-mode keys, whsec rotation, API version drift) lives in `backend/CLAUDE.md` § Local Stripe webhooks; per-developer walkthrough in `backend/README.md` § Local development with Stripe.
 
 ## Product Vocabulary
 
@@ -102,7 +104,7 @@ CI auto-bumps patch versions if SDK code changes without version updates.
 
 ## Next.js App Conventions
 
-Applies to both `frontend/` (merchant portal) and `mythos/` (admin dashboard) — both are Next.js 16 apps with server-side proxy routes forwarding to the Go backend. These rules exist because the patterns are easy to get wrong in subtle ways.
+Applies to both `frontend/` (agent-operator portal; the legacy merchant portal lives under `_merchant/` and is currently unrouted) and `mythos/` (admin dashboard) — both are Next.js 16 apps with server-side proxy routes forwarding to the Go backend. These rules exist because the patterns are easy to get wrong in subtle ways.
 
 ### Proxy routes (`app/api/**/route.ts`)
 
@@ -140,6 +142,7 @@ Applies to both `frontend/` (merchant portal) and `mythos/` (admin dashboard) �
 - [Backend API reference](backend/README.md) — all endpoints, auth patterns, withdrawal lifecycle
 - [Architecture deep-dive](Sangria-Architecture.md) — layered architecture, component breakdown
 - [Protocol overview](Sangria-Overview.md) — x402 operations, ERC-3009, settlement flow
+- [Agent Dashboard](Agent-Dashboard.md) — agent-operator portal routes, components, top-up flow
 - [TypeScript SDK docs](sdk/merchants/sdk-typescript/README.md) — all framework adapters, bypass config
 - [Python SDK docs](sdk/merchants/python/README.md) — FastAPI adapter, API contract
 - [Playground](playground/README.md) — example merchants, e2e testing

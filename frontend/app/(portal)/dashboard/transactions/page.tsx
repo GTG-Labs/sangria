@@ -1,8 +1,7 @@
-import { withAuth } from "@workos-inc/authkit-nextjs";
-import TransactionsContent from "./TransactionsContent";
+import ClientTransactionsContent from "./ClientTransactionsContent";
 
-export default async function TransactionsPage() {
-  await withAuth({ ensureSignedIn: true });
+export const metadata = { title: "Transactions — Sangria Agent" };
 
-  return <TransactionsContent />;
+export default function ClientTransactionsPage() {
+  return <ClientTransactionsContent />;
 }

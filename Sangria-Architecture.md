@@ -13,7 +13,7 @@ Orchestration Layer (Backend)
 	↓
 Persistence Layer (DB)   +   Infrastructure Layer (Facilitator + Base)
 	↓
-Frontend (Docs + Merchant dashboard)
+Frontend (Docs + Agent-operator dashboard)
 ```
 
 ### Architecture diagram (from spec)
@@ -63,7 +63,7 @@ Frontend (Docs + Merchant dashboard)
 | **Orchestration**  | Go, CDP SDK                                | Treasury wallets, server-side ERC-3009 authorization signing, mutexes, settlement, ledger management                            |
 | **Persistence**    | PostgreSQL, Drizzle ORM                    | User balances, API keys, audit logs                                                                                             |
 | **Infrastructure** | Coinbase Facilitator, Base Blockchain      | Gas-free settlement, on-chain USDC transfer                                                                                     |
-| **Frontend**       | Next.js 16, React 19, Tailwind CSS 4       | Merchant dashboard, documentation, auth                                                                                         |
+| **Frontend**       | Next.js 16, React 19, Tailwind CSS 4       | Agent-operator dashboard, documentation, auth                                                                                   |
 
 ### Component breakdown
 
@@ -123,9 +123,10 @@ Coinbase-hosted service that:
 
 #### Frontend
 
-A Next.js documentation site and merchant dashboard.
+A Next.js app split across two route groups: a public `(marketing)/` site (landing + docs) and an authenticated `(portal)/dashboard/` surface for the **agent operator** — the developer running an AI agent that spends through Sangria.
 
-- Current: landing page, docs, dark/light mode.
-- Planned: login/auth, merchant API key management, wallet funding UI.
+- Agent dashboard: balance, Stripe-powered top-ups, per-card spend caps, payment history. Lives at `/dashboard`, `/dashboard/cards`, `/dashboard/transactions`.
+- WorkOS AuthKit for sign-in; CSRF-protected proxy routes forward to the Go backend.
+- The legacy merchant-side surface (API key management, members, organizations, withdrawals) is parked in `frontend/app/(portal)/dashboard/_merchant/`. Next.js's leading-underscore convention keeps the folder out of the routing tree, so those pages aren't reachable today.
 
-**Key files:** `frontend/app/page.tsx`, `frontend/app/docs/`
+**Key files:** `frontend/app/(marketing)/page.tsx`, `frontend/app/(portal)/dashboard/ClientDashboardContent.tsx`. See [Agent-Dashboard.md](Agent-Dashboard.md) for the full route/component breakdown.

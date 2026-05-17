@@ -47,10 +47,10 @@ export default function ResizableSidebar({ children }: { children: React.ReactNo
 
   return (
     <aside
-      className="relative border-b border-zinc-200 bg-[#FAFAF8] lg:min-h-screen lg:border-b-0 lg:border-r"
+      className="relative border-b border-zinc-200 bg-[#FAFAF8] lg:sticky lg:top-0 lg:h-screen lg:border-b-0 lg:border-r"
       style={{ width }}
     >
-      <div className="flex h-full flex-col px-1.5 pt-3 pb-0">
+      <div className="flex h-full flex-col overflow-y-auto px-1.5 pt-3 pb-0">
         {children}
       </div>
 

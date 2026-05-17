@@ -13,6 +13,8 @@ require (
 	golang.org/x/crypto v0.48.0
 )
 
+require github.com/stripe/stripe-go/v82 v82.5.1 // indirect
+
 require (
 	github.com/andybalholm/brotli v1.2.0 // indirect
 	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect

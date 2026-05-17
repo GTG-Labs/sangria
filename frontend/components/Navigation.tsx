@@ -52,7 +52,7 @@ export default async function Navigation() {
         {/* Right side: Auth */}
         <div className="hidden md:flex items-center pl-4">
           {user ? (
-            <ArcadeButton href="/dashboard/api-keys" size="sm">
+            <ArcadeButton href="/dashboard" size="sm">
               Go to Dashboard →
             </ArcadeButton>
           ) : (

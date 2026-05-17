@@ -19,6 +19,7 @@ const (
 	SystemAccountOwnerEquity        = "Owner Equity"
 	SystemAccountWithdrawalClearing = "Withdrawal Clearing"
 	SystemAccountTrialGrantsIssued  = "Trial Grants Issued"
+	SystemAccountStripeClearing     = "Stripe Clearing"
 )
 
 // ensureSystemAccount creates a system-level account if it doesn't exist.
@@ -100,6 +101,13 @@ func EnsureSystemAccounts(ctx context.Context, pool *pgxpool.Pool) error {
 		// Trial grants issued — marketing-funded expense, debited each time a new
 		// agent operator receives their signup trial credit.
 		{SystemAccountTrialGrantsIssued, AccountTypeExpense, USD},
+
+		// Stripe clearing — ASSET account holding fiat in transit between
+		// Stripe and the operator's paid-credit liability. Debited when a
+		// Stripe top-up succeeds (we now own the cash), credited
+		// instantaneously by the operator-paid liability so the books
+		// balance per-event.
+		{SystemAccountStripeClearing, AccountTypeAsset, USD},
 	}
 
 	for _, a := range accounts {

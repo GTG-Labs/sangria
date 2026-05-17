@@ -51,19 +51,24 @@ Open [http://localhost:3000](http://localhost:3000) to view the application.
 
 ```text
 frontend/
-├── app/                          # Next.js App Router
-│   ├── (marketing)/             # Public pages (landing, docs, blog)
-│   ├── (portal)/dashboard/      # Authenticated application
-│   │   ├── api-keys/           # API key management
-│   │   ├── members/            # Organization members
-│   │   ├── organizations/      # Organization management
-│   │   ├── transactions/       # Transaction history
-│   │   └── withdrawals/        # Financial withdrawals
-│   └── api/backend/            # API proxy routes
-├── lib/                         # Core utilities & security
-├── components/                  # Reusable UI components
-├── contexts/                    # React state management
-└── proxy.ts                    # Security middleware (CSP + Auth)
+├── app/                                # Next.js App Router
+│   ├── (marketing)/                   # Public pages (landing, docs, blog)
+│   ├── (portal)/dashboard/            # Authenticated agent dashboard
+│   │   ├── page.tsx                  # Balance, top-up, recent cards (max 6)
+│   │   ├── cards/                    # Full agent-card list
+│   │   ├── transactions/             # Payment history
+│   │   └── _merchant/                # Legacy merchant dashboard (hidden — leading-underscore folders are excluded from Next.js routing)
+│   │       ├── api-keys/             # Merchant API key management
+│   │       ├── members/              # Organization members
+│   │       ├── organizations/        # Organization management
+│   │       ├── transactions/         # Merchant transaction history
+│   │       └── withdrawals/          # Merchant withdrawals
+│   ├── api/backend/                  # Merchant-side proxy routes
+│   └── api/client/                   # Agent-dashboard proxy routes
+├── lib/                                # Core utilities & security
+├── components/                         # Reusable UI components
+├── contexts/                           # React state management
+└── proxy.ts                            # Security middleware (CSP + Auth)
 ```
 
 ## 🔐 Security Features

@@ -1,48 +1,98 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { X, CreditCard, CheckCircle } from "lucide-react";
+import { X, AlertCircle } from "lucide-react";
 import ArcadeButton from "@/components/ArcadeButton";
-
-interface SavedCard {
-  brand: string;
-  last4: string;
-}
+import { internalFetch } from "@/lib/fetch";
 
 interface TopUpModalProps {
   open: boolean;
   onClose: () => void;
-  savedCard: SavedCard | null;
 }
 
 const QUICK_AMOUNTS = [10, 25, 50, 100];
 
-const CARD_BRAND_LABEL: Record<string, string> = {
-  visa: "Visa",
-  mastercard: "Mastercard",
-  amex: "Amex",
-  discover: "Discover",
-};
+interface CreateTopupResponse {
+  url: string;
+  topupId: string;
+}
 
-// Inner content unmounts when modal closes, so state resets naturally without useEffect.
-function TopUpContent({ onClose, savedCard }: { onClose: () => void; savedCard: SavedCard | null }) {
+// TopUpModal collects an amount and sends the user to Stripe-hosted Checkout
+// for the card flow. No Elements, no CardElement, no Stripe.js loading on
+// our origin — Stripe owns the entire card-collection UI. On success Stripe
+// redirects the user back to /dashboard?topup=success, where the dashboard
+// picks up the query param and refetches the balance.
+//
+// We accept a single dollar amount, ask the backend to create a Checkout
+// Session, and `window.location.href = url` to redirect. The webhook
+// (handlers in stripeWebhook.go) credits the ledger asynchronously when
+// `payment_intent.succeeded` fires.
+export default function TopUpModal({ open, onClose }: TopUpModalProps) {
   const [selectedAmount, setSelectedAmount] = useState<number>(25);
   const [customAmount, setCustomAmount] = useState("");
   const [useCustom, setUseCustom] = useState(false);
   const [confirming, setConfirming] = useState(false);
-  const [success, setSuccess] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
 
   const effectiveAmount = useCustom ? Number(customAmount) || 0 : selectedAmount;
-  const brandLabel = savedCard ? (CARD_BRAND_LABEL[savedCard.brand] ?? savedCard.brand) : null;
+
+  useEffect(() => {
+    if (!open) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [open, onClose]);
+
+  // Reset transient state every time the modal closes — no stale "confirming"
+  // spinner if the user reopens it after dismissing.
+  useEffect(() => {
+    if (open) return;
+    setConfirming(false);
+    setError(null);
+  }, [open]);
+
+  if (!open) return null;
 
   const handleConfirm = async () => {
     if (effectiveAmount <= 0) return;
     setConfirming(true);
-    // Stub: simulate network latency
-    await new Promise((r) => setTimeout(r, 1000));
-    setConfirming(false);
-    setSuccess(true);
+    setError(null);
+
+    try {
+      const amountMicrounits = Math.round(effectiveAmount * 1_000_000);
+      const res = await internalFetch("/api/client/topups", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amountMicrounits,
+          idempotencyKey: crypto.randomUUID(),
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({ error: "Unknown error" }));
+        setError(data.error ?? "Failed to start top-up");
+        setConfirming(false);
+        return;
+      }
+      const { url } = (await res.json()) as CreateTopupResponse;
+      if (!url) {
+        setError("Backend did not return a checkout URL");
+        setConfirming(false);
+        return;
+      }
+      // Full-page redirect to Stripe Checkout. We don't pop the modal first
+      // because navigating away unmounts everything anyway, and the brief
+      // "Redirecting…" state on the button reassures the user a click is in
+      // flight.
+      window.location.href = url;
+    } catch (err) {
+      console.error("Top-up failed:", err);
+      setError("Top-up failed");
+      setConfirming(false);
+    }
   };
 
   return (
@@ -52,7 +102,9 @@ function TopUpContent({ onClose, savedCard }: { onClose: () => void; savedCard: 
       aria-modal="true"
       aria-labelledby="topup-modal-title"
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
-      onClick={(e) => { if (e.target === overlayRef.current) onClose(); }}
+      onClick={(e) => {
+        if (e.target === overlayRef.current) onClose();
+      }}
     >
       <div className="relative w-full max-w-sm rounded-2xl bg-white shadow-xl p-6">
         <button
@@ -63,125 +115,82 @@ function TopUpContent({ onClose, savedCard }: { onClose: () => void; savedCard: 
           <X className="h-4 w-4" />
         </button>
 
-        {success ? (
-          <div className="flex flex-col items-center gap-3 py-6 text-center">
-            <CheckCircle className="h-10 w-10 text-green-500" />
-            <p id="topup-modal-title" className="text-lg font-semibold text-gray-900">Top-up initiated</p>
-            <p className="text-sm text-gray-500">
-              ${effectiveAmount.toFixed(2)} will arrive as USDC on Base in ~1 minute.
-            </p>
-            <ArcadeButton variant="secondary" size="sm" onClick={onClose} className="mt-2">
-              Done
-            </ArcadeButton>
+        <h2
+          id="topup-modal-title"
+          className="text-base font-semibold text-gray-900"
+        >
+          Top Up Agent
+        </h2>
+        <p className="mt-1 text-sm text-gray-500">
+          Choose an amount. You&apos;ll be sent to Stripe to enter your card
+          and complete payment.
+        </p>
+
+        {/* Quick amounts */}
+        <div className="mt-4 grid grid-cols-4 gap-2">
+          {QUICK_AMOUNTS.map((amt) => (
+            <button
+              key={amt}
+              onClick={() => {
+                setSelectedAmount(amt);
+                setUseCustom(false);
+              }}
+              className={`rounded-lg border py-2 text-sm font-medium transition-colors ${
+                !useCustom && selectedAmount === amt
+                  ? "border-sangria-600 bg-sangria-50 text-sangria-700"
+                  : "border-zinc-200 text-gray-700 hover:border-zinc-300 hover:bg-zinc-50"
+              }`}
+            >
+              ${amt}
+            </button>
+          ))}
+        </div>
+
+        {/* Custom amount */}
+        <div className="mt-2">
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">
+              $
+            </span>
+            <input
+              type="number"
+              min="1"
+              placeholder="Custom"
+              value={customAmount}
+              onChange={(e) => {
+                setCustomAmount(e.target.value);
+                setUseCustom(true);
+              }}
+              onFocus={() => setUseCustom(true)}
+              className={`w-full rounded-lg border py-2 pl-7 pr-3 text-sm outline-none transition-colors ${
+                useCustom
+                  ? "border-sangria-600 ring-1 ring-sangria-200"
+                  : "border-zinc-200"
+              }`}
+            />
           </div>
-        ) : (
-          <>
-            <h2 id="topup-modal-title" className="text-base font-semibold text-gray-900">Top Up Agent</h2>
-            <p className="mt-1 text-sm text-gray-500">
-              Choose an amount to add to your agent&apos;s USDC balance.
-            </p>
+        </div>
 
-            {/* Quick amounts */}
-            <div className="mt-4 grid grid-cols-4 gap-2">
-              {QUICK_AMOUNTS.map((amt) => (
-                <button
-                  key={amt}
-                  onClick={() => { setSelectedAmount(amt); setUseCustom(false); }}
-                  className={`rounded-lg border py-2 text-sm font-medium transition-colors ${
-                    !useCustom && selectedAmount === amt
-                      ? "border-sangria-600 bg-sangria-50 text-sangria-700"
-                      : "border-zinc-200 text-gray-700 hover:border-zinc-300 hover:bg-zinc-50"
-                  }`}
-                >
-                  ${amt}
-                </button>
-              ))}
-            </div>
-
-            {/* Custom amount */}
-            <div className="mt-2">
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">$</span>
-                <input
-                  type="number"
-                  min="1"
-                  placeholder="Custom"
-                  value={customAmount}
-                  onChange={(e) => { setCustomAmount(e.target.value); setUseCustom(true); }}
-                  onFocus={() => setUseCustom(true)}
-                  className={`w-full rounded-lg border py-2 pl-7 pr-3 text-sm outline-none transition-colors ${
-                    useCustom
-                      ? "border-sangria-600 ring-1 ring-sangria-200"
-                      : "border-zinc-200"
-                  }`}
-                />
-              </div>
-            </div>
-
-            {/* Payment method */}
-            <div className="mt-5">
-              <p className="text-xs font-medium uppercase tracking-wide text-gray-400">
-                Payment method
-              </p>
-              {savedCard ? (
-                <div className="mt-2 flex items-center gap-2.5 rounded-lg border border-zinc-200 px-3 py-2.5">
-                  <CreditCard className="h-4 w-4 text-gray-400" />
-                  <span className="text-sm text-gray-700">
-                    {brandLabel} ••••&nbsp;{savedCard.last4}
-                  </span>
-                </div>
-              ) : (
-                <div className="mt-2 space-y-2">
-                  {/* Stub card input fields — real Stripe Elements will replace these */}
-                  <input
-                    type="text"
-                    placeholder="Card number"
-                    className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-sangria-600 focus:ring-1 focus:ring-sangria-200"
-                  />
-                  <div className="grid grid-cols-2 gap-2">
-                    <input
-                      type="text"
-                      placeholder="MM / YY"
-                      className="rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-sangria-600 focus:ring-1 focus:ring-sangria-200"
-                    />
-                    <input
-                      type="text"
-                      placeholder="CVC"
-                      className="rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-sangria-600 focus:ring-1 focus:ring-sangria-200"
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="mt-5">
-              <ArcadeButton
-                onClick={handleConfirm}
-                disabled={confirming || effectiveAmount <= 0}
-                className="w-full"
-                size="sm"
-              >
-                {confirming
-                  ? "Processing..."
-                  : `Confirm $${effectiveAmount > 0 ? effectiveAmount.toFixed(2) : "0.00"}`}
-              </ArcadeButton>
-            </div>
-          </>
+        {error && (
+          <div className="mt-3 flex items-center gap-2 text-sm text-red-600">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            {error}
+          </div>
         )}
+
+        <div className="mt-5">
+          <ArcadeButton
+            onClick={handleConfirm}
+            disabled={confirming || effectiveAmount <= 0}
+            className="w-full"
+            size="sm"
+          >
+            {confirming
+              ? "Redirecting…"
+              : `Continue to Stripe · $${effectiveAmount > 0 ? effectiveAmount.toFixed(2) : "0.00"}`}
+          </ArcadeButton>
+        </div>
       </div>
     </div>
   );
-}
-
-export default function TopUpModal({ open, onClose, savedCard }: TopUpModalProps) {
-  // ESC key handler lives at the outer shell level so it works even before inner content mounts
-  useEffect(() => {
-    if (!open) return;
-    const handleKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-    document.addEventListener("keydown", handleKey);
-    return () => document.removeEventListener("keydown", handleKey);
-  }, [open, onClose]);
-
-  if (!open) return null;
-  return <TopUpContent onClose={onClose} savedCard={savedCard} />;
 }

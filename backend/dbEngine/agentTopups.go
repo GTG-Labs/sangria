@@ -229,6 +229,121 @@ func GetAgentTopupByStripePaymentIntentID(ctx context.Context, pool *pgxpool.Poo
 	return t, nil
 }
 
+// CompleteStripeAgentTopup finalizes a pending stripe_card topup by writing
+// the matching ledger entries (DEBIT system Stripe Clearing asset, CREDIT
+// the operator's paid-credits liability) and flipping the topup row to
+// completed — all inside one transaction so Stripe's at-least-once webhook
+// delivery can't double-credit. Lookup is by PaymentIntent ID, the field the
+// webhook payload carries.
+//
+// Status outcomes:
+//   - already completed → returns the existing row, no ledger write.
+//   - already failed    → returns ErrAgentTopupAlreadyFailed; the webhook
+//     handler returns 200 since the event has been processed.
+//   - pending           → writes ledger, marks completed, returns updated row.
+//   - missing           → returns ErrAgentTopupNotFound.
+func CompleteStripeAgentTopup(ctx context.Context, pool *pgxpool.Pool, stripePaymentIntentID string) (AgentTopup, error) {
+	if strings.TrimSpace(stripePaymentIntentID) == "" {
+		return AgentTopup{}, fmt.Errorf("stripe payment intent ID must not be empty")
+	}
+
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		return AgentTopup{}, fmt.Errorf("begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	// Lock the topup row. The CREDIT direction guard is defensive — refund
+	// rows live under the same stripe_payment_intent_id but with DEBIT
+	// direction and aren't completable by this function.
+	row := tx.QueryRow(ctx,
+		`SELECT `+agentTopupColumns+`
+		 FROM agent_topups
+		 WHERE stripe_payment_intent_id = $1 AND direction = 'CREDIT'
+		 FOR UPDATE`,
+		stripePaymentIntentID,
+	)
+	t, err := scanAgentTopup(row)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return AgentTopup{}, ErrAgentTopupNotFound
+		}
+		return AgentTopup{}, fmt.Errorf("lock agent topup: %w", err)
+	}
+
+	switch t.Status {
+	case AgentTopupStatusCompleted:
+		if err := tx.Commit(ctx); err != nil {
+			return AgentTopup{}, fmt.Errorf("commit: %w", err)
+		}
+		return t, nil
+	case AgentTopupStatusFailed:
+		return AgentTopup{}, ErrAgentTopupAlreadyFailed
+	case AgentTopupStatusPending:
+		// fall through
+	default:
+		return AgentTopup{}, fmt.Errorf("unexpected agent topup status: %s", t.Status)
+	}
+
+	// Need the operator's organization_id to look up the per-org liability
+	// account. operator-row read is fine; CreateAgentOperator already ran for
+	// the org before any topup could be inserted.
+	var orgID string
+	err = tx.QueryRow(ctx,
+		`SELECT organization_id FROM agent_operators WHERE id = $1`,
+		t.AgentOperatorID,
+	).Scan(&orgID)
+	if err != nil {
+		return AgentTopup{}, fmt.Errorf("read operator org: %w", err)
+	}
+
+	// Make sure both per-operator credit accounts exist before we touch the
+	// ledger. CreateAgentOperator already runs this on operator creation; we
+	// repeat it here so a topup against a legacy operator (created before
+	// the agent-credits accounts were introduced) can self-heal.
+	_, paidAcct, err := getOrCreateAgentCreditsAccountsInTx(ctx, tx, orgID)
+	if err != nil {
+		return AgentTopup{}, fmt.Errorf("ensure agent credit accounts: %w", err)
+	}
+	stripeAcct, err := GetSystemAccount(ctx, tx, SystemAccountStripeClearing, USD)
+	if err != nil {
+		return AgentTopup{}, fmt.Errorf("lookup stripe clearing system account: %w", err)
+	}
+
+	// Ledger idempotency key derives from the topup PK — guarantees that
+	// two concurrent webhook deliveries for the same PI converge on the
+	// same transactions row even if the FOR UPDATE-on-the-topup somehow
+	// raced.
+	ledgerKey := "stripe-topup-" + t.ID
+	entries, err := insertTransactionInTx(ctx, tx, ledgerKey, []LedgerLine{
+		{Currency: USD, Amount: t.AmountCreditsMicrounits, Direction: Debit, AccountID: stripeAcct.ID},
+		{Currency: USD, Amount: t.AmountCreditsMicrounits, Direction: Credit, AccountID: paidAcct.ID},
+	})
+	if err != nil {
+		return AgentTopup{}, fmt.Errorf("write topup ledger entries: %w", err)
+	}
+	if len(entries) == 0 {
+		return AgentTopup{}, fmt.Errorf("topup ledger write returned no entries")
+	}
+
+	row = tx.QueryRow(ctx,
+		`UPDATE agent_topups
+		 SET status = 'completed', completed_at = NOW(), ledger_transaction_id = $2
+		 WHERE id = $1 AND status = 'pending'
+		 RETURNING `+agentTopupColumns,
+		t.ID, entries[0].TransactionID,
+	)
+	completed, err := scanAgentTopup(row)
+	if err != nil {
+		return AgentTopup{}, fmt.Errorf("mark agent topup completed: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return AgentTopup{}, fmt.Errorf("commit: %w", err)
+	}
+	return completed, nil
+}
+
 // ListAgentTopupsByOperator returns the operator's billing history (both
 // CREDIT topups and DEBIT refunds) in newest-first order, paginated by
 // created_at cursor. Mirrors the GetMerchantTransactionsPaginated pattern in

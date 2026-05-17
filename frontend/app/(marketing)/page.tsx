@@ -19,7 +19,7 @@ export default async function Home() {
             <div className="flex flex-col sm:flex-row items-stretch sm:items-start gap-4">
               {user ? (
                 <ArcadeButton
-                  href="/dashboard/api-keys"
+                  href="/dashboard"
                   glow
                   className="[&>span]:w-full sm:[&>span]:w-auto"
                 >

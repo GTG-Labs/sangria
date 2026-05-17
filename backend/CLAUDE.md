@@ -13,6 +13,22 @@ go vet ./...            # Static analysis
 
 No test suite exists yet. No linter is configured.
 
+## Local Stripe webhooks
+
+`POST /webhooks/stripe` is fed by Stripe's hosted infrastructure, which can't reach `localhost`. For any local test that touches the top-up flow (or any future Stripe-driven flow), a forwarder must be running:
+
+```bash
+stripe listen --forward-to localhost:8080/webhooks/stripe
+```
+
+Leave it running in a separate terminal tab. While it's up, Stripe events delivered to your test account get POSTed to the local backend. Without it, top-up payments will succeed on Stripe's side but the `agent_topups` ledger write never fires and the dashboard balance stays at $0 (no errors anywhere — just silent absence of `level=INFO msg="stripe agent topup completed"` in the backend log).
+
+**Whsec rotation:** every `stripe listen` invocation prints a fresh `whsec_…`. That value must equal `STRIPE_WEBHOOK_SECRET` in `backend/.env`. If you Ctrl+C the forwarder you'll need to refresh the env var and restart the backend. The least-friction workflow is to start `stripe listen` once at the start of the day and not touch it.
+
+**API version drift:** the webhook handler uses `webhook.ConstructEventWithOptions(..., IgnoreAPIVersionMismatch: true)`. Stripe accounts default to the newest API version (currently ahead of stripe-go v82's pinned version); the metadata + PI ID shape we depend on is stable across these versions. Re-evaluate if we start reading newer-version-only fields.
+
+For the per-developer setup walkthrough (Stripe account, test keys, CLI install, env vars), see `backend/README.md` § Local development with Stripe.
+
 ## Architecture
 
 Routes are organized by auth type in `routes/`:

@@ -19,6 +19,14 @@ make down         # Stop all services
 
 Requires Docker. Services: backend on `:8080`, frontend on `:3000`, mythos (admin) on `:3001`.
 
+**Local Stripe webhooks:** any flow touching top-ups (e.g. the agent dashboard's "Top Up" button) also needs the Stripe CLI forwarding events to localhost. In a separate terminal:
+
+```bash
+stripe listen --forward-to localhost:8080/webhooks/stripe
+```
+
+Without it, top-up payments succeed on Stripe but the dashboard balance silently stays at $0. Full setup (test-mode keys, CLI install, whsec rotation) lives in [backend/README.md § Local development with Stripe](backend/README.md#local-development-with-stripe).
+
 ---
 
 ## Quick Start

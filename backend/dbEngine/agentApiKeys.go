@@ -255,6 +255,61 @@ func ListAgentAPIKeysByOperator(ctx context.Context, pool *pgxpool.Pool, agentOp
 	return keys, nextCursor, nil
 }
 
+// UpdateAgentAPIKeyCapsParams holds the caps payload for
+// UpdateAgentAPIKeyCaps. All four values must be > 0 — the schema CHECK
+// constraints (chk_agent_api_keys_*_positive) reject zeros and negatives, and
+// "unlimited" is represented client-side as `math.MaxInt64`.
+type UpdateAgentAPIKeyCapsParams struct {
+	MaxPerCallMicrounits          int64
+	DailyCapMicrounits            int64
+	MonthlyCapMicrounits          int64
+	RequireConfirmAboveMicrounits int64
+}
+
+// UpdateAgentAPIKeyCaps updates the four per-key spend limits in a single
+// UPDATE that also enforces operator ownership. Returns the number of rows
+// affected — 0 means either the key doesn't exist, was revoked, or belongs
+// to a different operator. The WHERE clause is the TOCTOU-safe equivalent of
+// SELECT-then-UPDATE; mirrors the pattern in RevokeAgentAPIKey.
+func UpdateAgentAPIKeyCaps(ctx context.Context, pool *pgxpool.Pool, id, agentOperatorID string, caps UpdateAgentAPIKeyCapsParams) (int64, error) {
+	if strings.TrimSpace(id) == "" {
+		return 0, fmt.Errorf("id must not be empty")
+	}
+	if strings.TrimSpace(agentOperatorID) == "" {
+		return 0, fmt.Errorf("agent operator ID must not be empty")
+	}
+	if caps.MaxPerCallMicrounits <= 0 {
+		return 0, fmt.Errorf("max_per_call_microunits must be positive, got %d", caps.MaxPerCallMicrounits)
+	}
+	if caps.DailyCapMicrounits <= 0 {
+		return 0, fmt.Errorf("daily_cap_microunits must be positive, got %d", caps.DailyCapMicrounits)
+	}
+	if caps.MonthlyCapMicrounits <= 0 {
+		return 0, fmt.Errorf("monthly_cap_microunits must be positive, got %d", caps.MonthlyCapMicrounits)
+	}
+	if caps.RequireConfirmAboveMicrounits < 0 {
+		return 0, fmt.Errorf("require_confirm_above_microunits must be non-negative, got %d", caps.RequireConfirmAboveMicrounits)
+	}
+
+	result, err := pool.Exec(ctx,
+		`UPDATE agent_api_keys
+		 SET max_per_call_microunits = $3,
+		     daily_cap_microunits = $4,
+		     monthly_cap_microunits = $5,
+		     require_confirm_above_microunits = $6
+		 WHERE id = $1
+		   AND agent_operator_id = $2
+		   AND revoked_at IS NULL`,
+		id, agentOperatorID,
+		caps.MaxPerCallMicrounits, caps.DailyCapMicrounits,
+		caps.MonthlyCapMicrounits, caps.RequireConfirmAboveMicrounits,
+	)
+	if err != nil {
+		return 0, fmt.Errorf("update agent api key caps: %w", err)
+	}
+	return result.RowsAffected(), nil
+}
+
 // RevokeAgentAPIKey marks an agent API key as revoked (sets revoked_at = NOW)
 // in a single statement that also enforces the admin permission check, so the
 // authorization decision and the mutation cannot be split by a race (root
