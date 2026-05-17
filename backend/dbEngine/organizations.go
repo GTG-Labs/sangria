@@ -21,7 +21,15 @@ var (
 // Organization Management
 // ================================
 
-// CreateOrganization creates a new organization and adds the creator as an admin
+// CreateOrganization creates a new organization, adds the creator as an admin,
+// and creates the org's agent_operator. All three steps commit atomically —
+// an org always has its 1:1 agent_operator from the moment it exists.
+//
+// Trial-credit policy: user-created additional orgs (this path) get $0 trial.
+// Only the user's personal org (created via EnsurePersonalOrganizationTx)
+// receives the trial credit. This caps each WorkOS user to exactly one trial
+// across their org graph, eliminating the "create N orgs, harvest N trials"
+// abuse vector.
 func CreateOrganization(ctx context.Context, pool *pgxpool.Pool, creatorUserID, orgName string) (string, error) {
 	tx, err := pool.Begin(ctx)
 	if err != nil {
@@ -45,6 +53,13 @@ func CreateOrganization(ctx context.Context, pool *pgxpool.Pool, creatorUserID, 
 	err = AddUserToOrganizationTx(ctx, tx, creatorUserID, orgID, true)
 	if err != nil {
 		return "", fmt.Errorf("failed to add creator to organization: %w", err)
+	}
+
+	// Create the org's agent_operator atomically with the org + member inserts.
+	// trialAmount=0: only personal orgs get the trial; user-created additional
+	// orgs start at zero balance (see policy note in the docstring above).
+	if _, err = CreateAgentOperatorTx(ctx, tx, orgID, 0); err != nil {
+		return "", fmt.Errorf("failed to create agent operator for org: %w", err)
 	}
 
 	if err = tx.Commit(ctx); err != nil {

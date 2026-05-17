@@ -10,6 +10,15 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// DefaultTrialCreditMicrounits is the trial credit (in microunits) auto-granted
+// to a user's PERSONAL agent operator at signup. $1 USD == 1_000_000 microunits.
+// Only personal orgs (is_personal=true) receive this — user-created additional
+// orgs get an operator with $0 trial. Caps each WorkOS user to one trial
+// regardless of how many orgs they create. Hardcoded for V0/V1; promote to
+// env-var config when the agent platform has a real fee model and we want to
+// tune the trial as a growth lever.
+const DefaultTrialCreditMicrounits int64 = 1_000_000
+
 // agentOperatorColumns is the canonical SELECT / RETURNING column list for
 // agent_operators rows. Keeps the Scan() target order in sync everywhere.
 const agentOperatorColumns = `id, organization_id, trial_credit_microunits, stripe_customer_id, kyc_status, address, created_at`
@@ -50,19 +59,42 @@ func GetAgentOperatorByID(ctx context.Context, pool *pgxpool.Pool, operatorID st
 // topup row plus the matching ledger transaction. All steps commit together or
 // not at all. Idempotent on organization_id: a retry against an org that
 // already has an operator returns the existing row unchanged.
+//
+// Pool-owning entry point. Callers that need to compose operator creation
+// with other inserts inside an outer atomic envelope should call
+// CreateAgentOperatorTx directly with their existing tx.
 func CreateAgentOperator(ctx context.Context, pool *pgxpool.Pool, orgID string, trialAmount int64) (AgentOperator, error) {
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		return AgentOperator{}, fmt.Errorf("begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx) // safe no-op once Commit fires
+
+	op, err := CreateAgentOperatorTx(ctx, tx, orgID, trialAmount)
+	if err != nil {
+		return AgentOperator{}, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return AgentOperator{}, fmt.Errorf("commit: %w", err)
+	}
+	return op, nil
+}
+
+// CreateAgentOperatorTx is the in-tx core of CreateAgentOperator. Caller owns
+// the tx (begin/commit/rollback). Same idempotency guarantees: if an operator
+// already exists for the given orgID, returns the existing row without
+// re-creating accounts or re-granting trial credit. Used by signup flows
+// (EnsurePersonalOrganizationTx, dbengine.CreateOrganization) that need
+// operator creation to commit atomically with the surrounding org + member
+// inserts.
+func CreateAgentOperatorTx(ctx context.Context, tx pgx.Tx, orgID string, trialAmount int64) (AgentOperator, error) {
 	if strings.TrimSpace(orgID) == "" {
 		return AgentOperator{}, fmt.Errorf("organization ID must not be empty")
 	}
 	if trialAmount < 0 {
 		return AgentOperator{}, fmt.Errorf("trial amount must be non-negative, got %d", trialAmount)
 	}
-
-	tx, err := pool.Begin(ctx)
-	if err != nil {
-		return AgentOperator{}, fmt.Errorf("begin transaction: %w", err)
-	}
-	defer tx.Rollback(ctx) // safe no-op once Commit fires
 
 	// 1. Insert the operator row. The UNIQUE on organization_id serializes
 	//    concurrent creates; on conflict we return the existing row.
@@ -75,12 +107,10 @@ func CreateAgentOperator(ctx context.Context, pool *pgxpool.Pool, orgID string, 
 	)
 	op, err := scanAgentOperator(row)
 	if errors.Is(err, pgx.ErrNoRows) {
+		// Operator already exists — return it; do NOT re-grant trial.
 		existing, getErr := getAgentOperatorByOrgIDInTx(ctx, tx, orgID)
 		if getErr != nil {
 			return AgentOperator{}, fmt.Errorf("read existing operator after conflict: %w", getErr)
-		}
-		if err := tx.Commit(ctx); err != nil {
-			return AgentOperator{}, fmt.Errorf("commit: %w", err)
 		}
 		return existing, nil
 	}
@@ -101,9 +131,6 @@ func CreateAgentOperator(ctx context.Context, pool *pgxpool.Pool, orgID string, 
 		}
 	}
 
-	if err := tx.Commit(ctx); err != nil {
-		return AgentOperator{}, fmt.Errorf("commit: %w", err)
-	}
 	return op, nil
 }
 
