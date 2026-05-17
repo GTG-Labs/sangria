@@ -67,7 +67,7 @@ export default function ClientCardsContent() {
   }, [fetchAll]);
 
   const handleRevoke = useCallback(
-    async (keyId: string) => {
+    async (keyId: string): Promise<boolean> => {
       try {
         const res = await internalFetch(
           `/api/client/agent/keys/${encodeURIComponent(keyId)}`,
@@ -75,12 +75,14 @@ export default function ClientCardsContent() {
         );
         if (!res.ok) {
           setError("Failed to revoke key");
-          return;
+          return false;
         }
         await fetchAll();
+        return true;
       } catch (err) {
         const detail = err instanceof Error ? `: ${err.message}` : "";
         setError(`Failed to revoke key${detail}`);
+        return false;
       }
     },
     [fetchAll],

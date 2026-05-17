@@ -107,14 +107,10 @@ export default function ClientDashboardContent() {
     setError(null);
 
     try {
-      const [agentRes, txRes] = await Promise.all([
-        internalFetch("/api/client/agent", { signal: controller.signal }),
-        internalFetch("/api/client/transactions?limit=5", {
-          signal: controller.signal,
-        }),
-      ]);
+      const agentRes = await internalFetch("/api/client/agent", {
+        signal: controller.signal,
+      });
       if (controller.signal.aborted) return;
-
       if (!agentRes.ok) {
         setError("Failed to load agent data");
         return;
@@ -124,14 +120,26 @@ export default function ClientDashboardContent() {
       setAgent(agentData);
 
       // Transactions are optional — a brand-new operator hasn't paid anyone
-      // yet, so a 4xx on this endpoint shouldn't block the rest of the page.
-      if (txRes.ok) {
-        const txData = await txRes.json();
+      // yet, and a network failure on this endpoint must not take the rest
+      // of the page down. Fetch it independently with a local try/catch so
+      // a rejection here can't bubble up and clobber the agent data we
+      // already loaded successfully above.
+      try {
+        const txRes = await internalFetch("/api/client/transactions?limit=5", {
+          signal: controller.signal,
+        });
         if (controller.signal.aborted) return;
-        setTransactions(
-          ((txData.data ?? txData) as ClientTransaction[]).slice(0, 5),
-        );
-      } else {
+        if (txRes.ok) {
+          const txData = await txRes.json();
+          if (controller.signal.aborted) return;
+          setTransactions(
+            ((txData.data ?? txData) as ClientTransaction[]).slice(0, 5),
+          );
+        } else {
+          setTransactions([]);
+        }
+      } catch (err) {
+        if (err instanceof Error && err.name === "AbortError") return;
         setTransactions([]);
       }
       initialLoadedRef.current = true;
@@ -170,16 +178,23 @@ export default function ClientDashboardContent() {
   // call behind a confirm-on-second-click button, so we don't double-confirm
   // here — just call the backend, refresh, and close the modal.
   const handleRevoke = useCallback(
-    async (keyId: string) => {
-      const res = await internalFetch(
-        `/api/client/agent/keys/${encodeURIComponent(keyId)}`,
-        { method: "DELETE" },
-      );
-      if (!res.ok) {
-        setError("Failed to revoke key");
-        return;
+    async (keyId: string): Promise<boolean> => {
+      try {
+        const res = await internalFetch(
+          `/api/client/agent/keys/${encodeURIComponent(keyId)}`,
+          { method: "DELETE" },
+        );
+        if (!res.ok) {
+          setError("Failed to revoke key");
+          return false;
+        }
+        await fetchAll();
+        return true;
+      } catch (err) {
+        const detail = err instanceof Error ? `: ${err.message}` : "";
+        setError(`Failed to revoke key${detail}`);
+        return false;
       }
-      await fetchAll();
     },
     [fetchAll],
   );

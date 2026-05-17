@@ -27,7 +27,10 @@ interface CardSettingsModalProps {
   card: CardSettings | null; // null while no card selected
   onClose: () => void;
   onSaved: () => void; // parent refetches
-  onRevoke: (id: string) => Promise<void>;
+  // Returns true on success, false on failure. The modal uses this signal to
+  // stay open when revoke fails so the user can see the parent's error and
+  // either retry or dismiss manually.
+  onRevoke: (id: string) => Promise<boolean>;
 }
 
 // The backend stores "no limit" as math.MaxInt64 (the schema CHECKs reject
@@ -50,7 +53,7 @@ function CardSettingsContent({
   card: CardSettings;
   onClose: () => void;
   onSaved: () => void;
-  onRevoke: (id: string) => Promise<void>;
+  onRevoke: (id: string) => Promise<boolean>;
 }) {
   const [perCall, setPerCall] = useState(() =>
     isUnlimited(card.maxPerCallMicrounits)
@@ -153,8 +156,8 @@ function CardSettingsContent({
       setTimeout(() => setConfirmRevoke(false), 4000);
       return;
     }
-    await onRevoke(card.id);
-    onClose();
+    const success = await onRevoke(card.id);
+    if (success) onClose();
   };
 
   return (

@@ -1,5 +1,7 @@
 "use client";
 
+import { useId } from "react";
+
 interface LimitFieldProps {
   label: string;
   description: string;
@@ -25,12 +27,21 @@ export default function LimitField({
   onChange,
   onUnlimitedChange,
 }: LimitFieldProps) {
+  const inputId = useId();
+  const descriptionId = useId();
   return (
     <div className="flex flex-col gap-1.5 rounded-xl border border-zinc-200 bg-white p-4">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-sm font-medium text-gray-900">{label}</p>
-          <p className="mt-0.5 text-xs text-gray-400">{description}</p>
+          <label
+            htmlFor={inputId}
+            className="block text-sm font-medium text-gray-900"
+          >
+            {label}
+          </label>
+          <p id={descriptionId} className="mt-0.5 text-xs text-gray-400">
+            {description}
+          </p>
         </div>
         {allowUnlimited && (
           <label className="flex shrink-0 cursor-pointer items-center gap-2 text-xs text-gray-500">
@@ -49,6 +60,8 @@ export default function LimitField({
           $
         </span>
         <input
+          id={inputId}
+          aria-describedby={descriptionId}
           type="number"
           min="0.01"
           step="0.01"
